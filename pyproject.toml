@@ -1,0 +1,68 @@
+[tool.poetry]
+name = "asana-api-cli"
+version = "0.0.0"
+description = "Command-line wrapper around the official Asana Python SDK"
+authors = ["Masanao Izumo <asana@masanao.site>"]
+packages = [{include = "asana_api_cli", from = "src"}]
+
+[tool.poetry.scripts]
+asana-api = "asana_api_cli.cli:main"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+click = "^8.1"
+jq = "^1.8"
+tabulate = "^0.9"
+asana = "^5.2.4"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.15.5"
+
+[build-system]
+requires = ["poetry-core>=1.1.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["src/asana_api_cli/cli"]  # auto-generated (tools/codegen.py)
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "N", "B", "ISC", "G", "SIM", "Q"]
+ignore = ["SIM102"]
+unfixable = ["F401"]          # do not auto-fix unused imports
+
+[tool.ruff.lint.isort]
+sections.tests = ["tests", "tests.*"]
+section-order = [
+  "future",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "tests",
+  "local-folder"
+]
+
+[tool.vermin]
+target = "3.12"
+violations = true
+backport = [
+    "typing_extensions",
+    "typing",
+    "dataclasses",
+    "asyncio",
+    "argparse",
+    "enum",
+    "importlib",
+    "zoneinfo"
+]
+no_parse_comments = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ""
+disable_test_id_escaping_and_forfeit_all_rights_to_community_support = true
