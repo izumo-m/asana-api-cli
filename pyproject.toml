@@ -3,7 +3,7 @@ name = "asana-api-cli"
 version = "1.2.0"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
-readme = "docs/pypi.md"
+readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
