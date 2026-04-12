@@ -165,7 +165,7 @@ class TestGeneratedCli:
 
     def test_body_option_required(self, tasks_code: str) -> None:
         assert '@click.option("--body", required=True' in tasks_code
-        assert "parsed_body = json.loads(body)" in tasks_code
+        assert "parsed_body = resolve_body(body)" in tasks_code
 
     def test_paginate_flag_for_list_ops(self, tasks_code: str) -> None:
         assert '"--paginate"' in tasks_code

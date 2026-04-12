@@ -7,15 +7,47 @@ applying the global configuration passed in from the CLI.
 from __future__ import annotations
 
 import functools
+import json
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import asana
 from urllib3.util.retry import Retry
 
 DEFAULT_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
+
+
+def resolve_body(value: str) -> Any:
+    """Parse a body argument as JSON.
+
+    Supports three input forms:
+    - ``@path`` — read JSON from a file
+    - ``-``     — read JSON from stdin
+    - otherwise — parse the string itself as JSON
+    """
+    if value == "-":
+        raw = sys.stdin.read()
+    elif value.startswith("@"):
+        path = Path(value[1:])
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            print(f"Body file not found: {path}", file=sys.stderr)
+            sys.exit(1)
+        except OSError as exc:
+            print(f"Cannot read body file {path}: {exc}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        raw = value
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        print(f"Invalid JSON in body: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 @dataclass
