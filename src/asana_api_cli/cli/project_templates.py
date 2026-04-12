@@ -7,7 +7,7 @@ import click
 from asana import ProjectTemplatesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("project-templates")
@@ -16,40 +16,42 @@ def project_templates_group() -> None:
 
 
 @project_templates_group.command("delete-project-template")
-@click.argument("project_template_gid")
+@click.option("--project-template", required=True, help="Globally unique identifier for the project template. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_project_template(project_template_gid: str) -> Any:
+def delete_project_template(project_template: str) -> Any:
     """Delete a project template"""
     session = AsanaSession.from_env()
     api = ProjectTemplatesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_project_template(project_template_gid)
+    return api.delete_project_template(project_template)
 
 
 @project_templates_group.command("get-project-template")
-@click.argument("project_template_gid")
+@click.option("--project-template", required=True, help="Globally unique identifier for the project template.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_project_template(project_template_gid: str, opt_fields: str | None) -> Any:
+def get_project_template(project_template: str, opt_fields: str | None) -> Any:
     """Get a project template"""
     session = AsanaSession.from_env()
     api = ProjectTemplatesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_project_template(project_template_gid, opts)
+    return api.get_project_template(project_template, opts)
 
 
 @project_templates_group.command("get-project-templates")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--team", default=None, help="The team to filter projects on.")
-@click.option("--workspace", default=None, help="The workspace to filter results on.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_project_templates(limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_project_templates(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get multiple project templates"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectTemplatesApi(session.client)
     opts: dict[str, Any] = {}
@@ -61,19 +63,19 @@ def get_project_templates(limit: int | None, offset: str | None, opt_fields: str
         opts["opt_fields"] = opt_fields
     if team is not None:
         opts["team"] = team
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_project_templates(opts)
 
 
 @project_templates_group.command("get-project-templates-for-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_project_templates_for_team(team_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_project_templates_for_team(team: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get a team's project templates"""
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectTemplatesApi(session.client)
@@ -84,18 +86,18 @@ def get_project_templates_for_team(team_gid: str, limit: int | None, offset: str
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_project_templates_for_team(team_gid, opts)
+    return api.get_project_templates_for_team(team, opts)
 
 
 @project_templates_group.command("instantiate-project")
-@click.argument("project_template_gid")
+@click.option("--project-template", required=True, help="Globally unique identifier for the project template.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def instantiate_project(project_template_gid: str, opt_fields: str | None) -> Any:
+def instantiate_project(project_template: str, opt_fields: str | None) -> Any:
     """Instantiate a project from a project template"""
     session = AsanaSession.from_env()
     api = ProjectTemplatesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.instantiate_project(project_template_gid, opts)
+    return api.instantiate_project(project_template, opts)

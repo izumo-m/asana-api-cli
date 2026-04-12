@@ -7,7 +7,7 @@ import click
 from asana import MembershipsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("memberships")
@@ -26,25 +26,25 @@ def create_membership() -> Any:
 
 
 @memberships_group.command("delete-membership")
-@click.argument("membership_gid")
+@click.option("--membership", required=True, help="Globally unique identifier for the membership. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_membership(membership_gid: str) -> Any:
+def delete_membership(membership: str) -> Any:
     """Delete a membership"""
     session = AsanaSession.from_env()
     api = MembershipsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_membership(membership_gid)
+    return api.delete_membership(membership)
 
 
 @memberships_group.command("get-membership")
-@click.argument("membership_gid")
+@click.option("--membership", required=True, help="Globally unique identifier for the membership. If the method is called asynchronously, returns the request thread.")
 @formatted
-def get_membership(membership_gid: str) -> Any:
+def get_membership(membership: str) -> Any:
     """Get a membership"""
     session = AsanaSession.from_env()
     api = MembershipsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.get_membership(membership_gid)
+    return api.get_membership(membership)
 
 
 @memberships_group.command("get-memberships")
@@ -77,13 +77,13 @@ def get_memberships(limit: int | None, member: str | None, offset: str | None, o
 
 
 @memberships_group.command("update-membership")
-@click.argument("membership_gid")
+@click.option("--membership", required=True, help="Globally unique identifier for the membership. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The membership to update.")
 @formatted
-def update_membership(membership_gid: str, body: str) -> Any:
+def update_membership(membership: str, body: str) -> Any:
     """Update a membership"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = MembershipsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.update_membership(parsed_body, membership_gid)
+    return api.update_membership(parsed_body, membership)

@@ -1,4 +1,4 @@
-"""Tests for asana_api_cli.session — resolve_body helper."""
+"""Tests for asana_api_cli.session — resolve_body and resolve_workspace."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from asana_api_cli.session import resolve_body
+from asana_api_cli.session import (
+    DEFAULT_WORKSPACE_ENV,
+    resolve_body,
+    resolve_workspace,
+    runtime,
+)
 
 
 class TestResolveBodyInline:
@@ -52,3 +57,81 @@ class TestResolveBodyStdin:
         monkeypatch.setattr("sys.stdin", StringIO("not json"))
         with pytest.raises(SystemExit):
             resolve_body("-")
+
+
+# ---------------------------------------------------------------------------
+# resolve_workspace
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clean_workspace_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure each test starts with no workspace defaults set."""
+    monkeypatch.delenv(DEFAULT_WORKSPACE_ENV, raising=False)
+    monkeypatch.setattr(runtime, "default_workspace", None)
+
+
+class TestResolveWorkspaceExplicit:
+    """Explicit --workspace value always wins."""
+
+    def test_returns_explicit_value(self) -> None:
+        assert resolve_workspace("111") == "111"
+
+    def test_explicit_overrides_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        assert resolve_workspace("explicit_ws") == "explicit_ws"
+
+    def test_explicit_overrides_runtime(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "default_workspace", "runtime_ws")
+        assert resolve_workspace("explicit_ws") == "explicit_ws"
+
+
+class TestResolveWorkspaceEnvFallback:
+    """ASANA_DEFAULT_WORKSPACE env var is the second priority."""
+
+    def test_falls_back_to_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        assert resolve_workspace(None) == "env_ws"
+
+    def test_env_overrides_runtime(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        monkeypatch.setattr(runtime, "default_workspace", "runtime_ws")
+        assert resolve_workspace(None) == "env_ws"
+
+
+class TestResolveWorkspaceRuntimeFallback:
+    """--default-workspace (runtime.default_workspace) is the third priority."""
+
+    def test_falls_back_to_runtime(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "default_workspace", "runtime_ws")
+        assert resolve_workspace(None) == "runtime_ws"
+
+
+class TestResolveWorkspaceNoValue:
+    """No workspace available anywhere."""
+
+    def test_returns_none_when_optional(self) -> None:
+        assert resolve_workspace(None) is None
+
+    def test_exits_when_required(self) -> None:
+        with pytest.raises(SystemExit):
+            resolve_workspace(None, required=True)
+
+
+class TestResolveWorkspaceNoWorkspaceFlag:
+    """--no-workspace suppresses all fallbacks."""
+
+    def test_returns_none_ignoring_explicit(self) -> None:
+        assert resolve_workspace("111", no_workspace=True) is None
+
+    def test_returns_none_ignoring_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        assert resolve_workspace(None, no_workspace=True) is None
+
+    def test_returns_none_ignoring_runtime(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "default_workspace", "runtime_ws")
+        assert resolve_workspace(None, no_workspace=True) is None
+
+    def test_returns_none_even_when_required(self) -> None:
+        # --no-workspace wins over required=True
+        assert resolve_workspace(None, no_workspace=True, required=True) is None

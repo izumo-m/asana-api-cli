@@ -7,7 +7,7 @@ import click
 from asana import AuditLogAPIApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("audit-log-api")
@@ -16,7 +16,7 @@ def audit_log_api_group() -> None:
 
 
 @audit_log_api_group.command("get-audit-log-events")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--actor-gid", default=None, help="Filter to events triggered by the actor with this ID.")
 @click.option("--actor-type", default=None, help="Filter to events with an actor of this type. This only needs to be included if querying for actor types without an ID. If `actor_gid` is included, this should be excluded.")
 @click.option("--end-at", default=None, help="Filter to events created before this time (exclusive).")
@@ -27,8 +27,9 @@ def audit_log_api_group() -> None:
 @click.option("--start-at", default=None, help="Filter to events created after this time (inclusive).")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_audit_log_events(workspace_gid: str, actor_gid: str | None, actor_type: str | None, end_at: str | None, event_type: str | None, limit: int | None, offset: str | None, resource_gid: str | None, start_at: str | None, paginate: bool) -> Any:
+def get_audit_log_events(workspace: str | None, actor_gid: str | None, actor_type: str | None, end_at: str | None, event_type: str | None, limit: int | None, offset: str | None, resource_gid: str | None, start_at: str | None, paginate: bool) -> Any:
     """Get audit log events"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = AuditLogAPIApi(session.client)
     opts: dict[str, Any] = {}
@@ -48,4 +49,4 @@ def get_audit_log_events(workspace_gid: str, actor_gid: str | None, actor_type: 
         opts["resource_gid"] = resource_gid
     if start_at is not None:
         opts["start_at"] = start_at
-    return api.get_audit_log_events(workspace_gid, opts)
+    return api.get_audit_log_events(resolved_workspace, opts)

@@ -7,7 +7,7 @@ import click
 from asana import AttachmentsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("attachments")
@@ -47,32 +47,32 @@ def create_attachment_for_object(connect_to_app: bool | None, file: str | None, 
 
 
 @attachments_group.command("delete-attachment")
-@click.argument("attachment_gid")
+@click.option("--attachment", required=True, help="Globally unique identifier for the attachment. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_attachment(attachment_gid: str) -> Any:
+def delete_attachment(attachment: str) -> Any:
     """Delete an attachment"""
     session = AsanaSession.from_env()
     api = AttachmentsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_attachment(attachment_gid)
+    return api.delete_attachment(attachment)
 
 
 @attachments_group.command("get-attachment")
-@click.argument("attachment_gid")
+@click.option("--attachment", required=True, help="Globally unique identifier for the attachment.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_attachment(attachment_gid: str, opt_fields: str | None) -> Any:
+def get_attachment(attachment: str, opt_fields: str | None) -> Any:
     """Get an attachment"""
     session = AsanaSession.from_env()
     api = AttachmentsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_attachment(attachment_gid, opts)
+    return api.get_attachment(attachment, opts)
 
 
 @attachments_group.command("get-attachments-for-object")
-@click.argument("parent")
+@click.option("--parent", required=True, help="Globally unique identifier for object to fetch statuses from. Must be a GID for a `project`, `project_brief`, or `task`.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")

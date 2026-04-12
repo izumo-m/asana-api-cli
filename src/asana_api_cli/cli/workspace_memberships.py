@@ -7,7 +7,7 @@ import click
 from asana import WorkspaceMembershipsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("workspace-memberships")
@@ -16,27 +16,27 @@ def workspace_memberships_group() -> None:
 
 
 @workspace_memberships_group.command("get-workspace-membership")
-@click.argument("workspace_membership_gid")
+@click.option("--workspace-membership", required=True)
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_workspace_membership(workspace_membership_gid: str, opt_fields: str | None) -> Any:
+def get_workspace_membership(workspace_membership: str, opt_fields: str | None) -> Any:
     """Get a workspace membership"""
     session = AsanaSession.from_env()
     api = WorkspaceMembershipsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_workspace_membership(workspace_membership_gid, opts)
+    return api.get_workspace_membership(workspace_membership, opts)
 
 
 @workspace_memberships_group.command("get-workspace-memberships-for-user")
-@click.argument("user_gid")
+@click.option("--user", required=True, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_workspace_memberships_for_user(user_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_workspace_memberships_for_user(user: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get workspace memberships for a user"""
     session = AsanaSession.from_env(paginate=paginate)
     api = WorkspaceMembershipsApi(session.client)
@@ -47,19 +47,20 @@ def get_workspace_memberships_for_user(user_gid: str, limit: int | None, offset:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_workspace_memberships_for_user(user_gid, opts)
+    return api.get_workspace_memberships_for_user(user, opts)
 
 
 @workspace_memberships_group.command("get-workspace-memberships-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--user", default=None, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_workspace_memberships_for_workspace(workspace_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, user: str | None, paginate: bool) -> Any:
+def get_workspace_memberships_for_workspace(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, user: str | None, paginate: bool) -> Any:
     """Get the workspace memberships for a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = WorkspaceMembershipsApi(session.client)
     opts: dict[str, Any] = {}
@@ -71,4 +72,4 @@ def get_workspace_memberships_for_workspace(workspace_gid: str, limit: int | Non
         opts["opt_fields"] = opt_fields
     if user is not None:
         opts["user"] = user
-    return api.get_workspace_memberships_for_workspace(workspace_gid, opts)
+    return api.get_workspace_memberships_for_workspace(resolved_workspace, opts)

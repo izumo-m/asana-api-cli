@@ -16,6 +16,7 @@ from asana_api_cli.formatter import (
     _to_rows,
     formatted,
 )
+from asana_api_cli.session import runtime
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +218,101 @@ class TestHandleApiException:
         with pytest.raises(SystemExit):
             _handle_api_exception(self._make_exception(reason="Oops", body="not json"))
         assert "Oops" in capsys.readouterr().err
+
+
+class TestHandleNonJsonResponse:
+    """Tests for non-JSON error responses (HTML, XML, plain text, etc.)."""
+
+    def _make_exception(
+        self,
+        status: int = 502,
+        body: str | bytes | None = None,
+        reason: str = "Bad Gateway",
+    ) -> ApiException:
+        exc = ApiException(status=status, reason=reason)
+        exc.body = body  # type: ignore[assignment]
+        return exc
+
+    def test_html_body_shows_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
+        html = "<html><body><h1>502 Bad Gateway</h1></body></html>"
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(body=html))
+        err = capsys.readouterr().err
+        assert "non-JSON response" in err
+        assert "--debug" in err
+        # Raw body should NOT appear without debug mode
+        assert html not in err
+
+    def test_xml_body_shows_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
+        xml = '<?xml version="1.0"?><Error><Message>fail</Message></Error>'
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(status=500, body=xml))
+        err = capsys.readouterr().err
+        assert "non-JSON response" in err
+
+    def test_plain_text_body_shows_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(body="upstream connect error"))
+        err = capsys.readouterr().err
+        assert "non-JSON response" in err
+
+    def test_debug_dumps_raw_body(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(runtime, "debug", True)
+        html = "<html><body><h1>502 Bad Gateway</h1></body></html>"
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(body=html))
+        err = capsys.readouterr().err
+        assert "--- raw response body ---" in err
+        assert html in err
+        assert "--- end of response body ---" in err
+        monkeypatch.setattr(runtime, "debug", False)
+
+    def test_debug_off_hides_raw_body(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(runtime, "debug", False)
+        html = "<html><body>error</body></html>"
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(body=html))
+        err = capsys.readouterr().err
+        assert "--- raw response body ---" not in err
+        assert "<html>" not in err
+
+    def test_json_body_does_not_trigger_hint(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        body = json.dumps({"errors": [{"message": "not found"}]})
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(status=404, body=body))
+        err = capsys.readouterr().err
+        assert "non-JSON response" not in err
+
+    def test_empty_body_does_not_trigger_hint(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(body=""))
+        err = capsys.readouterr().err
+        assert "non-JSON response" not in err
+
+    def test_none_body_does_not_trigger_hint(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(body=None))
+        err = capsys.readouterr().err
+        assert "non-JSON response" not in err
+
+    def test_bytes_html_body(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        html_bytes = b"<html><body>nginx error</body></html>"
+        with pytest.raises(SystemExit):
+            _handle_api_exception(self._make_exception(body=html_bytes))
+        err = capsys.readouterr().err
+        assert "non-JSON response" in err
 
 
 # ---------------------------------------------------------------------------

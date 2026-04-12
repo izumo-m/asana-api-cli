@@ -7,7 +7,7 @@ import click
 from asana import TypeaheadApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("typeahead")
@@ -16,15 +16,16 @@ def typeahead_group() -> None:
 
 
 @typeahead_group.command("typeahead-for-workspace")
-@click.argument("workspace_gid")
-@click.argument("resource_type")
+@click.option("--resource-type", required=True, help="The type of values the typeahead should return. You can choose from one of the following: `custom_field`, `goal`, `project`, `project_template`, `portfolio`, `tag`, `task`, `team`, and `user`. Note...")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--count", type=int, default=None, help="The number of results to return. The default is 20 if this parameter is omitted, with a minimum of 1 and a maximum of 100. If there are fewer results found than requested, all will be returned.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--query", default=None, help="The string that will be used to search for relevant objects. If an empty string is passed in, the API will return results.")
 @click.option("--type", default=None, help="*Deprecated: new integrations should prefer the resource_type field.*")
 @formatted
-def typeahead_for_workspace(workspace_gid: str, resource_type: str, count: int | None, opt_fields: str | None, query: str | None, type: str | None) -> Any:
+def typeahead_for_workspace(resource_type: str, workspace: str | None, count: int | None, opt_fields: str | None, query: str | None, type: str | None) -> Any:
     """Get objects via typeahead"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = TypeaheadApi(session.client)
     opts: dict[str, Any] = {}
@@ -36,4 +37,4 @@ def typeahead_for_workspace(workspace_gid: str, resource_type: str, count: int |
         opts["query"] = query
     if type is not None:
         opts["type"] = type
-    return api.typeahead_for_workspace(workspace_gid, resource_type, opts)
+    return api.typeahead_for_workspace(resolved_workspace, resource_type, opts)

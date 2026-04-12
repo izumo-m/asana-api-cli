@@ -7,7 +7,7 @@ import click
 from asana import BudgetsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("budgets")
@@ -28,32 +28,32 @@ def create_budget(body: str) -> Any:
 
 
 @budgets_group.command("delete-budget")
-@click.argument("budget_gid")
+@click.option("--budget", required=True, help="Globally unique identifier for the budget. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_budget(budget_gid: str) -> Any:
+def delete_budget(budget: str) -> Any:
     """Delete a budget"""
     session = AsanaSession.from_env()
     api = BudgetsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_budget(budget_gid)
+    return api.delete_budget(budget)
 
 
 @budgets_group.command("get-budget")
-@click.argument("budget_gid")
+@click.option("--budget", required=True, help="Globally unique identifier for the budget.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_budget(budget_gid: str, opt_fields: str | None) -> Any:
+def get_budget(budget: str, opt_fields: str | None) -> Any:
     """Get a budget"""
     session = AsanaSession.from_env()
     api = BudgetsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_budget(budget_gid, opts)
+    return api.get_budget(budget, opts)
 
 
 @budgets_group.command("get-budgets")
-@click.argument("parent")
+@click.option("--parent", required=True, help="Globally unique identifier for the budget's parent object. This currently can only be a `project`. If the method is called asynchronously, returns the request thread.")
 @formatted
 def get_budgets(parent: str) -> Any:
     """Get all budgets"""
@@ -64,11 +64,11 @@ def get_budgets(parent: str) -> Any:
 
 
 @budgets_group.command("update-budget")
-@click.argument("budget_gid")
+@click.option("--budget", required=True, help="Globally unique identifier for the budget.")
 @click.option("--body", required=True, help="The budget to update.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_budget(budget_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_budget(budget: str, body: str, opt_fields: str | None) -> Any:
     """Update a budget"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -76,4 +76,4 @@ def update_budget(budget_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_budget(parsed_body, budget_gid, opts)
+    return api.update_budget(parsed_body, budget, opts)

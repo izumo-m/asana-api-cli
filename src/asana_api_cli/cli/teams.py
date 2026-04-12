@@ -7,7 +7,7 @@ import click
 from asana import TeamsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("teams")
@@ -16,11 +16,11 @@ def teams_group() -> None:
 
 
 @teams_group.command("add-user-for-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--body", required=True, help="The user to add to the team.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_user_for_team(team_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_user_for_team(team: str, body: str, opt_fields: str | None) -> Any:
     """Add a user to a team"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -28,7 +28,7 @@ def add_user_for_team(team_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_user_for_team(parsed_body, team_gid, opts)
+    return api.add_user_for_team(parsed_body, team, opts)
 
 
 @teams_group.command("create-team")
@@ -47,28 +47,28 @@ def create_team(body: str, opt_fields: str | None) -> Any:
 
 
 @teams_group.command("get-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_team(team_gid: str, opt_fields: str | None) -> Any:
+def get_team(team: str, opt_fields: str | None) -> Any:
     """Get a team"""
     session = AsanaSession.from_env()
     api = TeamsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_team(team_gid, opts)
+    return api.get_team(team, opts)
 
 
 @teams_group.command("get-teams-for-user")
-@click.argument("user_gid")
-@click.argument("organization")
+@click.option("--user", required=True, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
+@click.option("--organization", required=True, help="The workspace or organization to filter teams on.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_teams_for_user(user_gid: str, organization: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_teams_for_user(user: str, organization: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get teams for a user"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TeamsApi(session.client)
@@ -79,18 +79,19 @@ def get_teams_for_user(user_gid: str, organization: str, limit: int | None, offs
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_teams_for_user(user_gid, organization, opts)
+    return api.get_teams_for_user(user, organization, opts)
 
 
 @teams_group.command("get-teams-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_teams_for_workspace(workspace_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_teams_for_workspace(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get teams in a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = TeamsApi(session.client)
     opts: dict[str, Any] = {}
@@ -100,28 +101,28 @@ def get_teams_for_workspace(workspace_gid: str, limit: int | None, offset: str |
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_teams_for_workspace(workspace_gid, opts)
+    return api.get_teams_for_workspace(resolved_workspace, opts)
 
 
 @teams_group.command("remove-user-for-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The user to remove from the team.")
 @formatted
-def remove_user_for_team(team_gid: str, body: str) -> Any:
+def remove_user_for_team(team: str, body: str) -> Any:
     """Remove a user from a team"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TeamsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_user_for_team(parsed_body, team_gid)
+    return api.remove_user_for_team(parsed_body, team)
 
 
 @teams_group.command("update-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--body", required=True, help="The team to update.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_team(team_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_team(team: str, body: str, opt_fields: str | None) -> Any:
     """Update a team"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -129,4 +130,4 @@ def update_team(team_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_team(parsed_body, team_gid, opts)
+    return api.update_team(parsed_body, team, opts)

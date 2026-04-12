@@ -7,7 +7,7 @@ import click
 from asana import UserTaskListsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("user-task-lists")
@@ -16,29 +16,30 @@ def user_task_lists_group() -> None:
 
 
 @user_task_lists_group.command("get-user-task-list")
-@click.argument("user_task_list_gid")
+@click.option("--user-task-list", required=True, help="Globally unique identifier for the user task list.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_user_task_list(user_task_list_gid: str, opt_fields: str | None) -> Any:
+def get_user_task_list(user_task_list: str, opt_fields: str | None) -> Any:
     """Get a user task list"""
     session = AsanaSession.from_env()
     api = UserTaskListsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_user_task_list(user_task_list_gid, opts)
+    return api.get_user_task_list(user_task_list, opts)
 
 
 @user_task_lists_group.command("get-user-task-list-for-user")
-@click.argument("user_gid")
-@click.argument("workspace")
+@click.option("--user", required=True, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_user_task_list_for_user(user_gid: str, workspace: str, opt_fields: str | None) -> Any:
+def get_user_task_list_for_user(user: str, workspace: str | None, opt_fields: str | None) -> Any:
     """Get a user's task list"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = UserTaskListsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_user_task_list_for_user(user_gid, workspace, opts)
+    return api.get_user_task_list_for_user(user, resolved_workspace, opts)

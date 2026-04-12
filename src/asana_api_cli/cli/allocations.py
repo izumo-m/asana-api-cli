@@ -7,7 +7,7 @@ import click
 from asana import AllocationsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("allocations")
@@ -31,41 +31,43 @@ def create_allocation(body: str, opt_fields: str | None) -> Any:
 
 
 @allocations_group.command("delete-allocation")
-@click.argument("allocation_gid")
+@click.option("--allocation", required=True, help="Globally unique identifier for the allocation. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_allocation(allocation_gid: str) -> Any:
+def delete_allocation(allocation: str) -> Any:
     """Delete an allocation"""
     session = AsanaSession.from_env()
     api = AllocationsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_allocation(allocation_gid)
+    return api.delete_allocation(allocation)
 
 
 @allocations_group.command("get-allocation")
-@click.argument("allocation_gid")
+@click.option("--allocation", required=True, help="Globally unique identifier for the allocation.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_allocation(allocation_gid: str, opt_fields: str | None) -> Any:
+def get_allocation(allocation: str, opt_fields: str | None) -> Any:
     """Get an allocation"""
     session = AsanaSession.from_env()
     api = AllocationsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_allocation(allocation_gid, opts)
+    return api.get_allocation(allocation, opts)
 
 
 @allocations_group.command("get-allocations")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--assignee", default=None, help="Globally unique identifier for the user or placeholder the allocation is assigned to.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--parent", default=None, help="Globally unique identifier for the project to filter allocations by.")
-@click.option("--workspace", default=None, help="Globally unique identifier for the workspace.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_allocations(assignee: str | None, limit: int | None, offset: str | None, opt_fields: str | None, parent: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_allocations(workspace: str | None, assignee: str | None, limit: int | None, offset: str | None, opt_fields: str | None, parent: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get multiple allocations"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = AllocationsApi(session.client)
     opts: dict[str, Any] = {}
@@ -79,17 +81,17 @@ def get_allocations(assignee: str | None, limit: int | None, offset: str | None,
         opts["opt_fields"] = opt_fields
     if parent is not None:
         opts["parent"] = parent
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_allocations(opts)
 
 
 @allocations_group.command("update-allocation")
-@click.argument("allocation_gid")
+@click.option("--allocation", required=True, help="Globally unique identifier for the allocation.")
 @click.option("--body", required=True, help="The updated fields for the allocation.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_allocation(allocation_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_allocation(allocation: str, body: str, opt_fields: str | None) -> Any:
     """Update an allocation"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -97,4 +99,4 @@ def update_allocation(allocation_gid: str, body: str, opt_fields: str | None) ->
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_allocation(parsed_body, allocation_gid, opts)
+    return api.update_allocation(parsed_body, allocation, opts)

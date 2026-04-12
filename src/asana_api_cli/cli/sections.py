@@ -7,7 +7,7 @@ import click
 from asana import SectionsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("sections")
@@ -16,63 +16,63 @@ def sections_group() -> None:
 
 
 @sections_group.command("add-task-for-section")
-@click.argument("section_gid")
+@click.option("--section", required=True, help="The globally unique identifier for the section.")
 @formatted
-def add_task_for_section(section_gid: str) -> Any:
+def add_task_for_section(section: str) -> Any:
     """Add task to section"""
     session = AsanaSession.from_env()
     api = SectionsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_task_for_section(section_gid, opts)
+    return api.add_task_for_section(section, opts)
 
 
 @sections_group.command("create-section-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_section_for_project(project_gid: str, opt_fields: str | None) -> Any:
+def create_section_for_project(project: str, opt_fields: str | None) -> Any:
     """Create a section in a project"""
     session = AsanaSession.from_env()
     api = SectionsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_section_for_project(project_gid, opts)
+    return api.create_section_for_project(project, opts)
 
 
 @sections_group.command("delete-section")
-@click.argument("section_gid")
+@click.option("--section", required=True, help="The globally unique identifier for the section. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_section(section_gid: str) -> Any:
+def delete_section(section: str) -> Any:
     """Delete a section"""
     session = AsanaSession.from_env()
     api = SectionsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_section(section_gid)
+    return api.delete_section(section)
 
 
 @sections_group.command("get-section")
-@click.argument("section_gid")
+@click.option("--section", required=True, help="The globally unique identifier for the section.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_section(section_gid: str, opt_fields: str | None) -> Any:
+def get_section(section: str, opt_fields: str | None) -> Any:
     """Get a section"""
     session = AsanaSession.from_env()
     api = SectionsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_section(section_gid, opts)
+    return api.get_section(section, opts)
 
 
 @sections_group.command("get-sections-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_sections_for_project(project_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_sections_for_project(project: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get sections in a project"""
     session = AsanaSession.from_env(paginate=paginate)
     api = SectionsApi(session.client)
@@ -83,29 +83,29 @@ def get_sections_for_project(project_gid: str, limit: int | None, offset: str | 
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_sections_for_project(project_gid, opts)
+    return api.get_sections_for_project(project, opts)
 
 
 @sections_group.command("insert-section-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @formatted
-def insert_section_for_project(project_gid: str) -> Any:
+def insert_section_for_project(project: str) -> Any:
     """Move or Insert sections"""
     session = AsanaSession.from_env()
     api = SectionsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.insert_section_for_project(project_gid, opts)
+    return api.insert_section_for_project(project, opts)
 
 
 @sections_group.command("update-section")
-@click.argument("section_gid")
+@click.option("--section", required=True, help="The globally unique identifier for the section.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_section(section_gid: str, opt_fields: str | None) -> Any:
+def update_section(section: str, opt_fields: str | None) -> Any:
     """Update a section"""
     session = AsanaSession.from_env()
     api = SectionsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_section(section_gid, opts)
+    return api.update_section(section, opts)

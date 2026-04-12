@@ -7,7 +7,7 @@ import click
 from asana import ProjectBriefsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("project-briefs")
@@ -16,11 +16,11 @@ def project_briefs_group() -> None:
 
 
 @project_briefs_group.command("create-project-brief")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="The project brief to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_project_brief(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_project_brief(project: str, body: str, opt_fields: str | None) -> Any:
     """Create a project brief"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -28,40 +28,40 @@ def create_project_brief(project_gid: str, body: str, opt_fields: str | None) ->
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_project_brief(parsed_body, project_gid, opts)
+    return api.create_project_brief(parsed_body, project, opts)
 
 
 @project_briefs_group.command("delete-project-brief")
-@click.argument("project_brief_gid")
+@click.option("--project-brief", required=True, help="Globally unique identifier for the project brief. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_project_brief(project_brief_gid: str) -> Any:
+def delete_project_brief(project_brief: str) -> Any:
     """Delete a project brief"""
     session = AsanaSession.from_env()
     api = ProjectBriefsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_project_brief(project_brief_gid)
+    return api.delete_project_brief(project_brief)
 
 
 @project_briefs_group.command("get-project-brief")
-@click.argument("project_brief_gid")
+@click.option("--project-brief", required=True, help="Globally unique identifier for the project brief.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_project_brief(project_brief_gid: str, opt_fields: str | None) -> Any:
+def get_project_brief(project_brief: str, opt_fields: str | None) -> Any:
     """Get a project brief"""
     session = AsanaSession.from_env()
     api = ProjectBriefsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_project_brief(project_brief_gid, opts)
+    return api.get_project_brief(project_brief, opts)
 
 
 @project_briefs_group.command("update-project-brief")
-@click.argument("project_brief_gid")
+@click.option("--project-brief", required=True, help="Globally unique identifier for the project brief.")
 @click.option("--body", required=True, help="The updated fields for the project brief.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_project_brief(project_brief_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_project_brief(project_brief: str, body: str, opt_fields: str | None) -> Any:
     """Update a project brief"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -69,4 +69,4 @@ def update_project_brief(project_brief_gid: str, body: str, opt_fields: str | No
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_project_brief(parsed_body, project_brief_gid, opts)
+    return api.update_project_brief(parsed_body, project_brief, opts)

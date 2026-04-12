@@ -7,7 +7,7 @@ import click
 from asana import TaskTemplatesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("task-templates")
@@ -16,28 +16,28 @@ def task_templates_group() -> None:
 
 
 @task_templates_group.command("delete-task-template")
-@click.argument("task_template_gid")
+@click.option("--task-template", required=True, help="Globally unique identifier for the task template. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_task_template(task_template_gid: str) -> Any:
+def delete_task_template(task_template: str) -> Any:
     """Delete a task template"""
     session = AsanaSession.from_env()
     api = TaskTemplatesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_task_template(task_template_gid)
+    return api.delete_task_template(task_template)
 
 
 @task_templates_group.command("get-task-template")
-@click.argument("task_template_gid")
+@click.option("--task-template", required=True, help="Globally unique identifier for the task template.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_task_template(task_template_gid: str, opt_fields: str | None) -> Any:
+def get_task_template(task_template: str, opt_fields: str | None) -> Any:
     """Get a task template"""
     session = AsanaSession.from_env()
     api = TaskTemplatesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_task_template(task_template_gid, opts)
+    return api.get_task_template(task_template, opts)
 
 
 @task_templates_group.command("get-task-templates")
@@ -64,14 +64,14 @@ def get_task_templates(limit: int | None, offset: str | None, opt_fields: str | 
 
 
 @task_templates_group.command("instantiate-task")
-@click.argument("task_template_gid")
+@click.option("--task-template", required=True, help="Globally unique identifier for the task template.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def instantiate_task(task_template_gid: str, opt_fields: str | None) -> Any:
+def instantiate_task(task_template: str, opt_fields: str | None) -> Any:
     """Instantiate a task from a task template"""
     session = AsanaSession.from_env()
     api = TaskTemplatesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.instantiate_task(task_template_gid, opts)
+    return api.instantiate_task(task_template, opts)

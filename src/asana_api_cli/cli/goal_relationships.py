@@ -7,7 +7,7 @@ import click
 from asana import GoalRelationshipsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("goal-relationships")
@@ -16,11 +16,11 @@ def goal_relationships_group() -> None:
 
 
 @goal_relationships_group.command("add-supporting-relationship")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--body", required=True, help="The supporting resource to be added to the goal")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_supporting_relationship(goal_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_supporting_relationship(goal: str, body: str, opt_fields: str | None) -> Any:
     """Add a supporting goal relationship"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -28,25 +28,25 @@ def add_supporting_relationship(goal_gid: str, body: str, opt_fields: str | None
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_supporting_relationship(parsed_body, goal_gid, opts)
+    return api.add_supporting_relationship(parsed_body, goal, opts)
 
 
 @goal_relationships_group.command("get-goal-relationship")
-@click.argument("goal_relationship_gid")
+@click.option("--goal-relationship", required=True, help="Globally unique identifier for the goal relationship.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_goal_relationship(goal_relationship_gid: str, opt_fields: str | None) -> Any:
+def get_goal_relationship(goal_relationship: str, opt_fields: str | None) -> Any:
     """Get a goal relationship"""
     session = AsanaSession.from_env()
     api = GoalRelationshipsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_goal_relationship(goal_relationship_gid, opts)
+    return api.get_goal_relationship(goal_relationship, opts)
 
 
 @goal_relationships_group.command("get-goal-relationships")
-@click.argument("supported_goal")
+@click.option("--supported-goal", required=True, help="Globally unique identifier for the supported goal in the goal relationship.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
@@ -70,24 +70,24 @@ def get_goal_relationships(supported_goal: str, limit: int | None, offset: str |
 
 
 @goal_relationships_group.command("remove-supporting-relationship")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The supporting resource to be removed from the goal")
 @formatted
-def remove_supporting_relationship(goal_gid: str, body: str) -> Any:
+def remove_supporting_relationship(goal: str, body: str) -> Any:
     """Removes a supporting goal relationship"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = GoalRelationshipsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_supporting_relationship(parsed_body, goal_gid)
+    return api.remove_supporting_relationship(parsed_body, goal)
 
 
 @goal_relationships_group.command("update-goal-relationship")
-@click.argument("goal_relationship_gid")
+@click.option("--goal-relationship", required=True, help="Globally unique identifier for the goal relationship.")
 @click.option("--body", required=True, help="The updated fields for the goal relationship.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_goal_relationship(goal_relationship_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_goal_relationship(goal_relationship: str, body: str, opt_fields: str | None) -> Any:
     """Update a goal relationship"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -95,4 +95,4 @@ def update_goal_relationship(goal_relationship_gid: str, body: str, opt_fields: 
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_goal_relationship(parsed_body, goal_relationship_gid, opts)
+    return api.update_goal_relationship(parsed_body, goal_relationship, opts)

@@ -7,7 +7,7 @@ import click
 from asana import CustomFieldsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("custom-fields")
@@ -31,53 +31,54 @@ def create_custom_field(body: str, opt_fields: str | None) -> Any:
 
 
 @custom_fields_group.command("create-enum-option-for-custom-field")
-@click.argument("custom_field_gid")
+@click.option("--custom-field", required=True, help="Globally unique identifier for the custom field.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_enum_option_for_custom_field(custom_field_gid: str, opt_fields: str | None) -> Any:
+def create_enum_option_for_custom_field(custom_field: str, opt_fields: str | None) -> Any:
     """Create an enum option"""
     session = AsanaSession.from_env()
     api = CustomFieldsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_enum_option_for_custom_field(custom_field_gid, opts)
+    return api.create_enum_option_for_custom_field(custom_field, opts)
 
 
 @custom_fields_group.command("delete-custom-field")
-@click.argument("custom_field_gid")
+@click.option("--custom-field", required=True, help="Globally unique identifier for the custom field. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_custom_field(custom_field_gid: str) -> Any:
+def delete_custom_field(custom_field: str) -> Any:
     """Delete a custom field"""
     session = AsanaSession.from_env()
     api = CustomFieldsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_custom_field(custom_field_gid)
+    return api.delete_custom_field(custom_field)
 
 
 @custom_fields_group.command("get-custom-field")
-@click.argument("custom_field_gid")
+@click.option("--custom-field", required=True, help="Globally unique identifier for the custom field.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_custom_field(custom_field_gid: str, opt_fields: str | None) -> Any:
+def get_custom_field(custom_field: str, opt_fields: str | None) -> Any:
     """Get a custom field"""
     session = AsanaSession.from_env()
     api = CustomFieldsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_custom_field(custom_field_gid, opts)
+    return api.get_custom_field(custom_field, opts)
 
 
 @custom_fields_group.command("get-custom-fields-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_custom_fields_for_workspace(workspace_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_custom_fields_for_workspace(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get a workspace's custom fields"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = CustomFieldsApi(session.client)
     opts: dict[str, Any] = {}
@@ -87,46 +88,46 @@ def get_custom_fields_for_workspace(workspace_gid: str, limit: int | None, offse
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_custom_fields_for_workspace(workspace_gid, opts)
+    return api.get_custom_fields_for_workspace(resolved_workspace, opts)
 
 
 @custom_fields_group.command("insert-enum-option-for-custom-field")
-@click.argument("custom_field_gid")
+@click.option("--custom-field", required=True, help="Globally unique identifier for the custom field.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def insert_enum_option_for_custom_field(custom_field_gid: str, opt_fields: str | None) -> Any:
+def insert_enum_option_for_custom_field(custom_field: str, opt_fields: str | None) -> Any:
     """Reorder a custom field's enum"""
     session = AsanaSession.from_env()
     api = CustomFieldsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.insert_enum_option_for_custom_field(custom_field_gid, opts)
+    return api.insert_enum_option_for_custom_field(custom_field, opts)
 
 
 @custom_fields_group.command("update-custom-field")
-@click.argument("custom_field_gid")
+@click.option("--custom-field", required=True, help="Globally unique identifier for the custom field.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_custom_field(custom_field_gid: str, opt_fields: str | None) -> Any:
+def update_custom_field(custom_field: str, opt_fields: str | None) -> Any:
     """Update a custom field"""
     session = AsanaSession.from_env()
     api = CustomFieldsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_custom_field(custom_field_gid, opts)
+    return api.update_custom_field(custom_field, opts)
 
 
 @custom_fields_group.command("update-enum-option")
-@click.argument("enum_option_gid")
+@click.option("--enum-option", required=True, help="Globally unique identifier for the enum option.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_enum_option(enum_option_gid: str, opt_fields: str | None) -> Any:
+def update_enum_option(enum_option: str, opt_fields: str | None) -> Any:
     """Update an enum option"""
     session = AsanaSession.from_env()
     api = CustomFieldsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_enum_option(enum_option_gid, opts)
+    return api.update_enum_option(enum_option, opts)

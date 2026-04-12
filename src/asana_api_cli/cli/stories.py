@@ -7,7 +7,7 @@ import click
 from asana import StoriesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("stories")
@@ -16,11 +16,11 @@ def stories_group() -> None:
 
 
 @stories_group.command("create-story-for-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--body", required=True, help="The story to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_story_for_goal(goal_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_story_for_goal(goal: str, body: str, opt_fields: str | None) -> Any:
     """Create a story on a goal"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -28,15 +28,15 @@ def create_story_for_goal(goal_gid: str, body: str, opt_fields: str | None) -> A
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_story_for_goal(parsed_body, goal_gid, opts)
+    return api.create_story_for_goal(parsed_body, goal, opts)
 
 
 @stories_group.command("create-story-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--body", required=True, help="The story to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_story_for_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_story_for_task(task: str, body: str, opt_fields: str | None) -> Any:
     """Create a story on a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -44,28 +44,28 @@ def create_story_for_task(task_gid: str, body: str, opt_fields: str | None) -> A
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_story_for_task(parsed_body, task_gid, opts)
+    return api.create_story_for_task(parsed_body, task, opts)
 
 
 @stories_group.command("delete-story")
-@click.argument("story_gid")
+@click.option("--story", required=True, help="Globally unique identifier for the story. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_story(story_gid: str) -> Any:
+def delete_story(story: str) -> Any:
     """Delete a story"""
     session = AsanaSession.from_env()
     api = StoriesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_story(story_gid)
+    return api.delete_story(story)
 
 
 @stories_group.command("get-stories-for-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_stories_for_goal(goal_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_stories_for_goal(goal: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get stories from a goal"""
     session = AsanaSession.from_env(paginate=paginate)
     api = StoriesApi(session.client)
@@ -76,17 +76,17 @@ def get_stories_for_goal(goal_gid: str, limit: int | None, offset: str | None, o
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_stories_for_goal(goal_gid, opts)
+    return api.get_stories_for_goal(goal, opts)
 
 
 @stories_group.command("get-stories-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_stories_for_task(task_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_stories_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get stories from a task"""
     session = AsanaSession.from_env(paginate=paginate)
     api = StoriesApi(session.client)
@@ -97,29 +97,29 @@ def get_stories_for_task(task_gid: str, limit: int | None, offset: str | None, o
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_stories_for_task(task_gid, opts)
+    return api.get_stories_for_task(task, opts)
 
 
 @stories_group.command("get-story")
-@click.argument("story_gid")
+@click.option("--story", required=True, help="Globally unique identifier for the story.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_story(story_gid: str, opt_fields: str | None) -> Any:
+def get_story(story: str, opt_fields: str | None) -> Any:
     """Get a story"""
     session = AsanaSession.from_env()
     api = StoriesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_story(story_gid, opts)
+    return api.get_story(story, opts)
 
 
 @stories_group.command("update-story")
-@click.argument("story_gid")
+@click.option("--story", required=True, help="Globally unique identifier for the story.")
 @click.option("--body", required=True, help="The comment story to update.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_story(story_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_story(story: str, body: str, opt_fields: str | None) -> Any:
     """Update a story"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -127,4 +127,4 @@ def update_story(story_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_story(parsed_body, story_gid, opts)
+    return api.update_story(parsed_body, story, opts)

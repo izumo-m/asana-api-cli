@@ -18,6 +18,7 @@ import asana
 from urllib3.util.retry import Retry
 
 DEFAULT_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
+DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
 
 
 def resolve_body(value: str) -> Any:
@@ -64,6 +65,7 @@ class _Runtime:
     timeout: float | None = None
     token_env: str = DEFAULT_TOKEN_ENV
     temp_dir: str | None = None
+    default_workspace: str | None = None
 
 
 runtime = _Runtime()
@@ -138,3 +140,34 @@ class AsanaSession:
             print(f"{var} environment variable is not set", file=sys.stderr)
             sys.exit(1)
         return cls(token=token, paginate=paginate)
+
+
+def resolve_workspace(
+    explicit: str | None,
+    *,
+    no_workspace: bool = False,
+    required: bool = False,
+) -> str | None:
+    """Resolve workspace GID with fallback chain.
+
+    Priority: explicit value > ASANA_DEFAULT_WORKSPACE env > --default-workspace flag.
+    If *no_workspace* is set, always returns None (skip sending workspace).
+    If *required* is set and no value is found, exits with an error.
+    """
+    if no_workspace:
+        return None
+    if explicit is not None:
+        return explicit
+    ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
+    if ws:
+        return ws
+    if runtime.default_workspace:
+        return runtime.default_workspace
+    if required:
+        print(
+            f"Workspace is required. Specify --workspace, "
+            f"set {DEFAULT_WORKSPACE_ENV}, or use --default-workspace.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return None

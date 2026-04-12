@@ -65,6 +65,7 @@ from asana_api_cli.cli.workspaces import workspaces_group
 @click.option("--timeout", type=float, default=None, help="Per-request timeout in seconds")
 @click.option("--token-env", "token_env", default=None, help="Environment variable name holding the Asana access token (default: ASANA_ACCESS_TOKEN)")
 @click.option("--temp-dir", "temp_dir", default=None, type=click.Path(file_okay=False), help="Directory for temporary downloads")
+@click.option("--default-workspace", "default_workspace", default=None, help="Default workspace GID (overrides ASANA_DEFAULT_WORKSPACE)")
 @click.option("--debug", is_flag=True, default=False, help="Print HTTP request/response to stderr for troubleshooting")
 def main(
     host: str | None,
@@ -76,6 +77,7 @@ def main(
     timeout: float | None,
     token_env: str | None,
     temp_dir: str | None,
+    default_workspace: str | None,
     debug: bool,
 ) -> None:
     """Asana API CLI (SDK-backed wrapper)."""
@@ -89,6 +91,7 @@ def main(
     if token_env:
         runtime.token_env = token_env
     runtime.temp_dir = temp_dir
+    runtime.default_workspace = default_workspace
     runtime.debug = debug
 
 

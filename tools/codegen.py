@@ -249,11 +249,30 @@ _HEADER = (
     "import click\n"
     "from asana import {class_name}\n\n"
     "from asana_api_cli.formatter import formatted\n"
-    "from asana_api_cli.session import AsanaSession, resolve_body\n\n\n"
+    "from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace\n\n\n"
     '@click.group("{group_name}")\n'
     "def {group_var}() -> None:\n"
     '    """{group_doc} commands."""\n'
 )
+
+# Workspace-related parameter names (both positional and option forms)
+_WORKSPACE_PARAMS = {"workspace_gid", "workspace"}
+
+
+def _option_name(param_name: str) -> str:
+    """Convert a SDK parameter name to a CLI option name.
+
+    Strips the ``_gid`` suffix so that e.g. ``task_gid`` becomes ``task``
+    and ``workspace_gid`` becomes ``workspace``.
+    """
+    if param_name.endswith("_gid"):
+        return param_name[:-4]
+    return param_name
+
+
+def _is_workspace_param(name: str) -> bool:
+    """Return True if the parameter represents a workspace identifier."""
+    return name in _WORKSPACE_PARAMS
 
 
 def _escape_help(text: str) -> str:
@@ -271,12 +290,36 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
     paginatable = op.paginatable
 
+    # Detect workspace in opts_params
+    ws_opt = next((p for p in opts_params if _is_workspace_param(p.name)), None)
+    # Detect workspace in path positionals
+    ws_positional = next((n for n in path_positionals if _is_workspace_param(n)), None)
+    has_workspace = ws_opt is not None or ws_positional is not None
+    # --no-workspace is only for optional workspace opts (not path params, not required opts)
+    needs_no_workspace = ws_opt is not None and not ws_opt.required
+
+    # Non-workspace positionals and opts
+    non_ws_positionals = [n for n in path_positionals if not _is_workspace_param(n)]
+    non_ws_opts = [p for p in opts_params if not _is_workspace_param(p.name)]
+
     lines: list[str] = []
     lines.append(f'@{group_var}.command("{op.command_name}")')
 
-    # path positionals → @click.argument
-    for name in path_positionals:
-        lines.append(f'@click.argument("{name}")')
+    # path positionals → --option (with _gid stripped)
+    for name in non_ws_positionals:
+        opt_name = _option_name(name)
+        flag = "--" + opt_name.replace("_", "-")
+        dp = op.params.get(name)
+        help_text = _escape_help(dp.description) if dp else ""
+        help_part = f', help="{help_text}"' if help_text else ""
+        lines.append(f'@click.option("{flag}", required=True{help_part})')
+
+    # --workspace (unified from both positional workspace_gid and option workspace)
+    if has_workspace:
+        lines.append(
+            '@click.option("--workspace", default=None, '
+            'help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")'
+        )
 
     # body → required --body option
     if has_body:
@@ -287,8 +330,8 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
         body_help = _escape_help(body_param.description or default_body_desc)
         lines.append(f'@click.option("--body", required=True, help="{body_help}")')
 
-    # opts params → options
-    for p in opts_params:
+    # remaining opts params → options (excluding workspace)
+    for p in non_ws_opts:
         flag = "--" + p.name.replace("_", "-")
         click_type = _click_type(p.py_type)
         help_text = _escape_help(p.description)
@@ -302,6 +345,13 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
         parts.append(f'help="{help_text}"')
         lines.append(f"@click.option({', '.join(parts)})")
 
+    # --no-workspace (only for optional workspace opts)
+    if needs_no_workspace:
+        lines.append(
+            '@click.option("--no-workspace", is_flag=True, default=False, '
+            'help="Do not send workspace parameter even if a default is configured")'
+        )
+
     # --paginate
     if paginatable:
         lines.append(
@@ -313,13 +363,18 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
 
     # function signature
     fn_args: list[str] = []
-    for name in path_positionals:
-        fn_args.append(f"{name}: str")
+    for name in non_ws_positionals:
+        opt_name = _option_name(name)
+        fn_args.append(f"{opt_name}: str")
+    if has_workspace:
+        fn_args.append("workspace: str | None")
     if has_body:
         fn_args.append("body: str")
-    for p in opts_params:
+    for p in non_ws_opts:
         annotation = _py_annotation(p.py_type, optional=not p.required)
         fn_args.append(f"{p.name}: {annotation}")
+    if needs_no_workspace:
+        fn_args.append("no_workspace: bool")
     if paginatable:
         fn_args.append("paginate: bool")
 
@@ -331,6 +386,15 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     if has_body:
         lines.append("    parsed_body = resolve_body(body)")
 
+    # resolve workspace
+    if has_workspace:
+        ws_required = ws_positional is not None or (ws_opt is not None and ws_opt.required)
+        no_ws_arg = "no_workspace=no_workspace, " if needs_no_workspace else ""
+        lines.append(
+            f"    resolved_workspace = resolve_workspace("
+            f"workspace, {no_ws_arg}required={ws_required})"
+        )
+
     # session
     if paginatable:
         lines.append("    session = AsanaSession.from_env(paginate=paginate)")
@@ -341,12 +405,16 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     # opts dict
     if opts_params:
         lines.append("    opts: dict[str, Any] = {}")
-        for p in opts_params:
+        for p in non_ws_opts:
             if p.required:
                 lines.append(f'    opts["{p.name}"] = {p.name}')
             else:
                 lines.append(f"    if {p.name} is not None:")
                 lines.append(f'        opts["{p.name}"] = {p.name}')
+        # workspace opt → use resolved value
+        if ws_opt is not None:
+            lines.append("    if resolved_workspace is not None:")
+            lines.append(f'        opts["{ws_opt.name}"] = resolved_workspace')
     else:
         lines.append("    opts: dict[str, Any] = {}")
 
@@ -354,7 +422,11 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     call_args: list[str] = []
     if has_body:
         call_args.append("parsed_body")
-    call_args.extend(path_positionals)
+    for name in path_positionals:
+        if _is_workspace_param(name):
+            call_args.append("resolved_workspace")
+        else:
+            call_args.append(_option_name(name))
     if op.has_opts:
         call_args.append("opts")
     lines.append(f"    return api.{op.method_name}({', '.join(call_args)})")
@@ -434,6 +506,10 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
         'help="Directory for temporary downloads")'
     )
     lines.append(
+        '@click.option("--default-workspace", "default_workspace", default=None, '
+        'help="Default workspace GID (overrides ASANA_DEFAULT_WORKSPACE)")'
+    )
+    lines.append(
         '@click.option("--debug", is_flag=True, default=False, '
         'help="Print HTTP request/response to stderr for troubleshooting")'
     )
@@ -447,6 +523,7 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    timeout: float | None,")
     lines.append("    token_env: str | None,")
     lines.append("    temp_dir: str | None,")
+    lines.append("    default_workspace: str | None,")
     lines.append("    debug: bool,")
     lines.append(") -> None:")
     lines.append('    """Asana API CLI (SDK-backed wrapper)."""')
@@ -460,6 +537,7 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    if token_env:")
     lines.append("        runtime.token_env = token_env")
     lines.append("    runtime.temp_dir = temp_dir")
+    lines.append("    runtime.default_workspace = default_workspace")
     lines.append("    runtime.debug = debug")
     lines.append("")
     lines.append("")

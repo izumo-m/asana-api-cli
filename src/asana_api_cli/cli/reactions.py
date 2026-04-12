@@ -7,7 +7,7 @@ import click
 from asana import ReactionsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("reactions")
@@ -16,8 +16,8 @@ def reactions_group() -> None:
 
 
 @reactions_group.command("get-reactions-on-object")
-@click.argument("target")
-@click.argument("emoji_base")
+@click.option("--target", required=True, help="Globally unique identifier for object to fetch reactions from. Must be a GID for a status update or story.")
+@click.option("--emoji-base", required=True, help="Only return reactions with this emoji base character.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
