@@ -115,3 +115,7 @@ tasks_api = asana.TasksApi(session.client)
 for task in tasks_api.get_tasks({"project": "123"}):
     print(task)
 ```
+
+## License
+
+[Apache License 2.0](LICENSE)
