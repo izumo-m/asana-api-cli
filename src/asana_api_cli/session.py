@@ -65,7 +65,6 @@ class _Runtime:
     timeout: float | None = None
     token_env: str = DEFAULT_TOKEN_ENV
     temp_dir: str | None = None
-    default_workspace: str | None = None
 
 
 runtime = _Runtime()
@@ -150,7 +149,7 @@ def resolve_workspace(
 ) -> str | None:
     """Resolve workspace GID with fallback chain.
 
-    Priority: explicit value > ASANA_DEFAULT_WORKSPACE env > --default-workspace flag.
+    Priority: explicit --workspace value > ASANA_DEFAULT_WORKSPACE env var.
     If *no_workspace* is set, always returns None (skip sending workspace).
     If *required* is set and no value is found, exits with an error.
     """
@@ -161,12 +160,10 @@ def resolve_workspace(
     ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
     if ws:
         return ws
-    if runtime.default_workspace:
-        return runtime.default_workspace
     if required:
         print(
-            f"Workspace is required. Specify --workspace, "
-            f"set {DEFAULT_WORKSPACE_ENV}, or use --default-workspace.",
+            f"Workspace is required. Specify --workspace or "
+            f"set {DEFAULT_WORKSPACE_ENV}.",
             file=sys.stderr,
         )
         sys.exit(1)

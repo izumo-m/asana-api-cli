@@ -506,10 +506,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
         'help="Directory for temporary downloads")'
     )
     lines.append(
-        '@click.option("--default-workspace", "default_workspace", default=None, '
-        'help="Default workspace GID (overrides ASANA_DEFAULT_WORKSPACE)")'
-    )
-    lines.append(
         '@click.option("--debug", is_flag=True, default=False, '
         'help="Print HTTP request/response to stderr for troubleshooting")'
     )
@@ -523,7 +519,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    timeout: float | None,")
     lines.append("    token_env: str | None,")
     lines.append("    temp_dir: str | None,")
-    lines.append("    default_workspace: str | None,")
     lines.append("    debug: bool,")
     lines.append(") -> None:")
     lines.append('    """Asana API CLI (SDK-backed wrapper)."""')
@@ -537,7 +532,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    if token_env:")
     lines.append("        runtime.token_env = token_env")
     lines.append("    runtime.temp_dir = temp_dir")
-    lines.append("    runtime.default_workspace = default_workspace")
     lines.append("    runtime.debug = debug")
     lines.append("")
     lines.append("")

@@ -1,9 +1,10 @@
 [project]
 name = "asana-api-cli"
-version = "1.1.0"
+version = "1.2.0"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
-license = {text = "Apache-2.0"}
+readme = "docs/pypi.md"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1,<9",
@@ -12,11 +13,21 @@ dependencies = [
     "asana>=5.2.4,<6",
 ]
 
+[project.urls]
+Homepage = "https://github.com/izumo-m/asana-api-cli"
+Repository = "https://github.com/izumo-m/asana-api-cli"
+Issues = "https://github.com/izumo-m/asana-api-cli/issues"
+
 [project.scripts]
 asana-api = "asana_api_cli.cli:main"
 
 [dependency-groups]
-dev = ["ruff>=0.15.5,<1", "pytest>=7"]
+dev = [
+    "ruff<1",
+    "pytest>=9,<10",
+    "build>=1,<2",
+    "twine>=6,<7",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
