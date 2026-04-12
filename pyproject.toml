@@ -1,6 +1,6 @@
 [project]
 name = "asana-api-cli"
-version = "1.0.0"
+version = "1.1.0"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
 license = {text = "Apache-2.0"}
