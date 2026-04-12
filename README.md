@@ -12,7 +12,7 @@ regeneration picks up any new endpoints.
 
 ```bash
 # For development (run inside a virtualenv)
-poetry install
+uv sync
 
 # Install into ~/.local/bin
 pipx install .
@@ -79,8 +79,8 @@ src/asana_api_cli/
 
 - **`session.py`** — hand-written. Builds `asana.Configuration` + `ApiClient`
   and toggles `return_page_iterator` for `--paginate`.
-- **`formatter.py`** — hand-written. Supports `json` / `table` / `csv` output
-  and `--query` (jq).
+- **`formatter.py`** — hand-written. Supports `json` / `table` / `csv` / `text`
+  output and `--query` (jq).
 - **`cli/`** — auto-generated. Walks the official SDK's `*Api` classes and
   emits click command groups.
 
