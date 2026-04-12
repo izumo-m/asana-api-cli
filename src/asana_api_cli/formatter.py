@@ -20,7 +20,7 @@ def formatted(f: Any) -> Any:
     @click.option(
         "--output",
         "output_format",
-        type=click.Choice(["json", "table", "csv"], case_sensitive=False),
+        type=click.Choice(["json", "table", "csv", "text"], case_sensitive=False),
         default="json",
         help="Output format (default: json)",
     )
@@ -75,6 +75,10 @@ def _format_output(data: Any, *, output_format: str, jq_query: str | None) -> No
             click.echo(f"Invalid jq expression: {e}", err=True)
             sys.exit(1)
 
+    if output_format == "text":
+        _print_text(data)
+        return
+
     if output_format == "json":
         click.echo(json.dumps(data, indent=2, ensure_ascii=False))
         return
@@ -101,6 +105,27 @@ def _to_rows(data: Any) -> list[dict[str, Any]] | None:
     if isinstance(data, dict):
         return [data]
     return None
+
+
+def _print_text(data: Any) -> None:
+    """Print data in plain text format (like ``aws --output text``)."""
+    if data is None:
+        click.echo("None")
+        return
+    if isinstance(data, (str, int, float, bool)):
+        click.echo(data)
+        return
+    if isinstance(data, dict):
+        click.echo("\t".join(str(v) for v in data.values()))
+        return
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                click.echo("\t".join(str(v) for v in item.values()))
+            else:
+                click.echo(item)
+        return
+    click.echo(data)
 
 
 def _print_csv(rows: list[dict[str, Any]]) -> None:

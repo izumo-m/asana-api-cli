@@ -106,6 +106,48 @@ class TestFormatOutputCsv:
         assert capsys.readouterr().out == ""
 
 
+class TestFormatOutputText:
+    def test_string_scalar(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output("hello", output_format="text", jq_query=None)
+        assert capsys.readouterr().out.strip() == "hello"
+
+    def test_int_scalar(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output(42, output_format="text", jq_query=None)
+        assert capsys.readouterr().out.strip() == "42"
+
+    def test_bool_scalar(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output(True, output_format="text", jq_query=None)
+        assert capsys.readouterr().out.strip() == "True"
+
+    def test_none(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output(None, output_format="text", jq_query=None)
+        assert capsys.readouterr().out.strip() == "None"
+
+    def test_dict_tab_separated(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output({"gid": "1", "name": "Task"}, output_format="text", jq_query=None)
+        assert capsys.readouterr().out.strip() == "1\tTask"
+
+    def test_list_of_dicts(self, capsys: pytest.CaptureFixture[str]) -> None:
+        data = [{"gid": "1", "name": "A"}, {"gid": "2", "name": "B"}]
+        _format_output(data, output_format="text", jq_query=None)
+        lines = capsys.readouterr().out.strip().splitlines()
+        assert lines[0] == "1\tA"
+        assert lines[1] == "2\tB"
+
+    def test_list_of_scalars(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output(["a", "b", "c"], output_format="text", jq_query=None)
+        lines = capsys.readouterr().out.strip().splitlines()
+        assert lines == ["a", "b", "c"]
+
+    def test_empty_list(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output([], output_format="text", jq_query=None)
+        assert capsys.readouterr().out == ""
+
+    def test_with_jq_query(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output({"data": {"gid": "123"}}, output_format="text", jq_query=".data.gid")
+        assert capsys.readouterr().out.strip() == "123"
+
+
 class TestFormatOutputJq:
     def test_jq_filter(self, capsys: pytest.CaptureFixture[str]) -> None:
         _format_output(
