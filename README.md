@@ -35,6 +35,9 @@ export ASANA_ACCESS_TOKEN="1/12345..."
 ## Usage (examples)
 
 ```bash
+# Show version
+asana-api --version
+
 # List commands
 asana-api --help
 asana-api tasks --help

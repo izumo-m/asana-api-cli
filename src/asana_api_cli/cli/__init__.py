@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import click
 
+from asana_api_cli.version import version_string
+
 from asana_api_cli.session import runtime
 from asana_api_cli.cli.access_requests import access_requests_group
 from asana_api_cli.cli.allocations import allocations_group
@@ -53,6 +55,7 @@ from asana_api_cli.cli.workspaces import workspaces_group
 
 
 @click.group()
+@click.version_option(version_string(), prog_name="asana-api")
 @click.option("--host", default=None, help="Override API base URL (default: https://app.asana.com/api/1.0)")
 @click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")
 @click.option("--no-verify-ssl", is_flag=True, default=False, help="Disable TLS certificate verification (insecure)")

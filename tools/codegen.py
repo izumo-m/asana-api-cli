@@ -383,6 +383,8 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
         "",
         "import click",
         "",
+        "from asana_api_cli.version import version_string",
+        "",
     ]
     lines.append("from asana_api_cli.session import runtime")
     for g in groups:
@@ -391,6 +393,7 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("")
     lines.append("")
     lines.append("@click.group()")
+    lines.append("@click.version_option(version_string(), prog_name=\"asana-api\")")
     lines.append(
         '@click.option("--host", default=None, '
         'help="Override API base URL (default: https://app.asana.com/api/1.0)")'
