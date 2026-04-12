@@ -62,12 +62,11 @@ def get_allocation(allocation: str, opt_fields: str | None) -> Any:
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--parent", default=None, help="Globally unique identifier for the project to filter allocations by.")
-@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_allocations(workspace: str | None, assignee: str | None, limit: int | None, offset: str | None, opt_fields: str | None, parent: str | None, no_workspace: bool, paginate: bool) -> Any:
+def get_allocations(workspace: str | None, assignee: str | None, limit: int | None, offset: str | None, opt_fields: str | None, parent: str | None, paginate: bool) -> Any:
     """Get multiple allocations"""
-    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
+    resolved_workspace = resolve_workspace(workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = AllocationsApi(session.client)
     opts: dict[str, Any] = {}

@@ -23,7 +23,7 @@ pipx install .
 | Name | Required | Description |
 |------|----------|-------------|
 | `ASANA_ACCESS_TOKEN` | Yes (at runtime only) | Asana Personal Access Token |
-| `ASANA_DEFAULT_WORKSPACE` | No | Default workspace GID used when `--workspace` is omitted |
+| `ASANA_DEFAULT_WORKSPACE` | No | Default workspace GID for endpoints that require it |
 
 The token can be issued from the
 [Asana Developer Console](https://app.asana.com/0/developer-console).
@@ -52,9 +52,6 @@ asana-api workspaces get-workspaces
 asana-api projects get-projects-for-workspace
 asana-api projects get-projects --workspace <WORKSPACE_GID>
 
-# Explicitly skip workspace even when a default is configured
-asana-api projects get-projects --no-workspace
-
 # List tasks (first page)
 asana-api tasks get-tasks --project <PROJECT_GID>
 
@@ -74,14 +71,16 @@ asana-api tasks get-tasks --project <PID> --query '.data' --output csv
 
 ### Workspace resolution
 
-Many API endpoints require a workspace. The CLI resolves it in this order:
+Many API endpoints require a workspace. For those endpoints (e.g.
+`get-projects-for-workspace`), the CLI resolves it in this order:
 
 1. `--workspace <GID>` on the command
 2. `ASANA_DEFAULT_WORKSPACE` environment variable
 
-For endpoints where workspace is truly optional (query parameter, not path
-parameter), `--no-workspace` suppresses any default so the parameter is not
-sent at all.
+For endpoints where workspace is optional (e.g. `get-tasks`), the env-var
+fallback is **not** used — pass `--workspace` explicitly if needed. This
+prevents conflicts with other scope parameters like `--project` that are
+mutually exclusive with workspace in the Asana API.
 
 ## Project layout
 

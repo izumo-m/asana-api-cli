@@ -54,12 +54,11 @@ def delete_time_tracking_entry(time_tracking_entry: str) -> Any:
 @click.option("--task", default=None, help="Globally unique identifier for the task to filter time tracking entries by.")
 @click.option("--timesheet-approval-status", default=None, help="Globally unique identifier for the timesheet approval status to filter time tracking entries by.")
 @click.option("--user", default=None, help="Globally unique identifier for the user to filter time tracking entries by.")
-@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_time_tracking_entries(workspace: str | None, attributable_to: str | None, entered_on_end_date: str | None, entered_on_start_date: str | None, limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, task: str | None, timesheet_approval_status: str | None, user: str | None, no_workspace: bool, paginate: bool) -> Any:
+def get_time_tracking_entries(workspace: str | None, attributable_to: str | None, entered_on_end_date: str | None, entered_on_start_date: str | None, limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, task: str | None, timesheet_approval_status: str | None, user: str | None, paginate: bool) -> Any:
     """Get multiple time tracking entries"""
-    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
+    resolved_workspace = resolve_workspace(workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = TimeTrackingEntriesApi(session.client)
     opts: dict[str, Any] = {}

@@ -111,12 +111,11 @@ def get_goal(goal: str, opt_fields: str | None) -> Any:
 @click.option("--task", default=None, help="Globally unique identifier for supporting task.")
 @click.option("--team", default=None, help="Globally unique identifier for the team.")
 @click.option("--time-periods", default=None, help="Globally unique identifiers for the time periods.")
-@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_goals(workspace: str | None, is_workspace_level: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, project: str | None, task: str | None, team: str | None, time_periods: str | None, no_workspace: bool, paginate: bool) -> Any:
+def get_goals(workspace: str | None, is_workspace_level: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, project: str | None, task: str | None, team: str | None, time_periods: str | None, paginate: bool) -> Any:
     """Get goals"""
-    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
+    resolved_workspace = resolve_workspace(workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = GoalsApi(session.client)
     opts: dict[str, Any] = {}

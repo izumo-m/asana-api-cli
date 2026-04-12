@@ -81,11 +81,15 @@ class TestResolveWorkspaceExplicit:
         assert resolve_workspace("explicit_ws") == "explicit_ws"
 
 class TestResolveWorkspaceEnvFallback:
-    """ASANA_DEFAULT_WORKSPACE env var is the second priority."""
+    """ASANA_DEFAULT_WORKSPACE env var is used only when required=True."""
 
-    def test_falls_back_to_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_falls_back_to_env_when_required(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
-        assert resolve_workspace(None) == "env_ws"
+        assert resolve_workspace(None, required=True) == "env_ws"
+
+    def test_no_fallback_when_optional(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        assert resolve_workspace(None) is None
 
 
 class TestResolveWorkspaceNoValue:
@@ -97,18 +101,3 @@ class TestResolveWorkspaceNoValue:
     def test_exits_when_required(self) -> None:
         with pytest.raises(SystemExit):
             resolve_workspace(None, required=True)
-
-
-class TestResolveWorkspaceNoWorkspaceFlag:
-    """--no-workspace suppresses all fallbacks."""
-
-    def test_returns_none_ignoring_explicit(self) -> None:
-        assert resolve_workspace("111", no_workspace=True) is None
-
-    def test_returns_none_ignoring_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
-        assert resolve_workspace(None, no_workspace=True) is None
-
-    def test_returns_none_even_when_required(self) -> None:
-        # --no-workspace wins over required=True
-        assert resolve_workspace(None, no_workspace=True, required=True) is None
