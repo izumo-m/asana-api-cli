@@ -7,7 +7,7 @@ import click
 from asana import ProjectStatusesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("project-statuses")
@@ -16,11 +16,11 @@ def project_statuses_group() -> None:
 
 
 @project_statuses_group.command("create-project-status-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="The project status to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_project_status_for_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_project_status_for_project(project: str, body: str, opt_fields: str | None) -> Any:
     """Create a project status"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -28,42 +28,42 @@ def create_project_status_for_project(project_gid: str, body: str, opt_fields: s
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_project_status_for_project(parsed_body, project_gid, opts)
+    return api.create_project_status_for_project(parsed_body, project, opts)
 
 
 @project_statuses_group.command("delete-project-status")
-@click.argument("project_status_gid")
+@click.option("--project-status", required=True, help="The project status update to get. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_project_status(project_status_gid: str) -> Any:
+def delete_project_status(project_status: str) -> Any:
     """Delete a project status"""
     session = AsanaSession.from_env()
     api = ProjectStatusesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_project_status(project_status_gid)
+    return api.delete_project_status(project_status)
 
 
 @project_statuses_group.command("get-project-status")
-@click.argument("project_status_gid")
+@click.option("--project-status", required=True, help="The project status update to get.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_project_status(project_status_gid: str, opt_fields: str | None) -> Any:
+def get_project_status(project_status: str, opt_fields: str | None) -> Any:
     """Get a project status"""
     session = AsanaSession.from_env()
     api = ProjectStatusesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_project_status(project_status_gid, opts)
+    return api.get_project_status(project_status, opts)
 
 
 @project_statuses_group.command("get-project-statuses-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_project_statuses_for_project(project_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_project_statuses_for_project(project: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get statuses from a project"""
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectStatusesApi(session.client)
@@ -74,4 +74,4 @@ def get_project_statuses_for_project(project_gid: str, limit: int | None, offset
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_project_statuses_for_project(project_gid, opts)
+    return api.get_project_statuses_for_project(project, opts)

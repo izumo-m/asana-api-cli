@@ -7,7 +7,7 @@ import click
 from asana import GoalsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("goals")
@@ -16,24 +16,24 @@ def goals_group() -> None:
 
 
 @goals_group.command("add-custom-field-setting-for-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="Information about the custom field setting.")
 @formatted
-def add_custom_field_setting_for_goal(goal_gid: str, body: str) -> Any:
+def add_custom_field_setting_for_goal(goal: str, body: str) -> Any:
     """Add a custom field to a goal"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = GoalsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_custom_field_setting_for_goal(parsed_body, goal_gid)
+    return api.add_custom_field_setting_for_goal(parsed_body, goal)
 
 
 @goals_group.command("add-followers")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--body", required=True, help="The followers to be added as collaborators")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_followers(goal_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_followers(goal: str, body: str, opt_fields: str | None) -> Any:
     """Add a collaborator to a goal"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -41,7 +41,7 @@ def add_followers(goal_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_followers(parsed_body, goal_gid, opts)
+    return api.add_followers(parsed_body, goal, opts)
 
 
 @goals_group.command("create-goal")
@@ -60,11 +60,11 @@ def create_goal(body: str, opt_fields: str | None) -> Any:
 
 
 @goals_group.command("create-goal-metric")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--body", required=True, help="The goal metric to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_goal_metric(goal_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_goal_metric(goal: str, body: str, opt_fields: str | None) -> Any:
     """Create a goal metric"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -72,35 +72,36 @@ def create_goal_metric(goal_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_goal_metric(parsed_body, goal_gid, opts)
+    return api.create_goal_metric(parsed_body, goal, opts)
 
 
 @goals_group.command("delete-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_goal(goal_gid: str) -> Any:
+def delete_goal(goal: str) -> Any:
     """Delete a goal"""
     session = AsanaSession.from_env()
     api = GoalsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_goal(goal_gid)
+    return api.delete_goal(goal)
 
 
 @goals_group.command("get-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_goal(goal_gid: str, opt_fields: str | None) -> Any:
+def get_goal(goal: str, opt_fields: str | None) -> Any:
     """Get a goal"""
     session = AsanaSession.from_env()
     api = GoalsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_goal(goal_gid, opts)
+    return api.get_goal(goal, opts)
 
 
 @goals_group.command("get-goals")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--is-workspace-level", type=bool, default=None, help="Filter to goals with is_workspace_level set to query value. Must be used with the workspace parameter.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
@@ -110,11 +111,12 @@ def get_goal(goal_gid: str, opt_fields: str | None) -> Any:
 @click.option("--task", default=None, help="Globally unique identifier for supporting task.")
 @click.option("--team", default=None, help="Globally unique identifier for the team.")
 @click.option("--time-periods", default=None, help="Globally unique identifiers for the time periods.")
-@click.option("--workspace", default=None, help="Globally unique identifier for the workspace.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_goals(is_workspace_level: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, project: str | None, task: str | None, team: str | None, time_periods: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_goals(workspace: str | None, is_workspace_level: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, project: str | None, task: str | None, team: str | None, time_periods: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get goals"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = GoalsApi(session.client)
     opts: dict[str, Any] = {}
@@ -136,44 +138,44 @@ def get_goals(is_workspace_level: bool | None, limit: int | None, offset: str | 
         opts["team"] = team
     if time_periods is not None:
         opts["time_periods"] = time_periods
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_goals(opts)
 
 
 @goals_group.command("get-parent-goals-for-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_parent_goals_for_goal(goal_gid: str, opt_fields: str | None) -> Any:
+def get_parent_goals_for_goal(goal: str, opt_fields: str | None) -> Any:
     """Get parent goals from a goal"""
     session = AsanaSession.from_env()
     api = GoalsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_parent_goals_for_goal(goal_gid, opts)
+    return api.get_parent_goals_for_goal(goal, opts)
 
 
 @goals_group.command("remove-custom-field-setting-for-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="Information about the custom field setting being removed.")
 @formatted
-def remove_custom_field_setting_for_goal(goal_gid: str, body: str) -> Any:
+def remove_custom_field_setting_for_goal(goal: str, body: str) -> Any:
     """Remove a custom field from a goal"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = GoalsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_custom_field_setting_for_goal(parsed_body, goal_gid)
+    return api.remove_custom_field_setting_for_goal(parsed_body, goal)
 
 
 @goals_group.command("remove-followers")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--body", required=True, help="The followers to be removed as collaborators")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def remove_followers(goal_gid: str, body: str, opt_fields: str | None) -> Any:
+def remove_followers(goal: str, body: str, opt_fields: str | None) -> Any:
     """Remove a collaborator from a goal"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -181,15 +183,15 @@ def remove_followers(goal_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.remove_followers(parsed_body, goal_gid, opts)
+    return api.remove_followers(parsed_body, goal, opts)
 
 
 @goals_group.command("update-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--body", required=True, help="The updated fields for the goal.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_goal(goal_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_goal(goal: str, body: str, opt_fields: str | None) -> Any:
     """Update a goal"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -197,15 +199,15 @@ def update_goal(goal_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_goal(parsed_body, goal_gid, opts)
+    return api.update_goal(parsed_body, goal, opts)
 
 
 @goals_group.command("update-goal-metric")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--body", required=True, help="The updated fields for the goal metric.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_goal_metric(goal_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_goal_metric(goal: str, body: str, opt_fields: str | None) -> Any:
     """Update a goal metric"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -213,4 +215,4 @@ def update_goal_metric(goal_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_goal_metric(parsed_body, goal_gid, opts)
+    return api.update_goal_metric(parsed_body, goal, opts)

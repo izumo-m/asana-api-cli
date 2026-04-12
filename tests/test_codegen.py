@@ -160,8 +160,9 @@ class TestGeneratedCli:
         assert '@tasks_group.command("create-task")' in tasks_code
         assert '@tasks_group.command("delete-task")' in tasks_code
 
-    def test_argument_for_path_positional(self, tasks_code: str) -> None:
-        assert '@click.argument("task_gid")' in tasks_code
+    def test_option_for_path_positional(self, tasks_code: str) -> None:
+        # *_gid positionals are converted to --{name} required options
+        assert '@click.option("--task", required=True' in tasks_code
 
     def test_body_option_required(self, tasks_code: str) -> None:
         assert '@click.option("--body", required=True' in tasks_code
@@ -183,7 +184,7 @@ class TestGeneratedCli:
     def test_calls_api_method(self, tasks_code: str) -> None:
         assert "api = TasksApi(session.client)" in tasks_code
         assert "return api.get_tasks(opts)" in tasks_code
-        assert "return api.get_task(task_gid, opts)" in tasks_code
+        assert "return api.get_task(task, opts)" in tasks_code
 
 
 # ---------------------------------------------------------------------------

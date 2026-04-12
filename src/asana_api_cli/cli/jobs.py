@@ -7,7 +7,7 @@ import click
 from asana import JobsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("jobs")
@@ -16,14 +16,14 @@ def jobs_group() -> None:
 
 
 @jobs_group.command("get-job")
-@click.argument("job_gid")
+@click.option("--job", required=True, help="Globally unique identifier for the job.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_job(job_gid: str, opt_fields: str | None) -> Any:
+def get_job(job: str, opt_fields: str | None) -> Any:
     """Get a job by id"""
     session = AsanaSession.from_env()
     api = JobsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_job(job_gid, opts)
+    return api.get_job(job, opts)

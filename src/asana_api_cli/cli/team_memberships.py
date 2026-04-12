@@ -7,7 +7,7 @@ import click
 from asana import TeamMembershipsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("team-memberships")
@@ -16,30 +16,32 @@ def team_memberships_group() -> None:
 
 
 @team_memberships_group.command("get-team-membership")
-@click.argument("team_membership_gid")
+@click.option("--team-membership", required=True)
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_team_membership(team_membership_gid: str, opt_fields: str | None) -> Any:
+def get_team_membership(team_membership: str, opt_fields: str | None) -> Any:
     """Get a team membership"""
     session = AsanaSession.from_env()
     api = TeamMembershipsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_team_membership(team_membership_gid, opts)
+    return api.get_team_membership(team_membership, opts)
 
 
 @team_memberships_group.command("get-team-memberships")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--team", default=None, help="Globally unique identifier for the team.")
 @click.option("--user", default=None, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user. This parameter must be used with the workspace parameter.")
-@click.option("--workspace", default=None, help="Globally unique identifier for the workspace. This parameter must be used with the user parameter.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_team_memberships(limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, user: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_team_memberships(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, user: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get team memberships"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = TeamMembershipsApi(session.client)
     opts: dict[str, Any] = {}
@@ -53,19 +55,19 @@ def get_team_memberships(limit: int | None, offset: str | None, opt_fields: str 
         opts["team"] = team
     if user is not None:
         opts["user"] = user
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_team_memberships(opts)
 
 
 @team_memberships_group.command("get-team-memberships-for-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_team_memberships_for_team(team_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_team_memberships_for_team(team: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get memberships from a team"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TeamMembershipsApi(session.client)
@@ -76,19 +78,20 @@ def get_team_memberships_for_team(team_gid: str, limit: int | None, offset: str 
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_team_memberships_for_team(team_gid, opts)
+    return api.get_team_memberships_for_team(team, opts)
 
 
 @team_memberships_group.command("get-team-memberships-for-user")
-@click.argument("user_gid")
-@click.argument("workspace")
+@click.option("--user", required=True, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_team_memberships_for_user(user_gid: str, workspace: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_team_memberships_for_user(user: str, workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get memberships from a user"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = TeamMembershipsApi(session.client)
     opts: dict[str, Any] = {}
@@ -98,4 +101,4 @@ def get_team_memberships_for_user(user_gid: str, workspace: str, limit: int | No
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_team_memberships_for_user(user_gid, workspace, opts)
+    return api.get_team_memberships_for_user(user, resolved_workspace, opts)

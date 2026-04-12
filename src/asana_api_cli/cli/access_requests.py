@@ -7,7 +7,7 @@ import click
 from asana import AccessRequestsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("access-requests")
@@ -16,14 +16,14 @@ def access_requests_group() -> None:
 
 
 @access_requests_group.command("approve-access-request")
-@click.argument("access_request_gid")
+@click.option("--access-request", required=True, help="Globally unique identifier for the access request. If the method is called asynchronously, returns the request thread.")
 @formatted
-def approve_access_request(access_request_gid: str) -> Any:
+def approve_access_request(access_request: str) -> Any:
     """Approve an access request"""
     session = AsanaSession.from_env()
     api = AccessRequestsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.approve_access_request(access_request_gid)
+    return api.approve_access_request(access_request)
 
 
 @access_requests_group.command("create-access-request")
@@ -39,7 +39,7 @@ def create_access_request(body: str) -> Any:
 
 
 @access_requests_group.command("get-access-requests")
-@click.argument("target")
+@click.option("--target", required=True, help="Globally unique identifier for the target object.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--user", default=None, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
 @formatted
@@ -56,11 +56,11 @@ def get_access_requests(target: str, opt_fields: str | None, user: str | None) -
 
 
 @access_requests_group.command("reject-access-request")
-@click.argument("access_request_gid")
+@click.option("--access-request", required=True, help="Globally unique identifier for the access request. If the method is called asynchronously, returns the request thread.")
 @formatted
-def reject_access_request(access_request_gid: str) -> Any:
+def reject_access_request(access_request: str) -> Any:
     """Reject an access request"""
     session = AsanaSession.from_env()
     api = AccessRequestsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.reject_access_request(access_request_gid)
+    return api.reject_access_request(access_request)

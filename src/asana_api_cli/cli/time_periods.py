@@ -7,7 +7,7 @@ import click
 from asana import TimePeriodsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("time-periods")
@@ -16,21 +16,21 @@ def time_periods_group() -> None:
 
 
 @time_periods_group.command("get-time-period")
-@click.argument("time_period_gid")
+@click.option("--time-period", required=True, help="Globally unique identifier for the time period.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_time_period(time_period_gid: str, opt_fields: str | None) -> Any:
+def get_time_period(time_period: str, opt_fields: str | None) -> Any:
     """Get a time period"""
     session = AsanaSession.from_env()
     api = TimePeriodsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_time_period(time_period_gid, opts)
+    return api.get_time_period(time_period, opts)
 
 
 @time_periods_group.command("get-time-periods")
-@click.argument("workspace")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--end-on", default=None, help="ISO 8601 date string")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
@@ -38,8 +38,9 @@ def get_time_period(time_period_gid: str, opt_fields: str | None) -> Any:
 @click.option("--start-on", default=None, help="ISO 8601 date string")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_time_periods(workspace: str, end_on: str | None, limit: int | None, offset: str | None, opt_fields: str | None, start_on: str | None, paginate: bool) -> Any:
+def get_time_periods(workspace: str | None, end_on: str | None, limit: int | None, offset: str | None, opt_fields: str | None, start_on: str | None, paginate: bool) -> Any:
     """Get time periods"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = TimePeriodsApi(session.client)
     opts: dict[str, Any] = {}
@@ -53,4 +54,4 @@ def get_time_periods(workspace: str, end_on: str | None, limit: int | None, offs
         opts["opt_fields"] = opt_fields
     if start_on is not None:
         opts["start_on"] = start_on
-    return api.get_time_periods(workspace, opts)
+    return api.get_time_periods(resolved_workspace, opts)

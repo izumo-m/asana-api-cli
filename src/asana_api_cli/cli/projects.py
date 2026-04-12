@@ -7,7 +7,7 @@ import click
 from asana import ProjectsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("projects")
@@ -16,11 +16,11 @@ def projects_group() -> None:
 
 
 @projects_group.command("add-custom-field-setting-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="Information about the custom field setting.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_custom_field_setting_for_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_custom_field_setting_for_project(project: str, body: str, opt_fields: str | None) -> Any:
     """Add a custom field to a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -28,15 +28,15 @@ def add_custom_field_setting_for_project(project_gid: str, body: str, opt_fields
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_custom_field_setting_for_project(parsed_body, project_gid, opts)
+    return api.add_custom_field_setting_for_project(parsed_body, project, opts)
 
 
 @projects_group.command("add-followers-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="Information about the followers being added.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_followers_for_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_followers_for_project(project: str, body: str, opt_fields: str | None) -> Any:
     """Add followers to a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -44,15 +44,15 @@ def add_followers_for_project(project_gid: str, body: str, opt_fields: str | Non
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_followers_for_project(parsed_body, project_gid, opts)
+    return api.add_followers_for_project(parsed_body, project, opts)
 
 
 @projects_group.command("add-members-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="Information about the members being added.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_members_for_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_members_for_project(project: str, body: str, opt_fields: str | None) -> Any:
     """Add users to a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -60,7 +60,7 @@ def add_members_for_project(project_gid: str, body: str, opt_fields: str | None)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_members_for_project(parsed_body, project_gid, opts)
+    return api.add_members_for_project(parsed_body, project, opts)
 
 
 @projects_group.command("create-project")
@@ -79,11 +79,11 @@ def create_project(body: str, opt_fields: str | None) -> Any:
 
 
 @projects_group.command("create-project-for-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--body", required=True, help="The new project to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_project_for_team(team_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_project_for_team(team: str, body: str, opt_fields: str | None) -> Any:
     """Create a project in a team"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -91,75 +91,78 @@ def create_project_for_team(team_gid: str, body: str, opt_fields: str | None) ->
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_project_for_team(parsed_body, team_gid, opts)
+    return api.create_project_for_team(parsed_body, team, opts)
 
 
 @projects_group.command("create-project-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--body", required=True, help="The new project to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_project_for_workspace(workspace_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_project_for_workspace(workspace: str | None, body: str, opt_fields: str | None) -> Any:
     """Create a project in a workspace"""
     parsed_body = resolve_body(body)
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_project_for_workspace(parsed_body, workspace_gid, opts)
+    return api.create_project_for_workspace(parsed_body, resolved_workspace, opts)
 
 
 @projects_group.command("delete-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_project(project_gid: str) -> Any:
+def delete_project(project: str) -> Any:
     """Delete a project"""
     session = AsanaSession.from_env()
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_project(project_gid)
+    return api.delete_project(project)
 
 
 @projects_group.command("duplicate-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def duplicate_project(project_gid: str, opt_fields: str | None) -> Any:
+def duplicate_project(project: str, opt_fields: str | None) -> Any:
     """Duplicate a project"""
     session = AsanaSession.from_env()
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.duplicate_project(project_gid, opts)
+    return api.duplicate_project(project, opts)
 
 
 @projects_group.command("get-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_project(project_gid: str, opt_fields: str | None) -> Any:
+def get_project(project: str, opt_fields: str | None) -> Any:
     """Get a project"""
     session = AsanaSession.from_env()
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_project(project_gid, opts)
+    return api.get_project(project, opts)
 
 
 @projects_group.command("get-projects")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--archived", type=bool, default=None, help="Only return projects whose `archived` field takes on the value of this parameter.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--team", default=None, help="**Deprecated.** The team to filter projects on. Please use `GET /memberships` with `{ member: team, resource_subtype: project_membership }` instead.")
-@click.option("--workspace", default=None, help="The workspace or organization to filter projects on.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_projects(archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_projects(workspace: str | None, archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get multiple projects"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
@@ -173,19 +176,19 @@ def get_projects(archived: bool | None, limit: int | None, offset: str | None, o
         opts["opt_fields"] = opt_fields
     if team is not None:
         opts["team"] = team
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_projects(opts)
 
 
 @projects_group.command("get-projects-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_projects_for_task(task_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_projects_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get projects a task is in"""
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectsApi(session.client)
@@ -196,18 +199,18 @@ def get_projects_for_task(task_gid: str, limit: int | None, offset: str | None, 
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_projects_for_task(task_gid, opts)
+    return api.get_projects_for_task(task, opts)
 
 
 @projects_group.command("get-projects-for-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--archived", type=bool, default=None, help="Only return projects whose `archived` field takes on the value of this parameter.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_projects_for_team(team_gid: str, archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_projects_for_team(team: str, archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get a team's projects"""
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectsApi(session.client)
@@ -220,19 +223,20 @@ def get_projects_for_team(team_gid: str, archived: bool | None, limit: int | Non
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_projects_for_team(team_gid, opts)
+    return api.get_projects_for_team(team, opts)
 
 
 @projects_group.command("get-projects-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--archived", type=bool, default=None, help="Only return projects whose `archived` field takes on the value of this parameter.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_projects_for_workspace(workspace_gid: str, archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_projects_for_workspace(workspace: str | None, archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get all projects in a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
@@ -244,29 +248,29 @@ def get_projects_for_workspace(workspace_gid: str, archived: bool | None, limit:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_projects_for_workspace(workspace_gid, opts)
+    return api.get_projects_for_workspace(resolved_workspace, opts)
 
 
 @projects_group.command("get-task-counts-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_task_counts_for_project(project_gid: str, opt_fields: str | None) -> Any:
+def get_task_counts_for_project(project: str, opt_fields: str | None) -> Any:
     """Get task count of a project"""
     session = AsanaSession.from_env()
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_task_counts_for_project(project_gid, opts)
+    return api.get_task_counts_for_project(project, opts)
 
 
 @projects_group.command("project-save-as-template")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="Describes the inputs used for creating a project template, such as the resulting project template's name, which team it should be created in.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def project_save_as_template(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def project_save_as_template(project: str, body: str, opt_fields: str | None) -> Any:
     """Create a project template from a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -274,28 +278,28 @@ def project_save_as_template(project_gid: str, body: str, opt_fields: str | None
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.project_save_as_template(parsed_body, project_gid, opts)
+    return api.project_save_as_template(parsed_body, project, opts)
 
 
 @projects_group.command("remove-custom-field-setting-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="Information about the custom field setting being removed.")
 @formatted
-def remove_custom_field_setting_for_project(project_gid: str, body: str) -> Any:
+def remove_custom_field_setting_for_project(project: str, body: str) -> Any:
     """Remove a custom field from a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_custom_field_setting_for_project(parsed_body, project_gid)
+    return api.remove_custom_field_setting_for_project(parsed_body, project)
 
 
 @projects_group.command("remove-followers-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="Information about the followers being removed.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def remove_followers_for_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def remove_followers_for_project(project: str, body: str, opt_fields: str | None) -> Any:
     """Remove followers from a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -303,15 +307,15 @@ def remove_followers_for_project(project_gid: str, body: str, opt_fields: str | 
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.remove_followers_for_project(parsed_body, project_gid, opts)
+    return api.remove_followers_for_project(parsed_body, project, opts)
 
 
 @projects_group.command("remove-members-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="Information about the members being removed.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def remove_members_for_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def remove_members_for_project(project: str, body: str, opt_fields: str | None) -> Any:
     """Remove users from a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -319,11 +323,11 @@ def remove_members_for_project(project_gid: str, body: str, opt_fields: str | No
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.remove_members_for_project(parsed_body, project_gid, opts)
+    return api.remove_members_for_project(parsed_body, project, opts)
 
 
 @projects_group.command("search-projects-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--completed", type=bool, default=None, help="Filter on project completion status.")
 @click.option("--completed-on", default=None, help="ISO 8601 date string or `null`.")
 @click.option("--created-on", default=None, help="ISO 8601 date string or `null`.")
@@ -334,8 +338,9 @@ def remove_members_for_project(project_gid: str, body: str, opt_fields: str | No
 @click.option("--start-on", default=None, help="ISO 8601 date string or `null`.")
 @click.option("--text", default=None, help="Performs full-text search on the project name.")
 @formatted
-def search_projects_for_workspace(workspace_gid: str, completed: bool | None, completed_on: str | None, created_on: str | None, due_on: str | None, opt_fields: str | None, sort_ascending: bool | None, sort_by: str | None, start_on: str | None, text: str | None) -> Any:
+def search_projects_for_workspace(workspace: str | None, completed: bool | None, completed_on: str | None, created_on: str | None, due_on: str | None, opt_fields: str | None, sort_ascending: bool | None, sort_by: str | None, start_on: str | None, text: str | None) -> Any:
     """Search projects in a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = ProjectsApi(session.client)
     opts: dict[str, Any] = {}
@@ -357,15 +362,15 @@ def search_projects_for_workspace(workspace_gid: str, completed: bool | None, co
         opts["start_on"] = start_on
     if text is not None:
         opts["text"] = text
-    return api.search_projects_for_workspace(workspace_gid, opts)
+    return api.search_projects_for_workspace(resolved_workspace, opts)
 
 
 @projects_group.command("update-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--body", required=True, help="The updated fields for the project.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_project(project: str, body: str, opt_fields: str | None) -> Any:
     """Update a project"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -373,4 +378,4 @@ def update_project(project_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_project(parsed_body, project_gid, opts)
+    return api.update_project(parsed_body, project, opts)

@@ -7,7 +7,7 @@ import click
 from asana import WorkspacesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("workspaces")
@@ -16,47 +16,50 @@ def workspaces_group() -> None:
 
 
 @workspaces_group.command("add-user-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--body", required=True, help="The user to add to the workspace.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_user_for_workspace(workspace_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_user_for_workspace(workspace: str | None, body: str, opt_fields: str | None) -> Any:
     """Add a user to a workspace or organization"""
     parsed_body = resolve_body(body)
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = WorkspacesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_user_for_workspace(parsed_body, workspace_gid, opts)
+    return api.add_user_for_workspace(parsed_body, resolved_workspace, opts)
 
 
 @workspaces_group.command("get-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_workspace(workspace_gid: str, opt_fields: str | None) -> Any:
+def get_workspace(workspace: str | None, opt_fields: str | None) -> Any:
     """Get a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = WorkspacesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_workspace(workspace_gid, opts)
+    return api.get_workspace(resolved_workspace, opts)
 
 
 @workspaces_group.command("get-workspace-events")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--sync", default=None, help="A sync token received from the last request, or none on first sync. Events will be returned from the point in time that the sync token was generated. *Note: On your first request, omit the sync tok...")
 @formatted
-def get_workspace_events(workspace_gid: str, sync: str | None) -> Any:
+def get_workspace_events(workspace: str | None, sync: str | None) -> Any:
     """Get workspace events"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = WorkspacesApi(session.client)
     opts: dict[str, Any] = {}
     if sync is not None:
         opts["sync"] = sync
-    return api.get_workspace_events(workspace_gid, opts)
+    return api.get_workspace_events(resolved_workspace, opts)
 
 
 @workspaces_group.command("get-workspaces")
@@ -80,29 +83,31 @@ def get_workspaces(limit: int | None, offset: str | None, opt_fields: str | None
 
 
 @workspaces_group.command("remove-user-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--body", required=True, help="The user to remove from the workspace.")
 @formatted
-def remove_user_for_workspace(workspace_gid: str, body: str) -> Any:
+def remove_user_for_workspace(workspace: str | None, body: str) -> Any:
     """Remove a user from a workspace or organization"""
     parsed_body = resolve_body(body)
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = WorkspacesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_user_for_workspace(parsed_body, workspace_gid)
+    return api.remove_user_for_workspace(parsed_body, resolved_workspace)
 
 
 @workspaces_group.command("update-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--body", required=True, help="The workspace object with all updated properties.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_workspace(workspace_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_workspace(workspace: str | None, body: str, opt_fields: str | None) -> Any:
     """Update a workspace"""
     parsed_body = resolve_body(body)
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = WorkspacesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_workspace(parsed_body, workspace_gid, opts)
+    return api.update_workspace(parsed_body, resolved_workspace, opts)

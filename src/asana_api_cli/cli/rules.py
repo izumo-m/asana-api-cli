@@ -7,7 +7,7 @@ import click
 from asana import RulesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("rules")
@@ -16,13 +16,13 @@ def rules_group() -> None:
 
 
 @rules_group.command("trigger-rule")
-@click.argument("rule_trigger_gid")
+@click.option("--rule-trigger", required=True, help="The ID of the incoming web request trigger. This value is a path parameter that is automatically generated for the API endpoint. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="A dictionary of variables accessible from within the rule.")
 @formatted
-def trigger_rule(rule_trigger_gid: str, body: str) -> Any:
+def trigger_rule(rule_trigger: str, body: str) -> Any:
     """Trigger a rule"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = RulesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.trigger_rule(parsed_body, rule_trigger_gid)
+    return api.trigger_rule(parsed_body, rule_trigger)

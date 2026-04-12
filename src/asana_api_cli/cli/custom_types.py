@@ -7,7 +7,7 @@ import click
 from asana import CustomTypesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("custom-types")
@@ -16,21 +16,21 @@ def custom_types_group() -> None:
 
 
 @custom_types_group.command("get-custom-type")
-@click.argument("custom_type_gid")
+@click.option("--custom-type", required=True, help="Globally unique identifier for the custom type.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_custom_type(custom_type_gid: str, opt_fields: str | None) -> Any:
+def get_custom_type(custom_type: str, opt_fields: str | None) -> Any:
     """Get a custom type"""
     session = AsanaSession.from_env()
     api = CustomTypesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_custom_type(custom_type_gid, opts)
+    return api.get_custom_type(custom_type, opts)
 
 
 @custom_types_group.command("get-custom-types")
-@click.argument("project")
+@click.option("--project", required=True, help="Globally unique identifier for the project, which is used as a filter when retrieving all custom types.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")

@@ -7,7 +7,7 @@ import click
 from asana import RolesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("roles")
@@ -31,40 +31,42 @@ def create_role(body: str, opt_fields: str | None) -> Any:
 
 
 @roles_group.command("delete-role")
-@click.argument("role_gid")
+@click.option("--role", required=True, help="Globally unique identifier for the role. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_role(role_gid: str) -> Any:
+def delete_role(role: str) -> Any:
     """Delete a role"""
     session = AsanaSession.from_env()
     api = RolesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_role(role_gid)
+    return api.delete_role(role)
 
 
 @roles_group.command("get-role")
-@click.argument("role_gid")
+@click.option("--role", required=True, help="Globally unique identifier for the role.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_role(role_gid: str, opt_fields: str | None) -> Any:
+def get_role(role: str, opt_fields: str | None) -> Any:
     """Get a role"""
     session = AsanaSession.from_env()
     api = RolesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_role(role_gid, opts)
+    return api.get_role(role, opts)
 
 
 @roles_group.command("get-roles")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--archived", type=bool, default=None, help="Only return projects whose `archived` field takes on the value of this parameter.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--workspace", default=None, help="The workspace or organization to filter roles on.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_roles(archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_roles(workspace: str | None, archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get multiple roles"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = RolesApi(session.client)
     opts: dict[str, Any] = {}
@@ -76,17 +78,17 @@ def get_roles(archived: bool | None, limit: int | None, offset: str | None, opt_
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_roles(opts)
 
 
 @roles_group.command("update-role")
-@click.argument("role_gid")
+@click.option("--role", required=True, help="Globally unique identifier for the role.")
 @click.option("--body", required=True, help="The updated fields for the role.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_role(role_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_role(role: str, body: str, opt_fields: str | None) -> Any:
     """Update a role"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -94,4 +96,4 @@ def update_role(role_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_role(parsed_body, role_gid, opts)
+    return api.update_role(parsed_body, role, opts)

@@ -7,7 +7,7 @@ import click
 from asana import CustomFieldSettingsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("custom-field-settings")
@@ -16,13 +16,13 @@ def custom_field_settings_group() -> None:
 
 
 @custom_field_settings_group.command("get-custom-field-settings-for-goal")
-@click.argument("goal_gid")
+@click.option("--goal", required=True, help="Globally unique identifier for the goal.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_custom_field_settings_for_goal(goal_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_custom_field_settings_for_goal(goal: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get a goal's custom fields"""
     session = AsanaSession.from_env(paginate=paginate)
     api = CustomFieldSettingsApi(session.client)
@@ -33,17 +33,17 @@ def get_custom_field_settings_for_goal(goal_gid: str, limit: int | None, offset:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_custom_field_settings_for_goal(goal_gid, opts)
+    return api.get_custom_field_settings_for_goal(goal, opts)
 
 
 @custom_field_settings_group.command("get-custom-field-settings-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_custom_field_settings_for_portfolio(portfolio_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_custom_field_settings_for_portfolio(portfolio: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get a portfolio's custom fields"""
     session = AsanaSession.from_env(paginate=paginate)
     api = CustomFieldSettingsApi(session.client)
@@ -54,17 +54,17 @@ def get_custom_field_settings_for_portfolio(portfolio_gid: str, limit: int | Non
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_custom_field_settings_for_portfolio(portfolio_gid, opts)
+    return api.get_custom_field_settings_for_portfolio(portfolio, opts)
 
 
 @custom_field_settings_group.command("get-custom-field-settings-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_custom_field_settings_for_project(project_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_custom_field_settings_for_project(project: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get a project's custom fields"""
     session = AsanaSession.from_env(paginate=paginate)
     api = CustomFieldSettingsApi(session.client)
@@ -75,18 +75,18 @@ def get_custom_field_settings_for_project(project_gid: str, limit: int | None, o
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_custom_field_settings_for_project(project_gid, opts)
+    return api.get_custom_field_settings_for_project(project, opts)
 
 
 @custom_field_settings_group.command("get-custom-field-settings-for-team")
-@click.argument("team_gid")
+@click.option("--team", required=True, help="Globally unique identifier for the team.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_custom_field_settings_for_team(team_gid: str, opt_fields: str | None) -> Any:
+def get_custom_field_settings_for_team(team: str, opt_fields: str | None) -> Any:
     """Get a team's custom fields"""
     session = AsanaSession.from_env()
     api = CustomFieldSettingsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_custom_field_settings_for_team(team_gid, opts)
+    return api.get_custom_field_settings_for_team(team, opts)

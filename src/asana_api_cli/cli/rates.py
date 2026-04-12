@@ -7,7 +7,7 @@ import click
 from asana import RatesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("rates")
@@ -31,28 +31,28 @@ def create_rate(body: str, opt_fields: str | None) -> Any:
 
 
 @rates_group.command("delete-rate")
-@click.argument("rate_gid")
+@click.option("--rate", required=True, help="Globally unique identifier for the rate. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_rate(rate_gid: str) -> Any:
+def delete_rate(rate: str) -> Any:
     """Delete a rate"""
     session = AsanaSession.from_env()
     api = RatesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_rate(rate_gid)
+    return api.delete_rate(rate)
 
 
 @rates_group.command("get-rate")
-@click.argument("rate_gid")
+@click.option("--rate", required=True, help="Globally unique identifier for the rate.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_rate(rate_gid: str, opt_fields: str | None) -> Any:
+def get_rate(rate: str, opt_fields: str | None) -> Any:
     """Get a rate"""
     session = AsanaSession.from_env()
     api = RatesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_rate(rate_gid, opts)
+    return api.get_rate(rate, opts)
 
 
 @rates_group.command("get-rates")
@@ -82,11 +82,11 @@ def get_rates(limit: int | None, offset: str | None, opt_fields: str | None, par
 
 
 @rates_group.command("update-rate")
-@click.argument("rate_gid")
+@click.option("--rate", required=True, help="Globally unique identifier for the rate.")
 @click.option("--body", required=True, help="The updated fields for the rate.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_rate(rate_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_rate(rate: str, body: str, opt_fields: str | None) -> Any:
     """Update a rate"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -94,4 +94,4 @@ def update_rate(rate_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_rate(parsed_body, rate_gid, opts)
+    return api.update_rate(parsed_body, rate, opts)

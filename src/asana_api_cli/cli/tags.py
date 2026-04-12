@@ -7,7 +7,7 @@ import click
 from asana import TagsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("tags")
@@ -31,55 +31,58 @@ def create_tag(body: str, opt_fields: str | None) -> Any:
 
 
 @tags_group.command("create-tag-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--body", required=True, help="The tag to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_tag_for_workspace(workspace_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_tag_for_workspace(workspace: str | None, body: str, opt_fields: str | None) -> Any:
     """Create a tag in a workspace"""
     parsed_body = resolve_body(body)
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = TagsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_tag_for_workspace(parsed_body, workspace_gid, opts)
+    return api.create_tag_for_workspace(parsed_body, resolved_workspace, opts)
 
 
 @tags_group.command("delete-tag")
-@click.argument("tag_gid")
+@click.option("--tag", required=True, help="Globally unique identifier for the tag. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_tag(tag_gid: str) -> Any:
+def delete_tag(tag: str) -> Any:
     """Delete a tag"""
     session = AsanaSession.from_env()
     api = TagsApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_tag(tag_gid)
+    return api.delete_tag(tag)
 
 
 @tags_group.command("get-tag")
-@click.argument("tag_gid")
+@click.option("--tag", required=True, help="Globally unique identifier for the tag.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_tag(tag_gid: str, opt_fields: str | None) -> Any:
+def get_tag(tag: str, opt_fields: str | None) -> Any:
     """Get a tag"""
     session = AsanaSession.from_env()
     api = TagsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_tag(tag_gid, opts)
+    return api.get_tag(tag, opts)
 
 
 @tags_group.command("get-tags")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--workspace", default=None, help="The workspace to filter tags on.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tags(limit: int | None, offset: str | None, opt_fields: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_tags(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get multiple tags"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = TagsApi(session.client)
     opts: dict[str, Any] = {}
@@ -89,19 +92,19 @@ def get_tags(limit: int | None, offset: str | None, opt_fields: str | None, work
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_tags(opts)
 
 
 @tags_group.command("get-tags-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tags_for_task(task_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tags_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get a task's tags"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TagsApi(session.client)
@@ -112,18 +115,19 @@ def get_tags_for_task(task_gid: str, limit: int | None, offset: str | None, opt_
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_tags_for_task(task_gid, opts)
+    return api.get_tags_for_task(task, opts)
 
 
 @tags_group.command("get-tags-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tags_for_workspace(workspace_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tags_for_workspace(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get tags in a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = TagsApi(session.client)
     opts: dict[str, Any] = {}
@@ -133,15 +137,15 @@ def get_tags_for_workspace(workspace_gid: str, limit: int | None, offset: str | 
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_tags_for_workspace(workspace_gid, opts)
+    return api.get_tags_for_workspace(resolved_workspace, opts)
 
 
 @tags_group.command("update-tag")
-@click.argument("tag_gid")
+@click.option("--tag", required=True, help="Globally unique identifier for the tag.")
 @click.option("--body", required=True, help="The tag to update.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_tag(tag_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_tag(tag: str, body: str, opt_fields: str | None) -> Any:
     """Update a tag"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -149,4 +153,4 @@ def update_tag(tag_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_tag(parsed_body, tag_gid, opts)
+    return api.update_tag(parsed_body, tag, opts)

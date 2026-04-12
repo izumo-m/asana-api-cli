@@ -7,7 +7,7 @@ import click
 from asana import ProjectMembershipsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("project-memberships")
@@ -16,28 +16,28 @@ def project_memberships_group() -> None:
 
 
 @project_memberships_group.command("get-project-membership")
-@click.argument("project_membership_gid")
+@click.option("--project-membership", required=True)
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_project_membership(project_membership_gid: str, opt_fields: str | None) -> Any:
+def get_project_membership(project_membership: str, opt_fields: str | None) -> Any:
     """Get a project membership"""
     session = AsanaSession.from_env()
     api = ProjectMembershipsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_project_membership(project_membership_gid, opts)
+    return api.get_project_membership(project_membership, opts)
 
 
 @project_memberships_group.command("get-project-memberships-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--user", default=None, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_project_memberships_for_project(project_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, user: str | None, paginate: bool) -> Any:
+def get_project_memberships_for_project(project: str, limit: int | None, offset: str | None, opt_fields: str | None, user: str | None, paginate: bool) -> Any:
     """Get memberships from a project"""
     session = AsanaSession.from_env(paginate=paginate)
     api = ProjectMembershipsApi(session.client)
@@ -50,4 +50,4 @@ def get_project_memberships_for_project(project_gid: str, limit: int | None, off
         opts["opt_fields"] = opt_fields
     if user is not None:
         opts["user"] = user
-    return api.get_project_memberships_for_project(project_gid, opts)
+    return api.get_project_memberships_for_project(project, opts)

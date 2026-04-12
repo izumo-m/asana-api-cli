@@ -47,6 +47,8 @@ def formatted(f: Any) -> Any:
 
 def _handle_api_exception(e: ApiException) -> None:
     """Print an Asana API error in human-readable form and exit."""
+    from asana_api_cli.session import runtime
+
     status = e.status or "error"
     messages: list[str] = []
     body = e.body
@@ -64,7 +66,28 @@ def _handle_api_exception(e: ApiException) -> None:
         messages.append(e.reason or "Unknown API error")
     for msg in messages:
         click.echo(f"Error ({status}): {msg}", err=True)
+    # When the body was not JSON, show a hint and,
+    # in debug mode, dump the raw body so the user can diagnose the issue.
+    if isinstance(body, str) and body and not _is_json(body):
+        click.echo(
+            "The server returned a non-JSON response. "
+            "Re-run with --debug to see the full response body.",
+            err=True,
+        )
+        if runtime.debug:
+            click.echo("--- raw response body ---", err=True)
+            click.echo(body, err=True)
+            click.echo("--- end of response body ---", err=True)
     sys.exit(1)
+
+
+def _is_json(text: str) -> bool:
+    """Return True if *text* looks like JSON."""
+    try:
+        json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return True
 
 
 def _format_output(data: Any, *, output_format: str, jq_query: str | None) -> None:

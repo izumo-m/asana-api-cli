@@ -7,7 +7,7 @@ import click
 from asana import TimeTrackingCategoriesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("time-tracking-categories")
@@ -31,26 +31,27 @@ def create_time_tracking_category(body: str, opt_fields: str | None) -> Any:
 
 
 @time_tracking_categories_group.command("delete-time-tracking-category")
-@click.argument("time_tracking_category_gid")
+@click.option("--time-tracking-category", required=True, help="Globally unique identifier for the time tracking category. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_time_tracking_category(time_tracking_category_gid: str) -> Any:
+def delete_time_tracking_category(time_tracking_category: str) -> Any:
     """Delete a time tracking category"""
     session = AsanaSession.from_env()
     api = TimeTrackingCategoriesApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_time_tracking_category(time_tracking_category_gid)
+    return api.delete_time_tracking_category(time_tracking_category)
 
 
 @time_tracking_categories_group.command("get-time-tracking-categories")
-@click.argument("workspace")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--is-archived", type=bool, default=None, help="Filter by archived status. If not provided, defaults to returning non-archived categories.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_time_tracking_categories(workspace: str, is_archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_time_tracking_categories(workspace: str | None, is_archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get time tracking categories for a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = TimeTrackingCategoriesApi(session.client)
     opts: dict[str, Any] = {}
@@ -62,25 +63,25 @@ def get_time_tracking_categories(workspace: str, is_archived: bool | None, limit
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_time_tracking_categories(workspace, opts)
+    return api.get_time_tracking_categories(resolved_workspace, opts)
 
 
 @time_tracking_categories_group.command("get-time-tracking-category")
-@click.argument("time_tracking_category_gid")
+@click.option("--time-tracking-category", required=True, help="Globally unique identifier for the time tracking category.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_time_tracking_category(time_tracking_category_gid: str, opt_fields: str | None) -> Any:
+def get_time_tracking_category(time_tracking_category: str, opt_fields: str | None) -> Any:
     """Get a time tracking category"""
     session = AsanaSession.from_env()
     api = TimeTrackingCategoriesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_time_tracking_category(time_tracking_category_gid, opts)
+    return api.get_time_tracking_category(time_tracking_category, opts)
 
 
 @time_tracking_categories_group.command("get-time-tracking-entries-for-time-tracking-category")
-@click.argument("time_tracking_category_gid")
+@click.option("--time-tracking-category", required=True, help="Globally unique identifier for the time tracking category.")
 @click.option("--end-date", default=None, help="The end date for filtering time tracking entries by their entry date.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
@@ -88,7 +89,7 @@ def get_time_tracking_category(time_tracking_category_gid: str, opt_fields: str 
 @click.option("--start-date", default=None, help="The start date for filtering time tracking entries by their entry date.")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_time_tracking_entries_for_time_tracking_category(time_tracking_category_gid: str, end_date: str | None, limit: int | None, offset: str | None, opt_fields: str | None, start_date: str | None, paginate: bool) -> Any:
+def get_time_tracking_entries_for_time_tracking_category(time_tracking_category: str, end_date: str | None, limit: int | None, offset: str | None, opt_fields: str | None, start_date: str | None, paginate: bool) -> Any:
     """Get time tracking entries for a time tracking category"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TimeTrackingCategoriesApi(session.client)
@@ -103,15 +104,15 @@ def get_time_tracking_entries_for_time_tracking_category(time_tracking_category_
         opts["opt_fields"] = opt_fields
     if start_date is not None:
         opts["start_date"] = start_date
-    return api.get_time_tracking_entries_for_time_tracking_category(time_tracking_category_gid, opts)
+    return api.get_time_tracking_entries_for_time_tracking_category(time_tracking_category, opts)
 
 
 @time_tracking_categories_group.command("update-time-tracking-category")
-@click.argument("time_tracking_category_gid")
+@click.option("--time-tracking-category", required=True, help="Globally unique identifier for the time tracking category.")
 @click.option("--body", required=True, help="The updated fields for the time tracking category.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_time_tracking_category(time_tracking_category_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_time_tracking_category(time_tracking_category: str, body: str, opt_fields: str | None) -> Any:
     """Update a time tracking category"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -119,4 +120,4 @@ def update_time_tracking_category(time_tracking_category_gid: str, body: str, op
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_time_tracking_category(parsed_body, time_tracking_category_gid, opts)
+    return api.update_time_tracking_category(parsed_body, time_tracking_category, opts)

@@ -7,7 +7,7 @@ import click
 from asana import PortfoliosApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("portfolios")
@@ -16,37 +16,37 @@ def portfolios_group() -> None:
 
 
 @portfolios_group.command("add-custom-field-setting-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="Information about the custom field setting.")
 @formatted
-def add_custom_field_setting_for_portfolio(portfolio_gid: str, body: str) -> Any:
+def add_custom_field_setting_for_portfolio(portfolio: str, body: str) -> Any:
     """Add a custom field to a portfolio"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_custom_field_setting_for_portfolio(parsed_body, portfolio_gid)
+    return api.add_custom_field_setting_for_portfolio(parsed_body, portfolio)
 
 
 @portfolios_group.command("add-item-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="Information about the item being inserted.")
 @formatted
-def add_item_for_portfolio(portfolio_gid: str, body: str) -> Any:
+def add_item_for_portfolio(portfolio: str, body: str) -> Any:
     """Add a portfolio item"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_item_for_portfolio(parsed_body, portfolio_gid)
+    return api.add_item_for_portfolio(parsed_body, portfolio)
 
 
 @portfolios_group.command("add-members-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--body", required=True, help="Information about the members being added.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_members_for_portfolio(portfolio_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_members_for_portfolio(portfolio: str, body: str, opt_fields: str | None) -> Any:
     """Add users to a portfolio"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -54,7 +54,7 @@ def add_members_for_portfolio(portfolio_gid: str, body: str, opt_fields: str | N
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_members_for_portfolio(parsed_body, portfolio_gid, opts)
+    return api.add_members_for_portfolio(parsed_body, portfolio, opts)
 
 
 @portfolios_group.command("create-portfolio")
@@ -73,38 +73,38 @@ def create_portfolio(body: str, opt_fields: str | None) -> Any:
 
 
 @portfolios_group.command("delete-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_portfolio(portfolio_gid: str) -> Any:
+def delete_portfolio(portfolio: str) -> Any:
     """Delete a portfolio"""
     session = AsanaSession.from_env()
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_portfolio(portfolio_gid)
+    return api.delete_portfolio(portfolio)
 
 
 @portfolios_group.command("duplicate-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def duplicate_portfolio(portfolio_gid: str, opt_fields: str | None) -> Any:
+def duplicate_portfolio(portfolio: str, opt_fields: str | None) -> Any:
     """Duplicate a portfolio"""
     session = AsanaSession.from_env()
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.duplicate_portfolio(portfolio_gid, opts)
+    return api.duplicate_portfolio(portfolio, opts)
 
 
 @portfolios_group.command("get-items-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_items_for_portfolio(portfolio_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_items_for_portfolio(portfolio: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get portfolio items"""
     session = AsanaSession.from_env(paginate=paginate)
     api = PortfoliosApi(session.client)
@@ -115,33 +115,34 @@ def get_items_for_portfolio(portfolio_gid: str, limit: int | None, offset: str |
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_items_for_portfolio(portfolio_gid, opts)
+    return api.get_items_for_portfolio(portfolio, opts)
 
 
 @portfolios_group.command("get-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_portfolio(portfolio_gid: str, opt_fields: str | None) -> Any:
+def get_portfolio(portfolio: str, opt_fields: str | None) -> Any:
     """Get a portfolio"""
     session = AsanaSession.from_env()
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_portfolio(portfolio_gid, opts)
+    return api.get_portfolio(portfolio, opts)
 
 
 @portfolios_group.command("get-portfolios")
-@click.argument("workspace")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--owner", default=None, help="The user who owns the portfolio. Currently, API users can only get a list of portfolios that they themselves own, unless the request is made from a Service Account. In the case of a Service Account...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_portfolios(workspace: str, limit: int | None, offset: str | None, opt_fields: str | None, owner: str | None, paginate: bool) -> Any:
+def get_portfolios(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, owner: str | None, paginate: bool) -> Any:
     """Get multiple portfolios"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
@@ -153,41 +154,41 @@ def get_portfolios(workspace: str, limit: int | None, offset: str | None, opt_fi
         opts["opt_fields"] = opt_fields
     if owner is not None:
         opts["owner"] = owner
-    return api.get_portfolios(workspace, opts)
+    return api.get_portfolios(resolved_workspace, opts)
 
 
 @portfolios_group.command("remove-custom-field-setting-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="Information about the custom field setting being removed.")
 @formatted
-def remove_custom_field_setting_for_portfolio(portfolio_gid: str, body: str) -> Any:
+def remove_custom_field_setting_for_portfolio(portfolio: str, body: str) -> Any:
     """Remove a custom field from a portfolio"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_custom_field_setting_for_portfolio(parsed_body, portfolio_gid)
+    return api.remove_custom_field_setting_for_portfolio(parsed_body, portfolio)
 
 
 @portfolios_group.command("remove-item-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="Information about the item being removed.")
 @formatted
-def remove_item_for_portfolio(portfolio_gid: str, body: str) -> Any:
+def remove_item_for_portfolio(portfolio: str, body: str) -> Any:
     """Remove a portfolio item"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = PortfoliosApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_item_for_portfolio(parsed_body, portfolio_gid)
+    return api.remove_item_for_portfolio(parsed_body, portfolio)
 
 
 @portfolios_group.command("remove-members-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--body", required=True, help="Information about the members being removed.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def remove_members_for_portfolio(portfolio_gid: str, body: str, opt_fields: str | None) -> Any:
+def remove_members_for_portfolio(portfolio: str, body: str, opt_fields: str | None) -> Any:
     """Remove users from a portfolio"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -195,15 +196,15 @@ def remove_members_for_portfolio(portfolio_gid: str, body: str, opt_fields: str 
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.remove_members_for_portfolio(parsed_body, portfolio_gid, opts)
+    return api.remove_members_for_portfolio(parsed_body, portfolio, opts)
 
 
 @portfolios_group.command("update-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--body", required=True, help="The updated fields for the portfolio.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_portfolio(portfolio_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_portfolio(portfolio: str, body: str, opt_fields: str | None) -> Any:
     """Update a portfolio"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -211,4 +212,4 @@ def update_portfolio(portfolio_gid: str, body: str, opt_fields: str | None) -> A
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_portfolio(parsed_body, portfolio_gid, opts)
+    return api.update_portfolio(parsed_body, portfolio, opts)

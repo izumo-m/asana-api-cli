@@ -7,7 +7,7 @@ import click
 from asana import TasksApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("tasks")
@@ -16,37 +16,37 @@ def tasks_group() -> None:
 
 
 @tasks_group.command("add-dependencies-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The list of tasks to set as dependencies.")
 @formatted
-def add_dependencies_for_task(task_gid: str, body: str) -> Any:
+def add_dependencies_for_task(task: str, body: str) -> Any:
     """Set dependencies for a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_dependencies_for_task(parsed_body, task_gid)
+    return api.add_dependencies_for_task(parsed_body, task)
 
 
 @tasks_group.command("add-dependents-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The list of tasks to add as dependents.")
 @formatted
-def add_dependents_for_task(task_gid: str, body: str) -> Any:
+def add_dependents_for_task(task: str, body: str) -> Any:
     """Set dependents for a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_dependents_for_task(parsed_body, task_gid)
+    return api.add_dependents_for_task(parsed_body, task)
 
 
 @tasks_group.command("add-followers-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--body", required=True, help="The followers to add to the task.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def add_followers_for_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
+def add_followers_for_task(task: str, body: str, opt_fields: str | None) -> Any:
     """Add followers to a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -54,41 +54,41 @@ def add_followers_for_task(task_gid: str, body: str, opt_fields: str | None) -> 
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.add_followers_for_task(parsed_body, task_gid, opts)
+    return api.add_followers_for_task(parsed_body, task, opts)
 
 
 @tasks_group.command("add-project-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The project to add the task to.")
 @formatted
-def add_project_for_task(task_gid: str, body: str) -> Any:
+def add_project_for_task(task: str, body: str) -> Any:
     """Add a project to a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_project_for_task(parsed_body, task_gid)
+    return api.add_project_for_task(parsed_body, task)
 
 
 @tasks_group.command("add-tag-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The tag to add to the task.")
 @formatted
-def add_tag_for_task(task_gid: str, body: str) -> Any:
+def add_tag_for_task(task: str, body: str) -> Any:
     """Add a tag to a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.add_tag_for_task(parsed_body, task_gid)
+    return api.add_tag_for_task(parsed_body, task)
 
 
 @tasks_group.command("create-subtask-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--body", required=True, help="The new subtask to create.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def create_subtask_for_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
+def create_subtask_for_task(task: str, body: str, opt_fields: str | None) -> Any:
     """Create a subtask"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -96,7 +96,7 @@ def create_subtask_for_task(task_gid: str, body: str, opt_fields: str | None) ->
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.create_subtask_for_task(parsed_body, task_gid, opts)
+    return api.create_subtask_for_task(parsed_body, task, opts)
 
 
 @tasks_group.command("create-task")
@@ -115,22 +115,22 @@ def create_task(body: str, opt_fields: str | None) -> Any:
 
 
 @tasks_group.command("delete-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @formatted
-def delete_task(task_gid: str) -> Any:
+def delete_task(task: str) -> Any:
     """Delete a task"""
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.delete_task(task_gid)
+    return api.delete_task(task)
 
 
 @tasks_group.command("duplicate-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--body", required=True, help="Describes the duplicate's name and the fields that will be duplicated.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def duplicate_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
+def duplicate_task(task: str, body: str, opt_fields: str | None) -> Any:
     """Duplicate a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -138,17 +138,17 @@ def duplicate_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.duplicate_task(parsed_body, task_gid, opts)
+    return api.duplicate_task(parsed_body, task, opts)
 
 
 @tasks_group.command("get-dependencies-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_dependencies_for_task(task_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_dependencies_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get dependencies from a task"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
@@ -159,17 +159,17 @@ def get_dependencies_for_task(task_gid: str, limit: int | None, offset: str | No
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_dependencies_for_task(task_gid, opts)
+    return api.get_dependencies_for_task(task, opts)
 
 
 @tasks_group.command("get-dependents-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_dependents_for_task(task_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_dependents_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get dependents from a task"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
@@ -180,17 +180,17 @@ def get_dependents_for_task(task_gid: str, limit: int | None, offset: str | None
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_dependents_for_task(task_gid, opts)
+    return api.get_dependents_for_task(task, opts)
 
 
 @tasks_group.command("get-subtasks-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_subtasks_for_task(task_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_subtasks_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get subtasks from a task"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
@@ -201,36 +201,38 @@ def get_subtasks_for_task(task_gid: str, limit: int | None, offset: str | None, 
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_subtasks_for_task(task_gid, opts)
+    return api.get_subtasks_for_task(task, opts)
 
 
 @tasks_group.command("get-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_task(task_gid: str, opt_fields: str | None) -> Any:
+def get_task(task: str, opt_fields: str | None) -> Any:
     """Get a task"""
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_task(task_gid, opts)
+    return api.get_task(task, opts)
 
 
 @tasks_group.command("get-task-for-custom-id")
-@click.argument("workspace_gid")
-@click.argument("custom_id")
+@click.option("--custom-id", required=True, help="Generated custom ID for a task. If the method is called asynchronously, returns the request thread.")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @formatted
-def get_task_for_custom_id(workspace_gid: str, custom_id: str) -> Any:
+def get_task_for_custom_id(custom_id: str, workspace: str | None) -> Any:
     """Get a task for a given custom ID"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.get_task_for_custom_id(workspace_gid, custom_id)
+    return api.get_task_for_custom_id(resolved_workspace, custom_id)
 
 
 @tasks_group.command("get-tasks")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--assignee", default=None, help="The assignee to filter tasks on. If searching for unassigned tasks, assignee.any = null can be specified. *Note: If you specify `assignee`, you must also specify the `workspace` to filter on.*")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
@@ -239,11 +241,12 @@ def get_task_for_custom_id(workspace_gid: str, custom_id: str) -> Any:
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--project", default=None, help="The project to filter tasks on.")
 @click.option("--section", default=None, help="The section to filter tasks on.")
-@click.option("--workspace", default=None, help="The workspace to filter tasks on. *Note: If you specify `workspace`, you must also specify the `assignee` to filter on.*")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tasks(assignee: str | None, completed_since: str | None, limit: int | None, modified_since: str | None, offset: str | None, opt_fields: str | None, project: str | None, section: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_tasks(workspace: str | None, assignee: str | None, completed_since: str | None, limit: int | None, modified_since: str | None, offset: str | None, opt_fields: str | None, project: str | None, section: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get multiple tasks"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
@@ -263,20 +266,20 @@ def get_tasks(assignee: str | None, completed_since: str | None, limit: int | No
         opts["project"] = project
     if section is not None:
         opts["section"] = section
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_tasks(opts)
 
 
 @tasks_group.command("get-tasks-for-project")
-@click.argument("project_gid")
+@click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time. Accepts a date-time string or the keyword *now*.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tasks_for_project(project_gid: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_project(project: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get tasks from a project"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
@@ -289,18 +292,18 @@ def get_tasks_for_project(project_gid: str, completed_since: str | None, limit: 
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_tasks_for_project(project_gid, opts)
+    return api.get_tasks_for_project(project, opts)
 
 
 @tasks_group.command("get-tasks-for-section")
-@click.argument("section_gid")
+@click.option("--section", required=True, help="The globally unique identifier for the section.")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time. Accepts a date-time string or the keyword *now*.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tasks_for_section(section_gid: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_section(section: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get tasks from a section"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
@@ -313,17 +316,17 @@ def get_tasks_for_section(section_gid: str, completed_since: str | None, limit: 
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_tasks_for_section(section_gid, opts)
+    return api.get_tasks_for_section(section, opts)
 
 
 @tasks_group.command("get-tasks-for-tag")
-@click.argument("tag_gid")
+@click.option("--tag", required=True, help="Globally unique identifier for the tag.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tasks_for_tag(tag_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_tag(tag: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get tasks from a tag"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
@@ -334,18 +337,18 @@ def get_tasks_for_tag(tag_gid: str, limit: int | None, offset: str | None, opt_f
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_tasks_for_tag(tag_gid, opts)
+    return api.get_tasks_for_tag(tag, opts)
 
 
 @tasks_group.command("get-tasks-for-user-task-list")
-@click.argument("user_task_list_gid")
+@click.option("--user-task-list", required=True, help="Globally unique identifier for the user task list.")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time. Accepts a date-time string or the keyword *now*.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tasks_for_user_task_list(user_task_list_gid: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_user_task_list(user_task_list: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
     """Get tasks from a user task list"""
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
@@ -358,41 +361,41 @@ def get_tasks_for_user_task_list(user_task_list_gid: str, completed_since: str |
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_tasks_for_user_task_list(user_task_list_gid, opts)
+    return api.get_tasks_for_user_task_list(user_task_list, opts)
 
 
 @tasks_group.command("remove-dependencies-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The list of tasks to unlink as dependencies.")
 @formatted
-def remove_dependencies_for_task(task_gid: str, body: str) -> Any:
+def remove_dependencies_for_task(task: str, body: str) -> Any:
     """Unlink dependencies from a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_dependencies_for_task(parsed_body, task_gid)
+    return api.remove_dependencies_for_task(parsed_body, task)
 
 
 @tasks_group.command("remove-dependents-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The list of tasks to remove as dependents.")
 @formatted
-def remove_dependents_for_task(task_gid: str, body: str) -> Any:
+def remove_dependents_for_task(task: str, body: str) -> Any:
     """Unlink dependents from a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_dependents_for_task(parsed_body, task_gid)
+    return api.remove_dependents_for_task(parsed_body, task)
 
 
 @tasks_group.command("remove-follower-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--body", required=True, help="The followers to remove from the task.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def remove_follower_for_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
+def remove_follower_for_task(task: str, body: str, opt_fields: str | None) -> Any:
     """Remove followers from a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -400,37 +403,37 @@ def remove_follower_for_task(task_gid: str, body: str, opt_fields: str | None) -
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.remove_follower_for_task(parsed_body, task_gid, opts)
+    return api.remove_follower_for_task(parsed_body, task, opts)
 
 
 @tasks_group.command("remove-project-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The project to remove the task from.")
 @formatted
-def remove_project_for_task(task_gid: str, body: str) -> Any:
+def remove_project_for_task(task: str, body: str) -> Any:
     """Remove a project from a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_project_for_task(parsed_body, task_gid)
+    return api.remove_project_for_task(parsed_body, task)
 
 
 @tasks_group.command("remove-tag-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on. If the method is called asynchronously, returns the request thread.")
 @click.option("--body", required=True, help="The tag to remove from the task.")
 @formatted
-def remove_tag_for_task(task_gid: str, body: str) -> Any:
+def remove_tag_for_task(task: str, body: str) -> Any:
     """Remove a tag from a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    return api.remove_tag_for_task(parsed_body, task_gid)
+    return api.remove_tag_for_task(parsed_body, task)
 
 
 @tasks_group.command("search-tasks-for-workspace")
-@click.argument("workspace_gid")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--completed", type=bool, default=None, help="Filter to completed tasks")
 @click.option("--completed-on", default=None, help="ISO 8601 date string or `null`")
 @click.option("--created-on", default=None, help="ISO 8601 date string or `null`")
@@ -447,8 +450,9 @@ def remove_tag_for_task(task_gid: str, body: str) -> Any:
 @click.option("--start-on", default=None, help="ISO 8601 date string or `null`")
 @click.option("--text", default=None, help="Performs full-text search on both task name and description")
 @formatted
-def search_tasks_for_workspace(workspace_gid: str, completed: bool | None, completed_on: str | None, created_on: str | None, due_on: str | None, has_attachment: bool | None, is_blocked: bool | None, is_blocking: bool | None, is_subtask: bool | None, modified_on: str | None, opt_fields: str | None, resource_subtype: str | None, sort_ascending: bool | None, sort_by: str | None, start_on: str | None, text: str | None) -> Any:
+def search_tasks_for_workspace(workspace: str | None, completed: bool | None, completed_on: str | None, created_on: str | None, due_on: str | None, has_attachment: bool | None, is_blocked: bool | None, is_blocking: bool | None, is_subtask: bool | None, modified_on: str | None, opt_fields: str | None, resource_subtype: str | None, sort_ascending: bool | None, sort_by: str | None, start_on: str | None, text: str | None) -> Any:
     """Search tasks in a workspace"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env()
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
@@ -482,15 +486,15 @@ def search_tasks_for_workspace(workspace_gid: str, completed: bool | None, compl
         opts["start_on"] = start_on
     if text is not None:
         opts["text"] = text
-    return api.search_tasks_for_workspace(workspace_gid, opts)
+    return api.search_tasks_for_workspace(resolved_workspace, opts)
 
 
 @tasks_group.command("set-parent-for-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--body", required=True, help="The new parent of the subtask.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def set_parent_for_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
+def set_parent_for_task(task: str, body: str, opt_fields: str | None) -> Any:
     """Set the parent of a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -498,15 +502,15 @@ def set_parent_for_task(task_gid: str, body: str, opt_fields: str | None) -> Any
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.set_parent_for_task(parsed_body, task_gid, opts)
+    return api.set_parent_for_task(parsed_body, task, opts)
 
 
 @tasks_group.command("update-task")
-@click.argument("task_gid")
+@click.option("--task", required=True, help="The task to operate on.")
 @click.option("--body", required=True, help="The task to update.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_task(task: str, body: str, opt_fields: str | None) -> Any:
     """Update a task"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -514,4 +518,4 @@ def update_task(task_gid: str, body: str, opt_fields: str | None) -> Any:
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_task(parsed_body, task_gid, opts)
+    return api.update_task(parsed_body, task, opts)

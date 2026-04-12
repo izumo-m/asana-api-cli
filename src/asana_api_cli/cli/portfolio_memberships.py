@@ -7,7 +7,7 @@ import click
 from asana import PortfolioMembershipsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("portfolio-memberships")
@@ -16,30 +16,32 @@ def portfolio_memberships_group() -> None:
 
 
 @portfolio_memberships_group.command("get-portfolio-membership")
-@click.argument("portfolio_membership_gid")
+@click.option("--portfolio-membership", required=True)
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_portfolio_membership(portfolio_membership_gid: str, opt_fields: str | None) -> Any:
+def get_portfolio_membership(portfolio_membership: str, opt_fields: str | None) -> Any:
     """Get a portfolio membership"""
     session = AsanaSession.from_env()
     api = PortfolioMembershipsApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_portfolio_membership(portfolio_membership_gid, opts)
+    return api.get_portfolio_membership(portfolio_membership, opts)
 
 
 @portfolio_memberships_group.command("get-portfolio-memberships")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--portfolio", default=None, help="The portfolio to filter results on.")
 @click.option("--user", default=None, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
-@click.option("--workspace", default=None, help="The workspace to filter results on.")
+@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_portfolio_memberships(limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, user: str | None, workspace: str | None, paginate: bool) -> Any:
+def get_portfolio_memberships(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, portfolio: str | None, user: str | None, no_workspace: bool, paginate: bool) -> Any:
     """Get multiple portfolio memberships"""
+    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = PortfolioMembershipsApi(session.client)
     opts: dict[str, Any] = {}
@@ -53,20 +55,20 @@ def get_portfolio_memberships(limit: int | None, offset: str | None, opt_fields:
         opts["portfolio"] = portfolio
     if user is not None:
         opts["user"] = user
-    if workspace is not None:
-        opts["workspace"] = workspace
+    if resolved_workspace is not None:
+        opts["workspace"] = resolved_workspace
     return api.get_portfolio_memberships(opts)
 
 
 @portfolio_memberships_group.command("get-portfolio-memberships-for-portfolio")
-@click.argument("portfolio_gid")
+@click.option("--portfolio", required=True, help="Globally unique identifier for the portfolio.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--user", default=None, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user.")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_portfolio_memberships_for_portfolio(portfolio_gid: str, limit: int | None, offset: str | None, opt_fields: str | None, user: str | None, paginate: bool) -> Any:
+def get_portfolio_memberships_for_portfolio(portfolio: str, limit: int | None, offset: str | None, opt_fields: str | None, user: str | None, paginate: bool) -> Any:
     """Get memberships from a portfolio"""
     session = AsanaSession.from_env(paginate=paginate)
     api = PortfolioMembershipsApi(session.client)
@@ -79,4 +81,4 @@ def get_portfolio_memberships_for_portfolio(portfolio_gid: str, limit: int | Non
         opts["opt_fields"] = opt_fields
     if user is not None:
         opts["user"] = user
-    return api.get_portfolio_memberships_for_portfolio(portfolio_gid, opts)
+    return api.get_portfolio_memberships_for_portfolio(portfolio, opts)

@@ -7,7 +7,7 @@ import click
 from asana import EventsApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("events")
@@ -16,7 +16,7 @@ def events_group() -> None:
 
 
 @events_group.command("get-events")
-@click.argument("resource")
+@click.option("--resource", required=True, help="A resource ID to subscribe to. The resource can be a task, project, or goal.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--sync", default=None, help="A sync token received from the last request, or none on first sync. Events will be returned from the point in time that the sync token was generated. *Note: On your first request, omit the sync tok...")
 @formatted

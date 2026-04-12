@@ -7,7 +7,7 @@ import click
 from asana import TimesheetApprovalStatusesApi
 
 from asana_api_cli.formatter import formatted
-from asana_api_cli.session import AsanaSession, resolve_body
+from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
 @click.group("timesheet-approval-statuses")
@@ -31,21 +31,21 @@ def create_timesheet_approval_status(body: str, opt_fields: str | None) -> Any:
 
 
 @timesheet_approval_statuses_group.command("get-timesheet-approval-status")
-@click.argument("timesheet_approval_status_gid")
+@click.option("--timesheet-approval-status", required=True, help="Globally unique identifier for the timesheet approval status.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def get_timesheet_approval_status(timesheet_approval_status_gid: str, opt_fields: str | None) -> Any:
+def get_timesheet_approval_status(timesheet_approval_status: str, opt_fields: str | None) -> Any:
     """Get a timesheet approval status"""
     session = AsanaSession.from_env()
     api = TimesheetApprovalStatusesApi(session.client)
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.get_timesheet_approval_status(timesheet_approval_status_gid, opts)
+    return api.get_timesheet_approval_status(timesheet_approval_status, opts)
 
 
 @timesheet_approval_statuses_group.command("get-timesheet-approval-statuses")
-@click.argument("workspace")
+@click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--approval-statuses", default=None, help="Filter by approval status. Can be one or more of draft, submitted, approved, or rejected.")
 @click.option("--from-date", default=None, help="The start date for filtering timesheet approval statuses.")
 @click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
@@ -55,8 +55,9 @@ def get_timesheet_approval_status(timesheet_approval_status_gid: str, opt_fields
 @click.option("--user", default=None, help="Globally unique identifier for the user to filter timesheet approval statuses by.")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_timesheet_approval_statuses(workspace: str, approval_statuses: str | None, from_date: str | None, limit: int | None, offset: str | None, opt_fields: str | None, to_date: str | None, user: str | None, paginate: bool) -> Any:
+def get_timesheet_approval_statuses(workspace: str | None, approval_statuses: str | None, from_date: str | None, limit: int | None, offset: str | None, opt_fields: str | None, to_date: str | None, user: str | None, paginate: bool) -> Any:
     """Get multiple timesheet approval statuses"""
+    resolved_workspace = resolve_workspace(workspace, required=True)
     session = AsanaSession.from_env(paginate=paginate)
     api = TimesheetApprovalStatusesApi(session.client)
     opts: dict[str, Any] = {}
@@ -74,15 +75,15 @@ def get_timesheet_approval_statuses(workspace: str, approval_statuses: str | Non
         opts["to_date"] = to_date
     if user is not None:
         opts["user"] = user
-    return api.get_timesheet_approval_statuses(workspace, opts)
+    return api.get_timesheet_approval_statuses(resolved_workspace, opts)
 
 
 @timesheet_approval_statuses_group.command("update-timesheet-approval-status")
-@click.argument("timesheet_approval_status_gid")
+@click.option("--timesheet-approval-status", required=True, help="Globally unique identifier for the timesheet approval status.")
 @click.option("--body", required=True, help="The fields to update on the timesheet approval status.")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @formatted
-def update_timesheet_approval_status(timesheet_approval_status_gid: str, body: str, opt_fields: str | None) -> Any:
+def update_timesheet_approval_status(timesheet_approval_status: str, body: str, opt_fields: str | None) -> Any:
     """Update a timesheet approval status"""
     parsed_body = resolve_body(body)
     session = AsanaSession.from_env()
@@ -90,4 +91,4 @@ def update_timesheet_approval_status(timesheet_approval_status_gid: str, body: s
     opts: dict[str, Any] = {}
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
-    return api.update_timesheet_approval_status(parsed_body, timesheet_approval_status_gid, opts)
+    return api.update_timesheet_approval_status(parsed_body, timesheet_approval_status, opts)
