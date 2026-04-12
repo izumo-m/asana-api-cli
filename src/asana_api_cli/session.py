@@ -65,7 +65,6 @@ class _Runtime:
     timeout: float | None = None
     token_env: str = DEFAULT_TOKEN_ENV
     temp_dir: str | None = None
-    default_workspace: str | None = None
 
 
 runtime = _Runtime()
@@ -145,28 +144,29 @@ class AsanaSession:
 def resolve_workspace(
     explicit: str | None,
     *,
-    no_workspace: bool = False,
     required: bool = False,
 ) -> str | None:
     """Resolve workspace GID with fallback chain.
 
-    Priority: explicit value > ASANA_DEFAULT_WORKSPACE env > --default-workspace flag.
-    If *no_workspace* is set, always returns None (skip sending workspace).
-    If *required* is set and no value is found, exits with an error.
+    Priority: explicit ``--workspace`` value > ``ASANA_DEFAULT_WORKSPACE``
+    env var (only when *required* is True).
+
+    When workspace is optional (``required=False``), the env-var fallback is
+    **not** used.  This prevents the default workspace from being sent
+    alongside other scope parameters (e.g. ``--project`` on ``get-tasks``)
+    that are mutually exclusive with workspace in the Asana API.
+
+    If *required* is True and no value is found, exits with an error.
     """
-    if no_workspace:
-        return None
     if explicit is not None:
         return explicit
-    ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
-    if ws:
-        return ws
-    if runtime.default_workspace:
-        return runtime.default_workspace
     if required:
+        ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
+        if ws:
+            return ws
         print(
-            f"Workspace is required. Specify --workspace, "
-            f"set {DEFAULT_WORKSPACE_ENV}, or use --default-workspace.",
+            f"Workspace is required. Specify --workspace or "
+            f"set {DEFAULT_WORKSPACE_ENV}.",
             file=sys.stderr,
         )
         sys.exit(1)

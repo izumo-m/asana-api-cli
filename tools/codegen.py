@@ -295,8 +295,6 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     # Detect workspace in path positionals
     ws_positional = next((n for n in path_positionals if _is_workspace_param(n)), None)
     has_workspace = ws_opt is not None or ws_positional is not None
-    # --no-workspace is only for optional workspace opts (not path params, not required opts)
-    needs_no_workspace = ws_opt is not None and not ws_opt.required
 
     # Non-workspace positionals and opts
     non_ws_positionals = [n for n in path_positionals if not _is_workspace_param(n)]
@@ -345,13 +343,6 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
         parts.append(f'help="{help_text}"')
         lines.append(f"@click.option({', '.join(parts)})")
 
-    # --no-workspace (only for optional workspace opts)
-    if needs_no_workspace:
-        lines.append(
-            '@click.option("--no-workspace", is_flag=True, default=False, '
-            'help="Do not send workspace parameter even if a default is configured")'
-        )
-
     # --paginate
     if paginatable:
         lines.append(
@@ -373,8 +364,6 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     for p in non_ws_opts:
         annotation = _py_annotation(p.py_type, optional=not p.required)
         fn_args.append(f"{p.name}: {annotation}")
-    if needs_no_workspace:
-        fn_args.append("no_workspace: bool")
     if paginatable:
         fn_args.append("paginate: bool")
 
@@ -389,10 +378,9 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     # resolve workspace
     if has_workspace:
         ws_required = ws_positional is not None or (ws_opt is not None and ws_opt.required)
-        no_ws_arg = "no_workspace=no_workspace, " if needs_no_workspace else ""
         lines.append(
             f"    resolved_workspace = resolve_workspace("
-            f"workspace, {no_ws_arg}required={ws_required})"
+            f"workspace, required={ws_required})"
         )
 
     # session
@@ -506,10 +494,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
         'help="Directory for temporary downloads")'
     )
     lines.append(
-        '@click.option("--default-workspace", "default_workspace", default=None, '
-        'help="Default workspace GID (overrides ASANA_DEFAULT_WORKSPACE)")'
-    )
-    lines.append(
         '@click.option("--debug", is_flag=True, default=False, '
         'help="Print HTTP request/response to stderr for troubleshooting")'
     )
@@ -523,7 +507,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    timeout: float | None,")
     lines.append("    token_env: str | None,")
     lines.append("    temp_dir: str | None,")
-    lines.append("    default_workspace: str | None,")
     lines.append("    debug: bool,")
     lines.append(") -> None:")
     lines.append('    """Asana API CLI (SDK-backed wrapper)."""')
@@ -537,7 +520,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    if token_env:")
     lines.append("        runtime.token_env = token_env")
     lines.append("    runtime.temp_dir = temp_dir")
-    lines.append("    runtime.default_workspace = default_workspace")
     lines.append("    runtime.debug = debug")
     lines.append("")
     lines.append("")

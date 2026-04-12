@@ -36,12 +36,11 @@ def get_team_membership(team_membership: str, opt_fields: str | None) -> Any:
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--team", default=None, help="Globally unique identifier for the team.")
 @click.option("--user", default=None, help="A string identifying a user. This can either be the string \"me\", an email, or the gid of a user. This parameter must be used with the workspace parameter.")
-@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_team_memberships(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, user: str | None, no_workspace: bool, paginate: bool) -> Any:
+def get_team_memberships(workspace: str | None, limit: int | None, offset: str | None, opt_fields: str | None, team: str | None, user: str | None, paginate: bool) -> Any:
     """Get team memberships"""
-    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
+    resolved_workspace = resolve_workspace(workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = TeamMembershipsApi(session.client)
     opts: dict[str, Any] = {}

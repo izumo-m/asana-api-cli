@@ -241,12 +241,11 @@ def get_task_for_custom_id(custom_id: str, workspace: str | None) -> Any:
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--project", default=None, help="The project to filter tasks on.")
 @click.option("--section", default=None, help="The section to filter tasks on.")
-@click.option("--no-workspace", is_flag=True, default=False, help="Do not send workspace parameter even if a default is configured")
 @click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
 @formatted
-def get_tasks(workspace: str | None, assignee: str | None, completed_since: str | None, limit: int | None, modified_since: str | None, offset: str | None, opt_fields: str | None, project: str | None, section: str | None, no_workspace: bool, paginate: bool) -> Any:
+def get_tasks(workspace: str | None, assignee: str | None, completed_since: str | None, limit: int | None, modified_since: str | None, offset: str | None, opt_fields: str | None, project: str | None, section: str | None, paginate: bool) -> Any:
     """Get multiple tasks"""
-    resolved_workspace = resolve_workspace(workspace, no_workspace=no_workspace, required=False)
+    resolved_workspace = resolve_workspace(workspace, required=False)
     session = AsanaSession.from_env(paginate=paginate)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
