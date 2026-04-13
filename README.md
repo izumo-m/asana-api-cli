@@ -29,6 +29,21 @@ export ASANA_ACCESS_TOKEN="1/12345..."
 export ASANA_DEFAULT_WORKSPACE="12345678"   # optional
 ```
 
+## Shell completion
+
+`asana-api` is built with Click, which supports dynamic shell completion.
+To enable bash completion, add the following line to your `~/.bashrc`:
+
+```bash
+eval "$(_ASANA_API_COMPLETE=bash_source asana-api)"
+```
+
+Then reload the shell (`source ~/.bashrc` or open a new terminal). Pressing
+`<TAB>` after `asana-api` will now complete subcommands and options.
+
+For `zsh` or `fish`, replace `bash_source` with `zsh_source` or `fish_source`
+and add the line to `~/.zshrc` or `~/.config/fish/config.fish` respectively.
+
 ## Usage
 
 ```bash
