@@ -1,11 +1,11 @@
 [project]
 name = "asana-api-cli"
-version = "1.2.0"
+version = "1.2.1"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "click>=8.1,<9",
     "jq>=1.8,<2",
@@ -62,7 +62,7 @@ section-order = [
 ]
 
 [tool.vermin]
-target = "3.12"
+target = "3.10"
 violations = true
 backport = [
     "typing_extensions",
