@@ -83,15 +83,15 @@ class AsanaSession:
         if runtime.host:
             config.host = runtime.host
         if runtime.proxy:
-            config.proxy = runtime.proxy
+            config.proxy = runtime.proxy  # pyright: ignore[reportAttributeAccessIssue]
         if not runtime.verify_ssl:
             config.verify_ssl = False
         if runtime.ssl_ca_cert:
-            config.ssl_ca_cert = runtime.ssl_ca_cert
+            config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.page_limit is not None:
             config.page_limit = runtime.page_limit
         if runtime.temp_dir:
-            config.temp_folder_path = runtime.temp_dir
+            config.temp_folder_path = runtime.temp_dir  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.retries is not None:
             # Replace only `total` while keeping the existing backoff/status_forcelist.
             config.retry_strategy = Retry(

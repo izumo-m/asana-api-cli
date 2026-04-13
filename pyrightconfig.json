@@ -1,0 +1,13 @@
+{
+  "typeCheckingMode": "basic",
+  "reportAny": "none",
+  "include": [
+    "src",
+    "tools"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/.venv",
+    "dist"
+  ]
+}
