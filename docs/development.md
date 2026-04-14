@@ -1,12 +1,12 @@
 # Development
 
+For contributor setup (cloning, `uv sync`, running tests, code style, PR
+rules), see [`CONTRIBUTING.md`](../CONTRIBUTING.md). This document covers
+the internal architecture and how to use `asana-api-cli` as a library.
+
 ## Install from source
 
 ```bash
-# For development (run inside a virtualenv)
-uv sync
-
-# Install into ~/.local/bin
 pipx install .
 ```
 
