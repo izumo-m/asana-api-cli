@@ -3,8 +3,8 @@
 ## Handling Asana API tokens
 
 `asana-api-cli` reads your Asana personal access token from the
-`ASANA_ACCESS_TOKEN` environment variable (or the variable named via
-`--token-env`). Treat this token as a secret:
+`--access-token` option, falling back to the `ASANA_ACCESS_TOKEN`
+environment variable. Treat this token as a secret:
 
 - Do not commit it to source control. Keep it out of `.env` files that are
   tracked by git and dotfiles you sync publicly.

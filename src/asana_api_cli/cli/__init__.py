@@ -63,7 +63,7 @@ from asana_api_cli.cli.workspaces import workspaces_group
 @click.option("--page-limit", "page_limit", type=int, default=None, help="Default per-page size for paginated endpoints")
 @click.option("--retries", type=int, default=None, help="Number of retries on 429/5xx responses (default: 5)")
 @click.option("--timeout", type=float, default=None, help="Per-request timeout in seconds")
-@click.option("--token-env", "token_env", default=None, help="Environment variable name holding the Asana access token (default: ASANA_ACCESS_TOKEN)")
+@click.option("--access-token", "access_token", default=None, help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)")
 @click.option("--temp-dir", "temp_dir", default=None, type=click.Path(file_okay=False), help="Directory for temporary downloads")
 @click.option("--debug", is_flag=True, default=False, help="Print HTTP request/response to stderr for troubleshooting")
 def main(
@@ -74,7 +74,7 @@ def main(
     page_limit: int | None,
     retries: int | None,
     timeout: float | None,
-    token_env: str | None,
+    access_token: str | None,
     temp_dir: str | None,
     debug: bool,
 ) -> None:
@@ -86,8 +86,8 @@ def main(
     runtime.page_limit = page_limit
     runtime.retries = retries
     runtime.timeout = timeout
-    if token_env:
-        runtime.token_env = token_env
+    if access_token:
+        runtime.access_token = access_token
     runtime.temp_dir = temp_dir
     runtime.debug = debug
 

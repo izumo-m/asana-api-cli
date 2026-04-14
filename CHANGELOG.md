@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reformatted the codebase with `ruff format`.
+- **BREAKING**: Replaced the global `--token-env` option with
+  `--access-token`, which now accepts the Asana personal access token
+  directly (matching `asana.Configuration.access_token`).
+  `ASANA_ACCESS_TOKEN` remains the default fallback. Users who relied
+  on `--token-env MY_VAR` should switch to `--access-token "$MY_VAR"`.
 
 ## [1.3.0] - 2026-04-14
 

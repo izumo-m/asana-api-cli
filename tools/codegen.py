@@ -475,9 +475,8 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
         'help="Per-request timeout in seconds")'
     )
     lines.append(
-        '@click.option("--token-env", "token_env", default=None, '
-        'help="Environment variable name holding the Asana access token '
-        '(default: ASANA_ACCESS_TOKEN)")'
+        '@click.option("--access-token", "access_token", default=None, '
+        'help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)")'
     )
     lines.append(
         '@click.option("--temp-dir", "temp_dir", default=None, '
@@ -496,7 +495,7 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    page_limit: int | None,")
     lines.append("    retries: int | None,")
     lines.append("    timeout: float | None,")
-    lines.append("    token_env: str | None,")
+    lines.append("    access_token: str | None,")
     lines.append("    temp_dir: str | None,")
     lines.append("    debug: bool,")
     lines.append(") -> None:")
@@ -508,8 +507,8 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    runtime.page_limit = page_limit")
     lines.append("    runtime.retries = retries")
     lines.append("    runtime.timeout = timeout")
-    lines.append("    if token_env:")
-    lines.append("        runtime.token_env = token_env")
+    lines.append("    if access_token:")
+    lines.append("        runtime.access_token = access_token")
     lines.append("    runtime.temp_dir = temp_dir")
     lines.append("    runtime.debug = debug")
     lines.append("")

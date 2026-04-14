@@ -215,7 +215,7 @@ class TestCliInit:
             '"--page-limit"',
             '"--retries"',
             '"--timeout"',
-            '"--token-env"',
+            '"--access-token"',
             '"--temp-dir"',
         ):
             assert flag in code, f"missing option {flag}"
