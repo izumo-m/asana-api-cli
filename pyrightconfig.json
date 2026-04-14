@@ -3,6 +3,10 @@
   "reportAny": "none",
   "include": [
     "src",
+    "tools",
+    "tests"
+  ],
+  "extraPaths": [
     "tools"
   ],
   "exclude": [

@@ -314,7 +314,7 @@ class TestHandleNonJsonResponse:
 
 
 class TestFormattedDecorator:
-    def _make_cli(self, return_value: Any) -> click.BaseCommand:
+    def _make_cli(self, return_value: Any) -> click.Command:
         @click.command()
         @formatted
         def cmd() -> Any:
