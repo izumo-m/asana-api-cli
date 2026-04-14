@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import ProjectPortfolioSettingsApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("project-portfolio-settings")
+@click.group("project-portfolio-settings", cls=GroupWithGlobalOptions)
 def project_portfolio_settings_group() -> None:
     """ProjectPortfolioSettings commands."""
 

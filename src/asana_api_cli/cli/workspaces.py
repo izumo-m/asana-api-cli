@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import WorkspacesApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("workspaces")
+@click.group("workspaces", cls=GroupWithGlobalOptions)
 def workspaces_group() -> None:
     """Workspaces commands."""
 

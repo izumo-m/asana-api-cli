@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import TimesheetApprovalStatusesApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("timesheet-approval-statuses")
+@click.group("timesheet-approval-statuses", cls=GroupWithGlobalOptions)
 def timesheet_approval_statuses_group() -> None:
     """TimesheetApprovalStatuses commands."""
 

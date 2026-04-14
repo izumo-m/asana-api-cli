@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import EventsApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("events")
+@click.group("events", cls=GroupWithGlobalOptions)
 def events_group() -> None:
     """Events commands."""
 

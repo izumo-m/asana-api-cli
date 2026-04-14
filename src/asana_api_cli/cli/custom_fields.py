@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import CustomFieldsApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("custom-fields")
+@click.group("custom-fields", cls=GroupWithGlobalOptions)
 def custom_fields_group() -> None:
     """CustomFields commands."""
 

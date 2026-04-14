@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import TimeTrackingCategoriesApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("time-tracking-categories")
+@click.group("time-tracking-categories", cls=GroupWithGlobalOptions)
 def time_tracking_categories_group() -> None:
     """TimeTrackingCategories commands."""
 

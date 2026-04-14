@@ -246,9 +246,10 @@ _HEADER = (
     "from typing import Any\n\n"
     "import click\n"
     "from asana import {class_name}\n\n"
+    "from asana_api_cli.click_ext import GroupWithGlobalOptions\n"
     "from asana_api_cli.formatter import formatted\n"
     "from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace\n\n\n"
-    '@click.group("{group_name}")\n'
+    '@click.group("{group_name}", cls=GroupWithGlobalOptions)\n'
     "def {group_var}() -> None:\n"
     '    """{group_doc} commands."""\n'
 )
@@ -437,16 +438,23 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
         "",
         "import click",
         "",
+        "from asana_api_cli.click_ext import LazyGroup",
+        "from asana_api_cli.session import runtime",
         "from asana_api_cli.version import version_string",
         "",
+        "",
+        "LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {",
     ]
-    lines.append("from asana_api_cli.session import runtime")
     for g in groups:
+        cli_name = g.group_name.replace("_", "-")
         var = f"{g.group_name}_group"
-        lines.append(f"from asana_api_cli.cli.{g.group_name} import {var}")
+        import_path = f"asana_api_cli.cli.{g.group_name}:{var}"
+        short_help = f"{g.class_name[:-3]} commands."
+        lines.append(f'    "{cli_name}": ("{import_path}", "{short_help}"),')
+    lines.append("}")
     lines.append("")
     lines.append("")
-    lines.append("@click.group()")
+    lines.append("@click.group(cls=LazyGroup, lazy_subcommands=LAZY_SUBCOMMANDS)")
     lines.append('@click.version_option(version_string(), prog_name="asana-api")')
     lines.append(
         '@click.option("--host", default=None, '
@@ -511,10 +519,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("        runtime.access_token = access_token")
     lines.append("    runtime.temp_dir = temp_dir")
     lines.append("    runtime.debug = debug")
-    lines.append("")
-    lines.append("")
-    for g in groups:
-        lines.append(f"main.add_command({g.group_name}_group)")
     lines.append("")
     return "\n".join(lines)
 

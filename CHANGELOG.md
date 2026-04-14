@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `--help` for any subcommand or subgroup now also lists the global
+  options (`--access-token`, `--host`, `--debug`, etc.) under a
+  "Global Options" section, so they no longer have to be looked up
+  from the top-level help.
+- Faster `asana-api --help` and startup: subcommand modules are now
+  loaded on demand instead of all at once.
 - Rewrote `SECURITY.md` to lead with the private reporting channels
   and to be honest about the project's best-effort response.
 - Reformatted the codebase with `ruff format`.
