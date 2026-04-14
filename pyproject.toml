@@ -17,6 +17,7 @@ dependencies = [
 Homepage = "https://github.com/izumo-m/asana-api-cli"
 Repository = "https://github.com/izumo-m/asana-api-cli"
 Issues = "https://github.com/izumo-m/asana-api-cli/issues"
+Changelog = "https://github.com/izumo-m/asana-api-cli/blob/main/CHANGELOG.md"
 
 [project.scripts]
 asana-api = "asana_api_cli.cli:main"

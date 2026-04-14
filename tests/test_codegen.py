@@ -3,6 +3,7 @@
 Verifies that code generated from the official asana SDK introspection meets
 the expected structure, naming conventions, and click command composition.
 """
+
 from __future__ import annotations
 
 import sys
