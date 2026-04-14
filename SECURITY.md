@@ -1,5 +1,34 @@
 # Security Policy
 
+Thank you for taking the time to report a security issue in
+`asana-api-cli`. This document explains how to reach the maintainer
+privately.
+
+## Reporting a vulnerability
+
+Please report suspected vulnerabilities **privately** through one of the
+following channels:
+
+- GitHub [private vulnerability reporting](https://github.com/izumo-m/asana-api-cli/security/advisories/new) (preferred)
+- Email <asana@masanao.site>
+
+Please **do not** file public GitHub issues, pull requests, or discussion
+posts for security problems until a fix has been released.
+
+When reporting, please include as much of the following as you can:
+
+- A description of the issue and its impact
+- The affected version or commit hash
+- Steps to reproduce, a proof-of-concept, or a minimal test case
+- Any suggested mitigation, if you have one
+
+## A note on response
+
+`asana-api-cli` is a small personal project. I cannot guarantee a
+response time, nor that every report will result in a fix or a new
+release, but I will read every report and do my best to handle it
+responsibly.
+
 ## Handling Asana API tokens
 
 `asana-api-cli` reads your Asana personal access token from the
@@ -14,11 +43,3 @@ environment variable. Treat this token as a secret:
   suspect it has been exposed.
 - When sharing command output, scrub any GIDs or data you do not want to
   disclose; `asana-api-cli` prints raw API responses by default.
-
-## Reporting a vulnerability
-
-If you find a security issue in `asana-api-cli` itself, please report it
-privately via GitHub's
-[private vulnerability reporting](https://github.com/izumo-m/asana-api-cli/security/advisories/new)
-or by emailing <asana@masanao.site>. Please avoid filing public issues for
-security problems.

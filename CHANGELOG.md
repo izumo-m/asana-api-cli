@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rewrote `SECURITY.md` to lead with the private reporting channels
+  and to be honest about the project's best-effort response.
 - Reformatted the codebase with `ruff format`.
 - **BREAKING**: Replaced the global `--token-env` option with
   `--access-token`, which now accepts the Asana personal access token
