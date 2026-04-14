@@ -99,4 +99,4 @@ for building from source, project layout, and library usage.
 
 ## License
 
-[Apache License 2.0](https://github.com/izumo-m/asana-api-cli/blob/main/LICENSE)
+[MIT License](https://github.com/izumo-m/asana-api-cli/blob/main/LICENSE)
