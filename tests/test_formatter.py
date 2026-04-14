@@ -1,4 +1,5 @@
 """Tests for asana_api_cli.formatter."""
+
 from __future__ import annotations
 
 import json
@@ -280,34 +281,26 @@ class TestHandleNonJsonResponse:
         assert "--- raw response body ---" not in err
         assert "<html>" not in err
 
-    def test_json_body_does_not_trigger_hint(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_json_body_does_not_trigger_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
         body = json.dumps({"errors": [{"message": "not found"}]})
         with pytest.raises(SystemExit):
             _handle_api_exception(self._make_exception(status=404, body=body))
         err = capsys.readouterr().err
         assert "non-JSON response" not in err
 
-    def test_empty_body_does_not_trigger_hint(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_empty_body_does_not_trigger_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit):
             _handle_api_exception(self._make_exception(body=""))
         err = capsys.readouterr().err
         assert "non-JSON response" not in err
 
-    def test_none_body_does_not_trigger_hint(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_none_body_does_not_trigger_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit):
             _handle_api_exception(self._make_exception(body=None))
         err = capsys.readouterr().err
         assert "non-JSON response" not in err
 
-    def test_bytes_html_body(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_bytes_html_body(self, capsys: pytest.CaptureFixture[str]) -> None:
         html_bytes = b"<html><body>nginx error</body></html>"
         with pytest.raises(SystemExit):
             _handle_api_exception(self._make_exception(body=html_bytes))

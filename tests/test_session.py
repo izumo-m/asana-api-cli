@@ -1,4 +1,5 @@
 """Tests for asana_api_cli.session — resolve_body and resolve_workspace."""
+
 from __future__ import annotations
 
 import json
@@ -79,6 +80,7 @@ class TestResolveWorkspaceExplicit:
     def test_explicit_overrides_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
         assert resolve_workspace("explicit_ws") == "explicit_ws"
+
 
 class TestResolveWorkspaceEnvFallback:
     """ASANA_DEFAULT_WORKSPACE env var is used only when required=True."""

@@ -4,6 +4,7 @@ A thin wrapper around the official `asana` SDK ApiClient that handles
 initialization from environment variables, toggling pagination mode, and
 applying the global configuration passed in from the CLI.
 """
+
 from __future__ import annotations
 
 import functools
@@ -165,8 +166,7 @@ def resolve_workspace(
         if ws:
             return ws
         print(
-            f"Workspace is required. Specify --workspace or "
-            f"set {DEFAULT_WORKSPACE_ENV}.",
+            f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
             file=sys.stderr,
         )
         sys.exit(1)

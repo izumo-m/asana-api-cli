@@ -7,6 +7,7 @@ groups from each method's signature and docstring. No OAS file is consulted.
 Usage:
     python tools/codegen.py [--outdir src/asana_api_cli]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,6 +22,7 @@ import asana
 # ---------------------------------------------------------------------------
 # Name conversion
 # ---------------------------------------------------------------------------
+
 
 def _snake(name: str) -> str:
     """PascalCase / 'AuditLogAPI' → snake_case ('audit_log_api')"""
@@ -157,8 +159,7 @@ class Operation:
     def opts_params(self) -> list[DocParam]:
         """Query params that go into the opts dict (from docstring, excluding positionals)."""
         return [
-            p for p in self.params.values()
-            if p.name not in self.positional and p.name != "body"
+            p for p in self.params.values() if p.name not in self.positional and p.name != "body"
         ]
 
     @property
@@ -175,10 +176,7 @@ class ApiGroup:
 
 def _enumerate_api_classes() -> list[type]:
     return sorted(
-        (
-            cls for name, cls in vars(asana).items()
-            if inspect.isclass(cls) and name.endswith("Api")
-        ),
+        (cls for name, cls in vars(asana).items() if inspect.isclass(cls) and name.endswith("Api")),
         key=lambda c: c.__name__,
     )
 
@@ -322,9 +320,7 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     # body → required --body option
     if has_body:
         default_body_desc = "Request body (JSON string, @file, or - for stdin)"
-        body_param = op.params.get(
-            "body", DocParam("body", "dict", default_body_desc, True)
-        )
+        body_param = op.params.get("body", DocParam("body", "dict", default_body_desc, True))
         body_help = _escape_help(body_param.description or default_body_desc)
         lines.append(f'@click.option("--body", required=True, help="{body_help}")')
 
@@ -346,8 +342,7 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     # --paginate
     if paginatable:
         lines.append(
-            '@click.option("--paginate", is_flag=True, default=False, '
-            'help="Fetch all pages")'
+            '@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")'
         )
 
     lines.append("@formatted")
@@ -379,8 +374,7 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     if has_workspace:
         ws_required = ws_positional is not None or (ws_opt is not None and ws_opt.required)
         lines.append(
-            f"    resolved_workspace = resolve_workspace("
-            f"workspace, required={ws_required})"
+            f"    resolved_workspace = resolve_workspace(workspace, required={ws_required})"
         )
 
     # session
@@ -453,22 +447,19 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("")
     lines.append("")
     lines.append("@click.group()")
-    lines.append("@click.version_option(version_string(), prog_name=\"asana-api\")")
+    lines.append('@click.version_option(version_string(), prog_name="asana-api")')
     lines.append(
         '@click.option("--host", default=None, '
         'help="Override API base URL (default: https://app.asana.com/api/1.0)")'
     )
-    lines.append(
-        '@click.option("--proxy", default=None, '
-        'help="HTTP/HTTPS proxy URL")'
-    )
+    lines.append('@click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")')
     lines.append(
         '@click.option("--no-verify-ssl", is_flag=True, default=False, '
         'help="Disable TLS certificate verification (insecure)")'
     )
     lines.append(
         '@click.option("--ca-cert", "ca_cert", default=None, '
-        'type=click.Path(exists=True, dir_okay=False), '
+        "type=click.Path(exists=True, dir_okay=False), "
         'help="Path to a PEM bundle of trusted CA certificates")'
     )
     lines.append(
@@ -490,7 +481,7 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     )
     lines.append(
         '@click.option("--temp-dir", "temp_dir", default=None, '
-        'type=click.Path(file_okay=False), '
+        "type=click.Path(file_okay=False), "
         'help="Directory for temporary downloads")'
     )
     lines.append(
@@ -532,6 +523,7 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
