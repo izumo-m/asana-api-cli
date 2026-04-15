@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import ProjectBriefsApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("project-briefs")
+@click.group("project-briefs", cls=GroupWithGlobalOptions)
 def project_briefs_group() -> None:
     """ProjectBriefs commands."""
 

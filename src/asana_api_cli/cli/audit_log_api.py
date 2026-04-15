@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import AuditLogAPIApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("audit-log-api")
+@click.group("audit-log-api", cls=GroupWithGlobalOptions)
 def audit_log_api_group() -> None:
     """AuditLogAPI commands."""
 

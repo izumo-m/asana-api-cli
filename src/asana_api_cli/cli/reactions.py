@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import ReactionsApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("reactions")
+@click.group("reactions", cls=GroupWithGlobalOptions)
 def reactions_group() -> None:
     """Reactions commands."""
 

@@ -18,7 +18,7 @@ from typing import Any
 import asana
 from urllib3.util.retry import Retry
 
-DEFAULT_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
+ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
 DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
 
 
@@ -64,7 +64,7 @@ class _Runtime:
     page_limit: int | None = None
     retries: int | None = None
     timeout: float | None = None
-    token_env: str = DEFAULT_TOKEN_ENV
+    access_token: str | None = None
     temp_dir: str | None = None
 
 
@@ -133,11 +133,13 @@ class AsanaSession:
 
     @classmethod
     def from_env(cls, *, paginate: bool = False) -> "AsanaSession":
-        """Build a session from environment variables (variable name from runtime.token_env)."""
-        var = runtime.token_env or DEFAULT_TOKEN_ENV
-        token = os.environ.get(var, "")
+        """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
+        token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
         if not token:
-            print(f"{var} environment variable is not set", file=sys.stderr)
+            print(
+                f"Access token is not set. Pass --access-token or set {ACCESS_TOKEN_ENV}.",
+                file=sys.stderr,
+            )
             sys.exit(1)
         return cls(token=token, paginate=paginate)
 

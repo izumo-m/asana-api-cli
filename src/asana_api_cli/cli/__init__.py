@@ -3,58 +3,62 @@ from __future__ import annotations
 
 import click
 
+from asana_api_cli.click_ext import LazyGroup
+from asana_api_cli.session import runtime
 from asana_api_cli.version import version_string
 
-from asana_api_cli.session import runtime
-from asana_api_cli.cli.access_requests import access_requests_group
-from asana_api_cli.cli.allocations import allocations_group
-from asana_api_cli.cli.attachments import attachments_group
-from asana_api_cli.cli.audit_log_api import audit_log_api_group
-from asana_api_cli.cli.batch_api import batch_api_group
-from asana_api_cli.cli.budgets import budgets_group
-from asana_api_cli.cli.custom_field_settings import custom_field_settings_group
-from asana_api_cli.cli.custom_fields import custom_fields_group
-from asana_api_cli.cli.custom_types import custom_types_group
-from asana_api_cli.cli.events import events_group
-from asana_api_cli.cli.exports import exports_group
-from asana_api_cli.cli.goal_relationships import goal_relationships_group
-from asana_api_cli.cli.goals import goals_group
-from asana_api_cli.cli.jobs import jobs_group
-from asana_api_cli.cli.memberships import memberships_group
-from asana_api_cli.cli.organization_exports import organization_exports_group
-from asana_api_cli.cli.portfolio_memberships import portfolio_memberships_group
-from asana_api_cli.cli.portfolios import portfolios_group
-from asana_api_cli.cli.project_briefs import project_briefs_group
-from asana_api_cli.cli.project_memberships import project_memberships_group
-from asana_api_cli.cli.project_portfolio_settings import project_portfolio_settings_group
-from asana_api_cli.cli.project_statuses import project_statuses_group
-from asana_api_cli.cli.project_templates import project_templates_group
-from asana_api_cli.cli.projects import projects_group
-from asana_api_cli.cli.rates import rates_group
-from asana_api_cli.cli.reactions import reactions_group
-from asana_api_cli.cli.roles import roles_group
-from asana_api_cli.cli.rules import rules_group
-from asana_api_cli.cli.sections import sections_group
-from asana_api_cli.cli.status_updates import status_updates_group
-from asana_api_cli.cli.stories import stories_group
-from asana_api_cli.cli.tags import tags_group
-from asana_api_cli.cli.task_templates import task_templates_group
-from asana_api_cli.cli.tasks import tasks_group
-from asana_api_cli.cli.team_memberships import team_memberships_group
-from asana_api_cli.cli.teams import teams_group
-from asana_api_cli.cli.time_periods import time_periods_group
-from asana_api_cli.cli.time_tracking_categories import time_tracking_categories_group
-from asana_api_cli.cli.time_tracking_entries import time_tracking_entries_group
-from asana_api_cli.cli.timesheet_approval_statuses import timesheet_approval_statuses_group
-from asana_api_cli.cli.typeahead import typeahead_group
-from asana_api_cli.cli.user_task_lists import user_task_lists_group
-from asana_api_cli.cli.users import users_group
-from asana_api_cli.cli.webhooks import webhooks_group
-from asana_api_cli.cli.workspace_memberships import workspace_memberships_group
-from asana_api_cli.cli.workspaces import workspaces_group
+
+LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
+    "access-requests": ("asana_api_cli.cli.access_requests:access_requests_group", "AccessRequests commands."),
+    "allocations": ("asana_api_cli.cli.allocations:allocations_group", "Allocations commands."),
+    "attachments": ("asana_api_cli.cli.attachments:attachments_group", "Attachments commands."),
+    "audit-log-api": ("asana_api_cli.cli.audit_log_api:audit_log_api_group", "AuditLogAPI commands."),
+    "batch-api": ("asana_api_cli.cli.batch_api:batch_api_group", "BatchAPI commands."),
+    "budgets": ("asana_api_cli.cli.budgets:budgets_group", "Budgets commands."),
+    "custom-field-settings": ("asana_api_cli.cli.custom_field_settings:custom_field_settings_group", "CustomFieldSettings commands."),
+    "custom-fields": ("asana_api_cli.cli.custom_fields:custom_fields_group", "CustomFields commands."),
+    "custom-types": ("asana_api_cli.cli.custom_types:custom_types_group", "CustomTypes commands."),
+    "events": ("asana_api_cli.cli.events:events_group", "Events commands."),
+    "exports": ("asana_api_cli.cli.exports:exports_group", "Exports commands."),
+    "goal-relationships": ("asana_api_cli.cli.goal_relationships:goal_relationships_group", "GoalRelationships commands."),
+    "goals": ("asana_api_cli.cli.goals:goals_group", "Goals commands."),
+    "jobs": ("asana_api_cli.cli.jobs:jobs_group", "Jobs commands."),
+    "memberships": ("asana_api_cli.cli.memberships:memberships_group", "Memberships commands."),
+    "organization-exports": ("asana_api_cli.cli.organization_exports:organization_exports_group", "OrganizationExports commands."),
+    "portfolio-memberships": ("asana_api_cli.cli.portfolio_memberships:portfolio_memberships_group", "PortfolioMemberships commands."),
+    "portfolios": ("asana_api_cli.cli.portfolios:portfolios_group", "Portfolios commands."),
+    "project-briefs": ("asana_api_cli.cli.project_briefs:project_briefs_group", "ProjectBriefs commands."),
+    "project-memberships": ("asana_api_cli.cli.project_memberships:project_memberships_group", "ProjectMemberships commands."),
+    "project-portfolio-settings": ("asana_api_cli.cli.project_portfolio_settings:project_portfolio_settings_group", "ProjectPortfolioSettings commands."),
+    "project-statuses": ("asana_api_cli.cli.project_statuses:project_statuses_group", "ProjectStatuses commands."),
+    "project-templates": ("asana_api_cli.cli.project_templates:project_templates_group", "ProjectTemplates commands."),
+    "projects": ("asana_api_cli.cli.projects:projects_group", "Projects commands."),
+    "rates": ("asana_api_cli.cli.rates:rates_group", "Rates commands."),
+    "reactions": ("asana_api_cli.cli.reactions:reactions_group", "Reactions commands."),
+    "roles": ("asana_api_cli.cli.roles:roles_group", "Roles commands."),
+    "rules": ("asana_api_cli.cli.rules:rules_group", "Rules commands."),
+    "sections": ("asana_api_cli.cli.sections:sections_group", "Sections commands."),
+    "status-updates": ("asana_api_cli.cli.status_updates:status_updates_group", "StatusUpdates commands."),
+    "stories": ("asana_api_cli.cli.stories:stories_group", "Stories commands."),
+    "tags": ("asana_api_cli.cli.tags:tags_group", "Tags commands."),
+    "task-templates": ("asana_api_cli.cli.task_templates:task_templates_group", "TaskTemplates commands."),
+    "tasks": ("asana_api_cli.cli.tasks:tasks_group", "Tasks commands."),
+    "team-memberships": ("asana_api_cli.cli.team_memberships:team_memberships_group", "TeamMemberships commands."),
+    "teams": ("asana_api_cli.cli.teams:teams_group", "Teams commands."),
+    "time-periods": ("asana_api_cli.cli.time_periods:time_periods_group", "TimePeriods commands."),
+    "time-tracking-categories": ("asana_api_cli.cli.time_tracking_categories:time_tracking_categories_group", "TimeTrackingCategories commands."),
+    "time-tracking-entries": ("asana_api_cli.cli.time_tracking_entries:time_tracking_entries_group", "TimeTrackingEntries commands."),
+    "timesheet-approval-statuses": ("asana_api_cli.cli.timesheet_approval_statuses:timesheet_approval_statuses_group", "TimesheetApprovalStatuses commands."),
+    "typeahead": ("asana_api_cli.cli.typeahead:typeahead_group", "Typeahead commands."),
+    "user-task-lists": ("asana_api_cli.cli.user_task_lists:user_task_lists_group", "UserTaskLists commands."),
+    "users": ("asana_api_cli.cli.users:users_group", "Users commands."),
+    "webhooks": ("asana_api_cli.cli.webhooks:webhooks_group", "Webhooks commands."),
+    "workspace-memberships": ("asana_api_cli.cli.workspace_memberships:workspace_memberships_group", "WorkspaceMemberships commands."),
+    "workspaces": ("asana_api_cli.cli.workspaces:workspaces_group", "Workspaces commands."),
+}
 
 
-@click.group()
+@click.group(cls=LazyGroup, lazy_subcommands=LAZY_SUBCOMMANDS)
 @click.version_option(version_string(), prog_name="asana-api")
 @click.option("--host", default=None, help="Override API base URL (default: https://app.asana.com/api/1.0)")
 @click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")
@@ -63,7 +67,7 @@ from asana_api_cli.cli.workspaces import workspaces_group
 @click.option("--page-limit", "page_limit", type=int, default=None, help="Default per-page size for paginated endpoints")
 @click.option("--retries", type=int, default=None, help="Number of retries on 429/5xx responses (default: 5)")
 @click.option("--timeout", type=float, default=None, help="Per-request timeout in seconds")
-@click.option("--token-env", "token_env", default=None, help="Environment variable name holding the Asana access token (default: ASANA_ACCESS_TOKEN)")
+@click.option("--access-token", "access_token", default=None, help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)")
 @click.option("--temp-dir", "temp_dir", default=None, type=click.Path(file_okay=False), help="Directory for temporary downloads")
 @click.option("--debug", is_flag=True, default=False, help="Print HTTP request/response to stderr for troubleshooting")
 def main(
@@ -74,7 +78,7 @@ def main(
     page_limit: int | None,
     retries: int | None,
     timeout: float | None,
-    token_env: str | None,
+    access_token: str | None,
     temp_dir: str | None,
     debug: bool,
 ) -> None:
@@ -86,55 +90,7 @@ def main(
     runtime.page_limit = page_limit
     runtime.retries = retries
     runtime.timeout = timeout
-    if token_env:
-        runtime.token_env = token_env
+    if access_token:
+        runtime.access_token = access_token
     runtime.temp_dir = temp_dir
     runtime.debug = debug
-
-
-main.add_command(access_requests_group)
-main.add_command(allocations_group)
-main.add_command(attachments_group)
-main.add_command(audit_log_api_group)
-main.add_command(batch_api_group)
-main.add_command(budgets_group)
-main.add_command(custom_field_settings_group)
-main.add_command(custom_fields_group)
-main.add_command(custom_types_group)
-main.add_command(events_group)
-main.add_command(exports_group)
-main.add_command(goal_relationships_group)
-main.add_command(goals_group)
-main.add_command(jobs_group)
-main.add_command(memberships_group)
-main.add_command(organization_exports_group)
-main.add_command(portfolio_memberships_group)
-main.add_command(portfolios_group)
-main.add_command(project_briefs_group)
-main.add_command(project_memberships_group)
-main.add_command(project_portfolio_settings_group)
-main.add_command(project_statuses_group)
-main.add_command(project_templates_group)
-main.add_command(projects_group)
-main.add_command(rates_group)
-main.add_command(reactions_group)
-main.add_command(roles_group)
-main.add_command(rules_group)
-main.add_command(sections_group)
-main.add_command(status_updates_group)
-main.add_command(stories_group)
-main.add_command(tags_group)
-main.add_command(task_templates_group)
-main.add_command(tasks_group)
-main.add_command(team_memberships_group)
-main.add_command(teams_group)
-main.add_command(time_periods_group)
-main.add_command(time_tracking_categories_group)
-main.add_command(time_tracking_entries_group)
-main.add_command(timesheet_approval_statuses_group)
-main.add_command(typeahead_group)
-main.add_command(user_task_lists_group)
-main.add_command(users_group)
-main.add_command(webhooks_group)
-main.add_command(workspace_memberships_group)
-main.add_command(workspaces_group)

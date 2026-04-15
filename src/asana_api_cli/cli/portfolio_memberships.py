@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import PortfolioMembershipsApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("portfolio-memberships")
+@click.group("portfolio-memberships", cls=GroupWithGlobalOptions)
 def portfolio_memberships_group() -> None:
     """PortfolioMemberships commands."""
 

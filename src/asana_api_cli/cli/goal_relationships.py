@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import GoalRelationshipsApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("goal-relationships")
+@click.group("goal-relationships", cls=GroupWithGlobalOptions)
 def goal_relationships_group() -> None:
     """GoalRelationships commands."""
 

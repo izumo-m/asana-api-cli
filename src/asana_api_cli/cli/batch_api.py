@@ -6,11 +6,12 @@ from typing import Any
 import click
 from asana import BatchAPIApi
 
+from asana_api_cli.click_ext import GroupWithGlobalOptions
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import AsanaSession, resolve_body, resolve_workspace
 
 
-@click.group("batch-api")
+@click.group("batch-api", cls=GroupWithGlobalOptions)
 def batch_api_group() -> None:
     """BatchAPI commands."""
 
