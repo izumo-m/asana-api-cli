@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - 2026-04-15
 
+### Added
+
+- GitHub Actions workflow to publish releases to PyPI automatically
+  via Trusted Publishers (OIDC) when a `v*` tag is pushed.
+
 ### Changed
 
 - `--help` for any subcommand or subgroup now also lists the global
