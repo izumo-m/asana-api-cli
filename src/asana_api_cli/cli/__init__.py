@@ -64,7 +64,6 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
 @click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")
 @click.option("--no-verify-ssl", is_flag=True, default=False, help="Disable TLS certificate verification (insecure)")
 @click.option("--ca-cert", "ca_cert", default=None, type=click.Path(exists=True, dir_okay=False), help="Path to a PEM bundle of trusted CA certificates")
-@click.option("--page-limit", "page_limit", type=int, default=None, help="Default per-page size for paginated endpoints")
 @click.option("--retries", type=int, default=None, help="Number of retries on 429/5xx responses (default: 5)")
 @click.option("--timeout", type=float, default=None, help="Per-request timeout in seconds")
 @click.option("--access-token", "access_token", default=None, help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)")
@@ -75,7 +74,6 @@ def main(
     proxy: str | None,
     no_verify_ssl: bool,
     ca_cert: str | None,
-    page_limit: int | None,
     retries: int | None,
     timeout: float | None,
     access_token: str | None,
@@ -87,7 +85,6 @@ def main(
     runtime.proxy = proxy
     runtime.verify_ssl = not no_verify_ssl
     runtime.ssl_ca_cert = ca_cert
-    runtime.page_limit = page_limit
     runtime.retries = retries
     runtime.timeout = timeout
     if access_token:

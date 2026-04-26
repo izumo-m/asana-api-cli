@@ -22,16 +22,26 @@ def audit_log_api_group() -> None:
 @click.option("--actor-type", default=None, help="Filter to events with an actor of this type. This only needs to be included if querying for actor types without an ID. If `actor_gid` is included, this should be excluded.")
 @click.option("--end-at", default=None, help="Filter to events created before this time (exclusive).")
 @click.option("--event-type", default=None, help="Filter to events of this type. Refer to the [supported audit log events](/docs/audit-log-events#supported-audit-log-events) for a full list of values.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--resource-gid", default=None, help="Filter to events with this resource ID.")
 @click.option("--start-at", default=None, help="Filter to events created after this time (inclusive).")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_audit_log_events(workspace: str | None, actor_gid: str | None, actor_type: str | None, end_at: str | None, event_type: str | None, limit: int | None, offset: str | None, resource_gid: str | None, start_at: str | None, paginate: bool) -> Any:
+def get_audit_log_events(workspace: str | None, actor_gid: str | None, actor_type: str | None, end_at: str | None, event_type: str | None, offset: str | None, resource_gid: str | None, start_at: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get audit log events"""
     resolved_workspace = resolve_workspace(workspace, required=True)
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = AuditLogAPIApi(session.client)
     opts: dict[str, Any] = {}
     if actor_gid is not None:
@@ -42,12 +52,12 @@ def get_audit_log_events(workspace: str | None, actor_gid: str | None, actor_typ
         opts["end_at"] = end_at
     if event_type is not None:
         opts["event_type"] = event_type
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if resource_gid is not None:
         opts["resource_gid"] = resource_gid
     if start_at is not None:
         opts["start_at"] = start_at
+    if max_items is not None:
+        return session.fetch_capped(api.get_audit_log_events, resolved_workspace, opts=opts, max_items=max_items)
     return api.get_audit_log_events(resolved_workspace, opts)

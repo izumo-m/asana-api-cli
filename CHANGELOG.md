@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--all-items` option on paginatable subcommands to fetch every item (no cap). This is the canonical name; `--paginate` becomes a deprecated alias.
+- `--page-size N` option on paginatable subcommands to tune the per-page request size.
+- `--max-items N` option on paginatable subcommands to stop after fetching N items in total. The last request is automatically capped to the remaining count to avoid overfetching.
+
+### Deprecated
+
+- `--paginate` is now a deprecated alias for `--all-items`. Specifying it still works but prints a warning to stderr; it will be removed in a future release.
+
+### Changed
+
+- **BREAKING**: Removed the per-subcommand `--limit` option on paginatable subcommands. Use `--page-size` for per-page tuning and `--max-items` for total caps.
+- **BREAKING**: Removed the global `--page-limit` option (redundant with `--page-size` in a single-shot CLI).
+- `--offset` is preserved on paginatable subcommands so callers can walk `next_page.offset` themselves for manual pagination.
+- `--max-items` cannot be combined with `--all-items` (or its deprecated alias `--paginate`); doing so raises an error.
+
 ## [1.4.0] - 2026-04-15
 
 ### Added

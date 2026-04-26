@@ -170,18 +170,49 @@ class TestGeneratedCli:
         assert '@click.option("--body", required=True' in tasks_code
         assert "parsed_body = resolve_body(body)" in tasks_code
 
-    def test_paginate_flag_for_list_ops(self, tasks_code: str) -> None:
+    def test_pagination_options_for_list_ops(self, tasks_code: str) -> None:
+        # Paginatable subcommands expose --all-items (canonical), --paginate
+        # (deprecated alias), --page-size, and --max-items.
+        assert '"--all-items"' in tasks_code
         assert '"--paginate"' in tasks_code
-        assert "AsanaSession.from_env(paginate=paginate)" in tasks_code
+        assert '"--page-size"' in tasks_code
+        assert '"--max-items"' in tasks_code
+        assert (
+            "AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)" in tasks_code
+        )
+
+    def test_paginate_is_deprecated_alias(self, tasks_code: str) -> None:
+        # The deprecated --paginate prints a stderr warning and is OR-merged
+        # with --all-items into a single fetch_all flag.
+        assert "(Deprecated) Alias for --all-items" in tasks_code
+        assert "--paginate is deprecated; use --all-items instead." in tasks_code
+        assert "fetch_all = all_items or paginate" in tasks_code
+
+    def test_no_raw_limit_on_paginatable(self, tasks_code: str) -> None:
+        # The SDK's per-page `limit` is replaced by --page-size at the CLI layer
+        # and must not leak through. `offset` stays as a passthrough so callers
+        # who walk next_page.offset themselves can drive pagination manually.
+        marker = 'tasks_group.command("get-tasks")\n'
+        start = tasks_code.index(marker)
+        next_cmd = tasks_code.index('tasks_group.command("', start + len(marker))
+        block = tasks_code[start:next_cmd]
+        assert '"--limit"' not in block
+        assert '"--offset"' in block
+
+    def test_mutual_exclusion_and_capped_branch(self, tasks_code: str) -> None:
+        assert "--max-items cannot be combined with --all-items" in tasks_code
+        assert "session.fetch_capped(api.get_tasks" in tasks_code
 
     def test_no_paginate_on_single_get(self, tasks_code: str) -> None:
-        # get_task(task_gid, opts) has no limit in opts, so --paginate should be absent
-        # Extract the function block to verify
+        # get_task(task_gid, opts) has no limit in opts, so pagination options should be absent
         marker = 'tasks_group.command("get-task")\n'
         start = tasks_code.index(marker)
         next_cmd = tasks_code.index('tasks_group.command("', start + len(marker))
         block = tasks_code[start:next_cmd]
         assert '"--paginate"' not in block
+        assert '"--all-items"' not in block
+        assert '"--page-size"' not in block
+        assert '"--max-items"' not in block
 
     def test_calls_api_method(self, tasks_code: str) -> None:
         assert "api = TasksApi(session.client)" in tasks_code
@@ -223,13 +254,14 @@ class TestCliInit:
             '"--proxy"',
             '"--no-verify-ssl"',
             '"--ca-cert"',
-            '"--page-limit"',
             '"--retries"',
             '"--timeout"',
             '"--access-token"',
             '"--temp-dir"',
         ):
             assert flag in code, f"missing option {flag}"
+        # --page-limit was replaced by per-subcommand --page-size / --max-items.
+        assert '"--page-limit"' not in code
         assert "runtime.host = host" in code
         assert "runtime.verify_ssl = not no_verify_ssl" in code
         assert "runtime.ssl_ca_cert = ca_cert" in code

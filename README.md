@@ -62,11 +62,24 @@ asana-api workspaces get-workspaces
 asana-api projects get-projects-for-workspace
 asana-api projects get-projects --workspace <WORKSPACE_GID>
 
-# List tasks (first page)
+# List tasks (first page only, default)
 asana-api tasks get-tasks --project <PROJECT_GID>
 
-# Auto-fetch all pages
-asana-api tasks get-tasks --project <PROJECT_GID> --paginate
+# Preview the first few items
+asana-api tasks get-tasks --project <PROJECT_GID> --max-items 5
+
+# Fetch up to N items across pages (auto-paginates)
+asana-api tasks get-tasks --project <PROJECT_GID> --max-items 250
+
+# Fetch all items (no cap)
+asana-api tasks get-tasks --project <PROJECT_GID> --all-items
+
+# Tune per-page request size (advanced)
+asana-api tasks get-tasks --project <PROJECT_GID> --page-size 50 --all-items
+
+# Manual pagination: walk pages yourself via --offset (token from
+# `next_page.offset` of the previous response)
+asana-api tasks get-tasks --project <PROJECT_GID> --page-size 50 --offset <TOKEN>
 
 # Single task (--task instead of positional argument)
 asana-api tasks get-task --task <TASK_GID>
