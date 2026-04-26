@@ -59,27 +59,37 @@ def get_role(role: str, opt_fields: str | None) -> Any:
 @roles_group.command("get-roles")
 @click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--archived", type=bool, default=None, help="Only return projects whose `archived` field takes on the value of this parameter.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_roles(workspace: str | None, archived: bool | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_roles(workspace: str | None, archived: bool | None, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get multiple roles"""
     resolved_workspace = resolve_workspace(workspace, required=False)
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = RolesApi(session.client)
     opts: dict[str, Any] = {}
     if archived is not None:
         opts["archived"] = archived
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
     if resolved_workspace is not None:
         opts["workspace"] = resolved_workspace
+    if max_items is not None:
+        return session.fetch_capped(api.get_roles, opts=opts, max_items=max_items)
     return api.get_roles(opts)
 
 

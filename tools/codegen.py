@@ -299,6 +299,12 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
     non_ws_positionals = [n for n in path_positionals if not _is_workspace_param(n)]
     non_ws_opts = [p for p in opts_params if not _is_workspace_param(p.name)]
 
+    # For paginatable ops, hide the raw SDK ``limit`` (exposed instead as
+    # ``--page-size``). ``offset`` stays as a passthrough so callers who walk
+    # ``next_page.offset`` themselves can still drive pagination manually.
+    if paginatable:
+        non_ws_opts = [p for p in non_ws_opts if p.name != "limit"]
+
     lines: list[str] = []
     lines.append(f'@{group_var}.command("{op.command_name}")')
 
@@ -340,10 +346,23 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
         parts.append(f'help="{help_text}"')
         lines.append(f"@click.option({', '.join(parts)})")
 
-    # --paginate
+    # --all-items / --paginate (deprecated alias) / --page-size / --max-items
     if paginatable:
         lines.append(
-            '@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")'
+            '@click.option("--all-items", "all_items", is_flag=True, default=False, '
+            'help="Fetch all items (no cap)")'
+        )
+        lines.append(
+            '@click.option("--paginate", "paginate", is_flag=True, default=False, '
+            'help="(Deprecated) Alias for --all-items")'
+        )
+        lines.append(
+            '@click.option("--page-size", "page_size", type=int, default=None, '
+            'help="Items per page (Asana API requires 1-100, default 100)")'
+        )
+        lines.append(
+            '@click.option("--max-items", "max_items", type=int, default=None, '
+            'help="Stop after fetching this many items in total")'
         )
 
     lines.append("@formatted")
@@ -361,7 +380,10 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
         annotation = _py_annotation(p.py_type, optional=not p.required)
         fn_args.append(f"{p.name}: {annotation}")
     if paginatable:
+        fn_args.append("all_items: bool")
         fn_args.append("paginate: bool")
+        fn_args.append("page_size: int | None")
+        fn_args.append("max_items: int | None")
 
     lines.append(f"def {op.method_name}({', '.join(fn_args)}) -> Any:")
     summary = op.summary or f"Call {class_name}.{op.method_name}"
@@ -380,7 +402,26 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
 
     # session
     if paginatable:
-        lines.append("    session = AsanaSession.from_env(paginate=paginate)")
+        lines.append("    if paginate:")
+        lines.append(
+            '        click.echo("Warning: --paginate is deprecated; use --all-items '
+            'instead.", err=True)'
+        )
+        lines.append("    fetch_all = all_items or paginate")
+        lines.append("    if fetch_all and max_items is not None:")
+        lines.append(
+            '        raise click.UsageError("--max-items cannot be combined with '
+            '--all-items (or its deprecated alias --paginate)")'
+        )
+        # Auto-shrink page_size when --max-items is smaller, to avoid overfetch.
+        lines.append("    effective_page_size = page_size")
+        lines.append(
+            "    if max_items is not None and (page_size is None or page_size > max_items):"
+        )
+        lines.append("        effective_page_size = max_items")
+        lines.append(
+            "    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)"
+        )
     else:
         lines.append("    session = AsanaSession.from_env()")
     lines.append(f"    api = {class_name}(session.client)")
@@ -412,6 +453,14 @@ def _build_command(op: Operation, class_name: str, group_var: str) -> str:
             call_args.append(_option_name(name))
     if op.has_opts:
         call_args.append("opts")
+    if paginatable:
+        # When --max-items is set, route through the manual paginator that respects
+        # the cap and shrinks the last request to the residual count.
+        capped_args = [f"api.{op.method_name}"] + [a for a in call_args if a != "opts"]
+        capped_args.append("opts=opts")
+        capped_args.append("max_items=max_items")
+        lines.append("    if max_items is not None:")
+        lines.append(f"        return session.fetch_capped({', '.join(capped_args)})")
     lines.append(f"    return api.{op.method_name}({', '.join(call_args)})")
 
     return "\n".join(lines) + "\n"
@@ -471,10 +520,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
         'help="Path to a PEM bundle of trusted CA certificates")'
     )
     lines.append(
-        '@click.option("--page-limit", "page_limit", type=int, default=None, '
-        'help="Default per-page size for paginated endpoints")'
-    )
-    lines.append(
         '@click.option("--retries", type=int, default=None, '
         'help="Number of retries on 429/5xx responses (default: 5)")'
     )
@@ -500,7 +545,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    proxy: str | None,")
     lines.append("    no_verify_ssl: bool,")
     lines.append("    ca_cert: str | None,")
-    lines.append("    page_limit: int | None,")
     lines.append("    retries: int | None,")
     lines.append("    timeout: float | None,")
     lines.append("    access_token: str | None,")
@@ -512,7 +556,6 @@ def generate_cli_init(groups: list[ApiGroup]) -> str:
     lines.append("    runtime.proxy = proxy")
     lines.append("    runtime.verify_ssl = not no_verify_ssl")
     lines.append("    runtime.ssl_ca_cert = ca_cert")
-    lines.append("    runtime.page_limit = page_limit")
     lines.append("    runtime.retries = retries")
     lines.append("    runtime.timeout = timeout")
     lines.append("    if access_token:")

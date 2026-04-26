@@ -19,17 +19,27 @@ def reactions_group() -> None:
 @reactions_group.command("get-reactions-on-object")
 @click.option("--target", required=True, help="Globally unique identifier for object to fetch reactions from. Must be a GID for a status update or story.")
 @click.option("--emoji-base", required=True, help="Only return reactions with this emoji base character.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_reactions_on_object(target: str, emoji_base: str, limit: int | None, offset: str | None, paginate: bool) -> Any:
+def get_reactions_on_object(target: str, emoji_base: str, offset: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get reactions with an emoji base on an object."""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = ReactionsApi(session.client)
     opts: dict[str, Any] = {}
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
+    if max_items is not None:
+        return session.fetch_capped(api.get_reactions_on_object, target, emoji_base, opts=opts, max_items=max_items)
     return api.get_reactions_on_object(target, emoji_base, opts)

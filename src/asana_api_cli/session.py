@@ -11,6 +11,7 @@ import functools
 import json
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,7 +62,6 @@ class _Runtime:
     proxy: str | None = None
     verify_ssl: bool = True
     ssl_ca_cert: str | None = None
-    page_limit: int | None = None
     retries: int | None = None
     timeout: float | None = None
     access_token: str | None = None
@@ -74,11 +74,15 @@ runtime = _Runtime()
 class AsanaSession:
     """Session that holds an ApiClient from the official asana SDK."""
 
-    def __init__(self, token: str, *, paginate: bool = False) -> None:
+    def __init__(self, token: str, *, paginate: bool = False, page_size: int | None = None) -> None:
         config = asana.Configuration()
         config.access_token = token
         # When --paginate is set, the SDK returns a PageIterator that walks every page.
         config.return_page_iterator = paginate
+        # When --page-size is set, override the SDK default per-page size (100).
+        if page_size is not None:
+            config.page_limit = page_size
+        self._page_size = page_size
 
         # Apply runtime values to Configuration
         if runtime.host:
@@ -89,8 +93,6 @@ class AsanaSession:
             config.verify_ssl = False
         if runtime.ssl_ca_cert:
             config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.page_limit is not None:
-            config.page_limit = runtime.page_limit
         if runtime.temp_dir:
             config.temp_folder_path = runtime.temp_dir  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.retries is not None:
@@ -132,7 +134,7 @@ class AsanaSession:
         return api_class(self._client)
 
     @classmethod
-    def from_env(cls, *, paginate: bool = False) -> "AsanaSession":
+    def from_env(cls, *, paginate: bool = False, page_size: int | None = None) -> "AsanaSession":
         """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
         token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
         if not token:
@@ -141,7 +143,52 @@ class AsanaSession:
                 file=sys.stderr,
             )
             sys.exit(1)
-        return cls(token=token, paginate=paginate)
+        return cls(token=token, paginate=paginate, page_size=page_size)
+
+    def fetch_capped(
+        self,
+        api_method: Callable[..., Any],
+        *args: Any,
+        opts: dict[str, Any],
+        max_items: int,
+    ) -> list[Any]:
+        """Fetch up to *max_items* items by manually walking ``next_page.offset``.
+
+        The last request is automatically capped to the remaining count so we
+        do not overfetch. Returns a flat list of items, matching the shape
+        produced by ``--paginate``.
+        """
+        # Disable the SDK's PageIterator path for the duration of these calls.
+        config = self._client.configuration
+        original = config.return_page_iterator
+        config.return_page_iterator = False
+        try:
+            page_size_default = self._page_size or 100
+            items: list[Any] = []
+            opts = dict(opts)  # don't mutate the caller's dict
+            while len(items) < max_items:
+                remaining = max_items - len(items)
+                opts["limit"] = min(remaining, page_size_default)
+                response = api_method(*args, opts)
+                page_data = _extract(response, "data") or []
+                items.extend(page_data)
+                next_page = _extract(response, "next_page")
+                offset = _extract(next_page, "offset") if next_page else None
+                if not offset:
+                    break
+                opts["offset"] = offset
+            return items[:max_items]
+        finally:
+            config.return_page_iterator = original
+
+
+def _extract(obj: Any, key: str) -> Any:
+    """Read *key* from a SDK response that may be a dict or a typed model."""
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
 
 
 def resolve_workspace(

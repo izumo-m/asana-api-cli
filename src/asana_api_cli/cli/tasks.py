@@ -144,64 +144,94 @@ def duplicate_task(task: str, body: str, opt_fields: str | None) -> Any:
 
 @tasks_group.command("get-dependencies-for-task")
 @click.option("--task", required=True, help="The task to operate on.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_dependencies_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_dependencies_for_task(task: str, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get dependencies from a task"""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
+    if max_items is not None:
+        return session.fetch_capped(api.get_dependencies_for_task, task, opts=opts, max_items=max_items)
     return api.get_dependencies_for_task(task, opts)
 
 
 @tasks_group.command("get-dependents-for-task")
 @click.option("--task", required=True, help="The task to operate on.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_dependents_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_dependents_for_task(task: str, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get dependents from a task"""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
+    if max_items is not None:
+        return session.fetch_capped(api.get_dependents_for_task, task, opts=opts, max_items=max_items)
     return api.get_dependents_for_task(task, opts)
 
 
 @tasks_group.command("get-subtasks-for-task")
 @click.option("--task", required=True, help="The task to operate on.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_subtasks_for_task(task: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_subtasks_for_task(task: str, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get subtasks from a task"""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
+    if max_items is not None:
+        return session.fetch_capped(api.get_subtasks_for_task, task, opts=opts, max_items=max_items)
     return api.get_subtasks_for_task(task, opts)
 
 
@@ -236,26 +266,34 @@ def get_task_for_custom_id(custom_id: str, workspace: str | None) -> Any:
 @click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--assignee", default=None, help="The assignee to filter tasks on. If searching for unassigned tasks, assignee.any = null can be specified. *Note: If you specify `assignee`, you must also specify the `workspace` to filter on.*")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--modified-since", default=None, help="Only return tasks that have been modified since the given time. *Note: A task is considered “modified” if any of its properties change, or associations between it and other objects are modified (e....")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--project", default=None, help="The project to filter tasks on.")
 @click.option("--section", default=None, help="The section to filter tasks on.")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_tasks(workspace: str | None, assignee: str | None, completed_since: str | None, limit: int | None, modified_since: str | None, offset: str | None, opt_fields: str | None, project: str | None, section: str | None, paginate: bool) -> Any:
+def get_tasks(workspace: str | None, assignee: str | None, completed_since: str | None, modified_since: str | None, offset: str | None, opt_fields: str | None, project: str | None, section: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get multiple tasks"""
     resolved_workspace = resolve_workspace(workspace, required=False)
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
     if assignee is not None:
         opts["assignee"] = assignee
     if completed_since is not None:
         opts["completed_since"] = completed_since
-    if limit is not None:
-        opts["limit"] = limit
     if modified_since is not None:
         opts["modified_since"] = modified_since
     if offset is not None:
@@ -268,99 +306,141 @@ def get_tasks(workspace: str | None, assignee: str | None, completed_since: str 
         opts["section"] = section
     if resolved_workspace is not None:
         opts["workspace"] = resolved_workspace
+    if max_items is not None:
+        return session.fetch_capped(api.get_tasks, opts=opts, max_items=max_items)
     return api.get_tasks(opts)
 
 
 @tasks_group.command("get-tasks-for-project")
 @click.option("--project", required=True, help="Globally unique identifier for the project.")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time. Accepts a date-time string or the keyword *now*.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_tasks_for_project(project: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_project(project: str, completed_since: str | None, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get tasks from a project"""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
     if completed_since is not None:
         opts["completed_since"] = completed_since
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
+    if max_items is not None:
+        return session.fetch_capped(api.get_tasks_for_project, project, opts=opts, max_items=max_items)
     return api.get_tasks_for_project(project, opts)
 
 
 @tasks_group.command("get-tasks-for-section")
 @click.option("--section", required=True, help="The globally unique identifier for the section.")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time. Accepts a date-time string or the keyword *now*.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_tasks_for_section(section: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_section(section: str, completed_since: str | None, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get tasks from a section"""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
     if completed_since is not None:
         opts["completed_since"] = completed_since
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
+    if max_items is not None:
+        return session.fetch_capped(api.get_tasks_for_section, section, opts=opts, max_items=max_items)
     return api.get_tasks_for_section(section, opts)
 
 
 @tasks_group.command("get-tasks-for-tag")
 @click.option("--tag", required=True, help="Globally unique identifier for the tag.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_tasks_for_tag(tag: str, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_tag(tag: str, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get tasks from a tag"""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
+    if max_items is not None:
+        return session.fetch_capped(api.get_tasks_for_tag, tag, opts=opts, max_items=max_items)
     return api.get_tasks_for_tag(tag, opts)
 
 
 @tasks_group.command("get-tasks-for-user-task-list")
 @click.option("--user-task-list", required=True, help="Globally unique identifier for the user task list.")
 @click.option("--completed-since", default=None, help="Only return tasks that are either incomplete or that have been completed since this time. Accepts a date-time string or the keyword *now*.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_tasks_for_user_task_list(user_task_list: str, completed_since: str | None, limit: int | None, offset: str | None, opt_fields: str | None, paginate: bool) -> Any:
+def get_tasks_for_user_task_list(user_task_list: str, completed_since: str | None, offset: str | None, opt_fields: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get tasks from a user task list"""
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TasksApi(session.client)
     opts: dict[str, Any] = {}
     if completed_since is not None:
         opts["completed_since"] = completed_since
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
         opts["opt_fields"] = opt_fields
+    if max_items is not None:
+        return session.fetch_capped(api.get_tasks_for_user_task_list, user_task_list, opts=opts, max_items=max_items)
     return api.get_tasks_for_user_task_list(user_task_list, opts)
 
 

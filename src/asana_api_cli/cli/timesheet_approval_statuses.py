@@ -49,25 +49,33 @@ def get_timesheet_approval_status(timesheet_approval_status: str, opt_fields: st
 @click.option("--workspace", default=None, help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)")
 @click.option("--approval-statuses", default=None, help="Filter by approval status. Can be one or more of draft, submitted, approved, or rejected.")
 @click.option("--from-date", default=None, help="The start date for filtering timesheet approval statuses.")
-@click.option("--limit", type=int, default=None, help="Results per page. The number of objects to return per page. The value must be between 1 and 100.")
 @click.option("--offset", default=None, help="Offset token. An offset to the next page returned by the API. A pagination request will return an offset token, which can be used as an input parameter to the next request. If an offset is not pass...")
 @click.option("--opt-fields", default=None, help="This endpoint returns a resource which excludes some properties by default. To include those optional properties, set this query parameter to a comma-separated list of the properties you wish to in...")
 @click.option("--to-date", default=None, help="The end date for filtering timesheet approval statuses.")
 @click.option("--user", default=None, help="Globally unique identifier for the user to filter timesheet approval statuses by.")
-@click.option("--paginate", is_flag=True, default=False, help="Fetch all pages")
+@click.option("--all-items", "all_items", is_flag=True, default=False, help="Fetch all items (no cap)")
+@click.option("--paginate", "paginate", is_flag=True, default=False, help="(Deprecated) Alias for --all-items")
+@click.option("--page-size", "page_size", type=int, default=None, help="Items per page (Asana API requires 1-100, default 100)")
+@click.option("--max-items", "max_items", type=int, default=None, help="Stop after fetching this many items in total")
 @formatted
-def get_timesheet_approval_statuses(workspace: str | None, approval_statuses: str | None, from_date: str | None, limit: int | None, offset: str | None, opt_fields: str | None, to_date: str | None, user: str | None, paginate: bool) -> Any:
+def get_timesheet_approval_statuses(workspace: str | None, approval_statuses: str | None, from_date: str | None, offset: str | None, opt_fields: str | None, to_date: str | None, user: str | None, all_items: bool, paginate: bool, page_size: int | None, max_items: int | None) -> Any:
     """Get multiple timesheet approval statuses"""
     resolved_workspace = resolve_workspace(workspace, required=True)
-    session = AsanaSession.from_env(paginate=paginate)
+    if paginate:
+        click.echo("Warning: --paginate is deprecated; use --all-items instead.", err=True)
+    fetch_all = all_items or paginate
+    if fetch_all and max_items is not None:
+        raise click.UsageError("--max-items cannot be combined with --all-items (or its deprecated alias --paginate)")
+    effective_page_size = page_size
+    if max_items is not None and (page_size is None or page_size > max_items):
+        effective_page_size = max_items
+    session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
     api = TimesheetApprovalStatusesApi(session.client)
     opts: dict[str, Any] = {}
     if approval_statuses is not None:
         opts["approval_statuses"] = approval_statuses
     if from_date is not None:
         opts["from_date"] = from_date
-    if limit is not None:
-        opts["limit"] = limit
     if offset is not None:
         opts["offset"] = offset
     if opt_fields is not None:
@@ -76,6 +84,8 @@ def get_timesheet_approval_statuses(workspace: str | None, approval_statuses: st
         opts["to_date"] = to_date
     if user is not None:
         opts["user"] = user
+    if max_items is not None:
+        return session.fetch_capped(api.get_timesheet_approval_statuses, resolved_workspace, opts=opts, max_items=max_items)
     return api.get_timesheet_approval_statuses(resolved_workspace, opts)
 
 

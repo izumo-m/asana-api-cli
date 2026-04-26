@@ -1,6 +1,6 @@
 [project]
 name = "asana-api-cli"
-version = "1.4.0"
+version = "1.5.0"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
 readme = "README.md"
@@ -28,6 +28,7 @@ dev = [
     "pytest>=9,<10",
     "build>=1,<2",
     "twine>=6,<7",
+    "vermin>=1.6,<2",
 ]
 
 [build-system]

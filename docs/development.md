@@ -35,6 +35,53 @@ src/asana_api_cli/
 - **`cli/`** — auto-generated. Walks the official SDK's `*Api` classes and
   emits click command groups.
 
+## Trying shell completion locally
+
+`asana-api` is built with click, which generates dynamic completion scripts.
+To experiment with completion without touching your real shell config, spawn
+an isolated sub-shell via `uv run` and install completion only inside it:
+
+```bash
+uv run $SHELL
+```
+
+`uv run $SHELL` puts `.venv/bin` on `PATH` so `asana-api` is callable
+directly. Inside the sub-shell, evaluate the appropriate completion source
+for your shell:
+
+```bash
+# bash
+eval "$(_ASANA_API_COMPLETE=bash_source asana-api)"
+
+# zsh
+eval "$(_ASANA_API_COMPLETE=zsh_source asana-api)"
+
+# fish
+_ASANA_API_COMPLETE=fish_source asana-api | source
+```
+
+Then try interactive completion:
+
+```text
+asana-api tasks get-tasks --<TAB><TAB>      # all options, including --debug etc.
+asana-api tasks get-tasks --de<TAB>         # completes to --debug
+asana-api tasks --<TAB><TAB>                # global options also work on subgroups
+asana-api tasks get-tasks --ca-cert <TAB>   # path completion for FILE-typed options
+```
+
+Exit with `exit` (or Ctrl-D) to drop completion and return to your normal
+shell. Nothing is persisted.
+
+For a quick non-interactive smoke test that doesn't need a sub-shell, drive
+the bash completion protocol directly:
+
+```bash
+COMP_WORDS="asana-api tasks get-tasks --" COMP_CWORD=3 \
+  _ASANA_API_COMPLETE=bash_complete uv run asana-api
+```
+
+This prints the candidate list as `type,value` lines.
+
 ## Using as a library
 
 This project exists to provide a CLI, but calling the SDK directly from Python
