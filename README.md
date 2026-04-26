@@ -55,6 +55,10 @@ asana-api --help
 asana-api tasks --help
 asana-api tasks get-tasks --help
 
+# Global options (--debug, --access-token, --host, ...) work at any level:
+asana-api --debug tasks get-tasks --project <PID>
+asana-api tasks get-tasks --project <PID> --debug   # equivalent
+
 # List workspaces
 asana-api workspaces get-workspaces
 
