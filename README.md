@@ -1,8 +1,21 @@
 # asana-api-cli
 
-A CLI tool for the Asana API. It thinly wraps the official
+A CLI for the Asana API. It thinly wraps the official
 [python-asana](https://github.com/Asana/python-asana) SDK with click, exposing
-every API endpoint from the command line via `asana-api <group> <command>`.
+every endpoint as `asana-api <group> <command>`.
+
+## Why asana-api-cli
+
+- **Near-complete SDK coverage.** Almost every method on every `*Api` class in
+  python-asana is available as a CLI command. Commands are generated directly
+  from the SDK, so new APIs surface as the upstream library evolves.
+- **SDK-compatible arguments and output.** Command arguments map to
+  python-asana method parameters (with minor naming adjustments — hyphens
+  become underscores, group names become PascalCase API classes), and JSON
+  output matches the SDK's response shape. The CLI makes it easy to iterate:
+  try different arguments, inspect the response, and refine until you
+  understand the endpoint's behavior. Once verified, port the call into your
+  Python app — far fewer surprises on the first integration.
 
 ## Installation
 
