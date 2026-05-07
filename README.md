@@ -7,8 +7,14 @@ every endpoint as `asana-api <group> <command>`.
 ## Why asana-api-cli
 
 - **Near-complete SDK coverage.** Almost every method on every `*Api` class in
-  python-asana is available as a CLI command. Commands are generated directly
-  from the SDK, so new APIs surface as the upstream library evolves.
+  python-asana is available as a CLI command. The command tree is built at
+  runtime from the installed `asana` package, so new APIs surface as the
+  upstream library evolves — no asana-api-cli release required.
+- **Tracks the SDK version you actually use.** Because commands are
+  introspected from whatever `asana` is installed alongside, the CLI surface
+  matches the SDK version pinned in your project. When using asana-api-cli
+  as a dev-dependency, `pip install -U asana` updates the CLI's available
+  endpoints in lockstep with your application code.
 - **SDK-compatible arguments and output.** Command arguments map to
   python-asana method parameters (with minor naming adjustments — hyphens
   become underscores, group names become PascalCase API classes), and JSON
@@ -21,10 +27,60 @@ every endpoint as `asana-api <group> <command>`.
 
 ```bash
 pip install asana-api-cli
+```
 
-# or, to install as an isolated CLI tool
+For best results, install asana-api-cli into the same Python environment
+that holds your project's `python-asana` so the CLI surface tracks the
+exact SDK version your application uses (see [As a
+dev-dependency](#as-a-dev-dependency) below).
+
+### As a dev-dependency
+
+If your project already uses `python-asana`, add asana-api-cli to your dev
+group so the CLI tracks the same SDK version your application code uses:
+
+```toml
+# pyproject.toml
+[project]
+dependencies = ["asana>=5.3,<6"]
+
+[dependency-groups]  # uv
+dev = ["asana-api-cli"]
+```
+
+```toml
+# Poetry
+[tool.poetry.group.dev.dependencies]
+asana-api-cli = "*"
+```
+
+After `uv sync` (or equivalent), `asana-api` resolves to the project's
+`.venv` and introspects whatever `asana` version is locked there. Tests
+prototyped with `asana-api tasks ...` will exactly match the SDK calls in
+your app.
+
+### Installing globally with pipx
+
+If you would rather isolate asana-api-cli from any project's dependencies
+— for example, when you administer Asana from the shell without writing
+Python — install it with [pipx](https://pipx.pypa.io/):
+
+```bash
 pipx install asana-api-cli
 ```
+
+In this setup the CLI uses the `python-asana` version that shipped with
+the asana-api-cli release; `pipx upgrade asana-api-cli` updates only
+asana-api-cli itself, not the bundled `python-asana`. To pull a newer
+`python-asana` into the existing pipx install without reinstalling the
+CLI:
+
+```bash
+pipx runpip asana-api-cli install -U asana
+```
+
+The next `asana-api` run sees the new SDK and any newly added endpoints
+automatically.
 
 ## Environment variables
 

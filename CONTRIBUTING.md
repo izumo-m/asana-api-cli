@@ -30,18 +30,20 @@ uv run pytest
 - Messages printed to the console (errors, help text, etc.) must be written
   in English.
 
-## Generated code
+## CLI surface
 
-The CLI command modules under `src/asana_api_cli/cli/` are **auto-generated**
-by `tools/codegen.py` and must not be edited by hand. To change CLI behavior,
-edit `tools/codegen.py` and regenerate:
+The CLI command tree is built **at runtime** by introspecting the installed
+`python-asana` SDK in `src/asana_api_cli/cli.py`. There is no codegen step.
+To change CLI behavior (option naming, pagination wiring, error handling,
+etc.) edit `cli.py` directly.
 
-```bash
-uv run python tools/codegen.py
-```
+When the bundled `asana` SDK version changes (`pyproject.toml`), the CLI
+surface may shift. The snapshot test at `tests/test_cli_surface.py` pins
+the expected shape; an SDK bump that adds, removes, or renames endpoints
+will fail the test until the fixture at `tests/fixtures/cli_surface.json`
+is regenerated and the changes are reflected in `CHANGELOG.md`.
 
-See [`docs/development.md`](docs/development.md) for the project layout and
-which modules are hand-written.
+See [`docs/development.md`](docs/development.md) for the project layout.
 
 ## Pull requests
 
