@@ -9,24 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING**: The CLI command tree is now built at runtime by introspecting
-  the installed `python-asana` SDK. The CLI surface follows whatever `asana`
-  version is installed in the active environment, not the version pinned at
-  release time. `pip install -U asana` (or `pipx runpip asana-api-cli install
-  -U asana`) is enough to pick up new SDK endpoints without releasing a new
-  asana-api-cli. Same for using asana-api-cli as a dev-dependency: the CLI
-  matches whatever SDK version your project pins.
-- The 47 auto-generated `src/asana_api_cli/cli/*.py` modules and the
-  `tools/codegen.py` build step have been removed. All CLI logic now lives
-  in `src/asana_api_cli/cli.py`. CLI behavior is unchanged for end users.
-- Bumped dev and transitive dependencies to their latest compatible
-  versions.
-
-### Added
-
-- `tests/test_cli_surface.py` snapshot test (against
-  `tests/fixtures/cli_surface.json`) detects CLI surface drift when the
-  bundled `asana` SDK is upgraded.
+- **BREAKING**: The CLI command tree is now built at runtime from the
+  installed `python-asana`. The CLI surface tracks whichever `asana`
+  version is installed; new SDK endpoints surface without releasing a
+  new asana-api-cli.
+- Replaced the auto-generated CLI modules and `tools/codegen.py` with
+  a single hand-written module (CLI behavior unchanged).
+- Loosened runtime dependency constraints: `click>=8.0`, `jq>=1.5`,
+  `tabulate>=0.9`, `asana>=5.2,<6`. The `<6` on `asana` is kept because
+  SDK 6.x is expected to change introspection assumptions.
+- Bumped dev and transitive dependencies.
 
 ## [1.5.0] - 2026-04-26
 
