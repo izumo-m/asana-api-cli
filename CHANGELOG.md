@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The 47 auto-generated `src/asana_api_cli/cli/*.py` modules and the
   `tools/codegen.py` build step have been removed. All CLI logic now lives
   in `src/asana_api_cli/cli.py`. CLI behavior is unchanged for end users.
+- Bumped dev and transitive dependencies to their latest compatible
+  versions.
 
 ### Added
 
