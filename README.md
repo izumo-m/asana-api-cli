@@ -42,7 +42,7 @@ group so the CLI tracks the same SDK version your application code uses:
 ```toml
 # pyproject.toml
 [project]
-dependencies = ["asana>=5.3,<6"]
+dependencies = ["asana>=5.2,<6"]
 
 [dependency-groups]  # uv
 dev = ["asana-api-cli"]

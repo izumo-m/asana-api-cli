@@ -48,7 +48,8 @@ tests/
 ## Bumping the SDK
 
 1. Edit `dependencies` in `pyproject.toml` to widen the `asana` constraint
-   (e.g. `asana>=5.3,<6`).
+   (e.g. bump the lower bound from `asana>=5.2,<6` to `asana>=5.3,<6` once
+   5.3 ships).
 2. `uv sync` to install the new SDK.
 3. `uv run pytest` — `test_cli_surface.py` will fail with the diff between
    the new SDK's surface and the recorded fixture.
