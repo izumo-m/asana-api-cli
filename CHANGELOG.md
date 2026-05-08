@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-08
+
 ### Changed
 
 - **BREAKING**: The CLI command tree is now built at runtime from the
@@ -99,7 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.5.0...v2.0.0
 [1.5.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.2.1...v1.3.0
