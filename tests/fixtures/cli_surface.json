@@ -1,0 +1,5001 @@
+{
+  "groups": [
+    {
+      "class_name": "AccessRequestsApi",
+      "commands": [
+        {
+          "command": "approve-access-request",
+          "has_opts": false,
+          "method": "approve_access_request",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "access_request_gid"
+          ]
+        },
+        {
+          "command": "create-access-request",
+          "has_opts": false,
+          "method": "create_access_request",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "get-access-requests",
+          "has_opts": true,
+          "method": "get_access_requests",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "target"
+          ]
+        },
+        {
+          "command": "reject-access-request",
+          "has_opts": false,
+          "method": "reject_access_request",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "access_request_gid"
+          ]
+        }
+      ],
+      "group": "access-requests"
+    },
+    {
+      "class_name": "AllocationsApi",
+      "commands": [
+        {
+          "command": "create-allocation",
+          "has_opts": true,
+          "method": "create_allocation",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-allocation",
+          "has_opts": false,
+          "method": "delete_allocation",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "allocation_gid"
+          ]
+        },
+        {
+          "command": "get-allocation",
+          "has_opts": true,
+          "method": "get_allocation",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "allocation_gid"
+          ]
+        },
+        {
+          "command": "get-allocations",
+          "has_opts": true,
+          "method": "get_allocations",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "assignee",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "parent",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "update-allocation",
+          "has_opts": true,
+          "method": "update_allocation",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "allocation_gid"
+          ]
+        }
+      ],
+      "group": "allocations"
+    },
+    {
+      "class_name": "AttachmentsApi",
+      "commands": [
+        {
+          "command": "create-attachment-for-object",
+          "has_opts": true,
+          "method": "create_attachment_for_object",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "connect_to_app",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "file",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "name",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "parent",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "url",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "delete-attachment",
+          "has_opts": false,
+          "method": "delete_attachment",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "attachment_gid"
+          ]
+        },
+        {
+          "command": "get-attachment",
+          "has_opts": true,
+          "method": "get_attachment",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "attachment_gid"
+          ]
+        },
+        {
+          "command": "get-attachments-for-object",
+          "has_opts": true,
+          "method": "get_attachments_for_object",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "parent"
+          ]
+        }
+      ],
+      "group": "attachments"
+    },
+    {
+      "class_name": "AuditLogAPIApi",
+      "commands": [
+        {
+          "command": "get-audit-log-events",
+          "has_opts": true,
+          "method": "get_audit_log_events",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "actor_gid",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "actor_type",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "end_at",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "event_type",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "resource_gid",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "start_at",
+              "py_type": "datetime",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        }
+      ],
+      "group": "audit-log-api"
+    },
+    {
+      "class_name": "BatchAPIApi",
+      "commands": [
+        {
+          "command": "create-batch-request",
+          "has_opts": true,
+          "method": "create_batch_request",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        }
+      ],
+      "group": "batch-api"
+    },
+    {
+      "class_name": "BudgetsApi",
+      "commands": [
+        {
+          "command": "create-budget",
+          "has_opts": false,
+          "method": "create_budget",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-budget",
+          "has_opts": false,
+          "method": "delete_budget",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "budget_gid"
+          ]
+        },
+        {
+          "command": "get-budget",
+          "has_opts": true,
+          "method": "get_budget",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "budget_gid"
+          ]
+        },
+        {
+          "command": "get-budgets",
+          "has_opts": false,
+          "method": "get_budgets",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "parent"
+          ]
+        },
+        {
+          "command": "update-budget",
+          "has_opts": true,
+          "method": "update_budget",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "budget_gid"
+          ]
+        }
+      ],
+      "group": "budgets"
+    },
+    {
+      "class_name": "CustomFieldSettingsApi",
+      "commands": [
+        {
+          "command": "get-custom-field-settings-for-goal",
+          "has_opts": true,
+          "method": "get_custom_field_settings_for_goal",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "get-custom-field-settings-for-portfolio",
+          "has_opts": true,
+          "method": "get_custom_field_settings_for_portfolio",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "get-custom-field-settings-for-project",
+          "has_opts": true,
+          "method": "get_custom_field_settings_for_project",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "get-custom-field-settings-for-team",
+          "has_opts": true,
+          "method": "get_custom_field_settings_for_team",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "team_gid"
+          ]
+        }
+      ],
+      "group": "custom-field-settings"
+    },
+    {
+      "class_name": "CustomFieldsApi",
+      "commands": [
+        {
+          "command": "create-custom-field",
+          "has_opts": true,
+          "method": "create_custom_field",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "create-enum-option-for-custom-field",
+          "has_opts": true,
+          "method": "create_enum_option_for_custom_field",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "custom_field_gid"
+          ]
+        },
+        {
+          "command": "delete-custom-field",
+          "has_opts": false,
+          "method": "delete_custom_field",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "custom_field_gid"
+          ]
+        },
+        {
+          "command": "get-custom-field",
+          "has_opts": true,
+          "method": "get_custom_field",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "custom_field_gid"
+          ]
+        },
+        {
+          "command": "get-custom-fields-for-workspace",
+          "has_opts": true,
+          "method": "get_custom_fields_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "insert-enum-option-for-custom-field",
+          "has_opts": true,
+          "method": "insert_enum_option_for_custom_field",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "custom_field_gid"
+          ]
+        },
+        {
+          "command": "update-custom-field",
+          "has_opts": true,
+          "method": "update_custom_field",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "custom_field_gid"
+          ]
+        },
+        {
+          "command": "update-enum-option",
+          "has_opts": true,
+          "method": "update_enum_option",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "enum_option_gid"
+          ]
+        }
+      ],
+      "group": "custom-fields"
+    },
+    {
+      "class_name": "CustomTypesApi",
+      "commands": [
+        {
+          "command": "get-custom-type",
+          "has_opts": true,
+          "method": "get_custom_type",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "custom_type_gid"
+          ]
+        },
+        {
+          "command": "get-custom-types",
+          "has_opts": true,
+          "method": "get_custom_types",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project"
+          ]
+        }
+      ],
+      "group": "custom-types"
+    },
+    {
+      "class_name": "EventsApi",
+      "commands": [
+        {
+          "command": "get-events",
+          "has_opts": true,
+          "method": "get_events",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "sync",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "resource"
+          ]
+        }
+      ],
+      "group": "events"
+    },
+    {
+      "class_name": "ExportsApi",
+      "commands": [
+        {
+          "command": "create-graph-export",
+          "has_opts": false,
+          "method": "create_graph_export",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "create-resource-export",
+          "has_opts": false,
+          "method": "create_resource_export",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body"
+          ]
+        }
+      ],
+      "group": "exports"
+    },
+    {
+      "class_name": "GoalRelationshipsApi",
+      "commands": [
+        {
+          "command": "add-supporting-relationship",
+          "has_opts": true,
+          "method": "add_supporting_relationship",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "get-goal-relationship",
+          "has_opts": true,
+          "method": "get_goal_relationship",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "goal_relationship_gid"
+          ]
+        },
+        {
+          "command": "get-goal-relationships",
+          "has_opts": true,
+          "method": "get_goal_relationships",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "supported_goal"
+          ]
+        },
+        {
+          "command": "remove-supporting-relationship",
+          "has_opts": false,
+          "method": "remove_supporting_relationship",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "update-goal-relationship",
+          "has_opts": true,
+          "method": "update_goal_relationship",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_relationship_gid"
+          ]
+        }
+      ],
+      "group": "goal-relationships"
+    },
+    {
+      "class_name": "GoalsApi",
+      "commands": [
+        {
+          "command": "add-custom-field-setting-for-goal",
+          "has_opts": false,
+          "method": "add_custom_field_setting_for_goal",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "add-followers",
+          "has_opts": true,
+          "method": "add_followers",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "create-goal",
+          "has_opts": true,
+          "method": "create_goal",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "create-goal-metric",
+          "has_opts": true,
+          "method": "create_goal_metric",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "delete-goal",
+          "has_opts": false,
+          "method": "delete_goal",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "get-goal",
+          "has_opts": true,
+          "method": "get_goal",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "get-goals",
+          "has_opts": true,
+          "method": "get_goals",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "is_workspace_level",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "portfolio",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "project",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "task",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "team",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "time_periods",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-parent-goals-for-goal",
+          "has_opts": true,
+          "method": "get_parent_goals_for_goal",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "remove-custom-field-setting-for-goal",
+          "has_opts": false,
+          "method": "remove_custom_field_setting_for_goal",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "remove-followers",
+          "has_opts": true,
+          "method": "remove_followers",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "update-goal",
+          "has_opts": true,
+          "method": "update_goal",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "update-goal-metric",
+          "has_opts": true,
+          "method": "update_goal_metric",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        }
+      ],
+      "group": "goals"
+    },
+    {
+      "class_name": "JobsApi",
+      "commands": [
+        {
+          "command": "get-job",
+          "has_opts": true,
+          "method": "get_job",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "job_gid"
+          ]
+        }
+      ],
+      "group": "jobs"
+    },
+    {
+      "class_name": "MembershipsApi",
+      "commands": [
+        {
+          "command": "create-membership",
+          "has_opts": true,
+          "method": "create_membership",
+          "paginatable": false,
+          "params": [],
+          "positional": []
+        },
+        {
+          "command": "delete-membership",
+          "has_opts": false,
+          "method": "delete_membership",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "membership_gid"
+          ]
+        },
+        {
+          "command": "get-membership",
+          "has_opts": false,
+          "method": "get_membership",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "membership_gid"
+          ]
+        },
+        {
+          "command": "get-memberships",
+          "has_opts": true,
+          "method": "get_memberships",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "member",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "parent",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "update-membership",
+          "has_opts": false,
+          "method": "update_membership",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "membership_gid"
+          ]
+        }
+      ],
+      "group": "memberships"
+    },
+    {
+      "class_name": "OrganizationExportsApi",
+      "commands": [
+        {
+          "command": "create-organization-export",
+          "has_opts": true,
+          "method": "create_organization_export",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "get-organization-export",
+          "has_opts": true,
+          "method": "get_organization_export",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "organization_export_gid"
+          ]
+        }
+      ],
+      "group": "organization-exports"
+    },
+    {
+      "class_name": "PortfolioMembershipsApi",
+      "commands": [
+        {
+          "command": "get-portfolio-membership",
+          "has_opts": true,
+          "method": "get_portfolio_membership",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "portfolio_membership_gid"
+          ]
+        },
+        {
+          "command": "get-portfolio-memberships",
+          "has_opts": true,
+          "method": "get_portfolio_memberships",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "portfolio",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-portfolio-memberships-for-portfolio",
+          "has_opts": true,
+          "method": "get_portfolio_memberships_for_portfolio",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "portfolio_gid"
+          ]
+        }
+      ],
+      "group": "portfolio-memberships"
+    },
+    {
+      "class_name": "PortfoliosApi",
+      "commands": [
+        {
+          "command": "add-custom-field-setting-for-portfolio",
+          "has_opts": false,
+          "method": "add_custom_field_setting_for_portfolio",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "add-item-for-portfolio",
+          "has_opts": false,
+          "method": "add_item_for_portfolio",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "add-members-for-portfolio",
+          "has_opts": true,
+          "method": "add_members_for_portfolio",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "create-portfolio",
+          "has_opts": true,
+          "method": "create_portfolio",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-portfolio",
+          "has_opts": false,
+          "method": "delete_portfolio",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "duplicate-portfolio",
+          "has_opts": true,
+          "method": "duplicate_portfolio",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "get-items-for-portfolio",
+          "has_opts": true,
+          "method": "get_items_for_portfolio",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "get-portfolio",
+          "has_opts": true,
+          "method": "get_portfolio",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "get-portfolios",
+          "has_opts": true,
+          "method": "get_portfolios",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "owner",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace"
+          ]
+        },
+        {
+          "command": "remove-custom-field-setting-for-portfolio",
+          "has_opts": false,
+          "method": "remove_custom_field_setting_for_portfolio",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "remove-item-for-portfolio",
+          "has_opts": false,
+          "method": "remove_item_for_portfolio",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "remove-members-for-portfolio",
+          "has_opts": true,
+          "method": "remove_members_for_portfolio",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "update-portfolio",
+          "has_opts": true,
+          "method": "update_portfolio",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "portfolio_gid"
+          ]
+        }
+      ],
+      "group": "portfolios"
+    },
+    {
+      "class_name": "ProjectBriefsApi",
+      "commands": [
+        {
+          "command": "create-project-brief",
+          "has_opts": true,
+          "method": "create_project_brief",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "delete-project-brief",
+          "has_opts": false,
+          "method": "delete_project_brief",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "project_brief_gid"
+          ]
+        },
+        {
+          "command": "get-project-brief",
+          "has_opts": true,
+          "method": "get_project_brief",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_brief_gid"
+          ]
+        },
+        {
+          "command": "update-project-brief",
+          "has_opts": true,
+          "method": "update_project_brief",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_brief_gid"
+          ]
+        }
+      ],
+      "group": "project-briefs"
+    },
+    {
+      "class_name": "ProjectMembershipsApi",
+      "commands": [
+        {
+          "command": "get-project-membership",
+          "has_opts": true,
+          "method": "get_project_membership",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_membership_gid"
+          ]
+        },
+        {
+          "command": "get-project-memberships-for-project",
+          "has_opts": true,
+          "method": "get_project_memberships_for_project",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        }
+      ],
+      "group": "project-memberships"
+    },
+    {
+      "class_name": "ProjectPortfolioSettingsApi",
+      "commands": [
+        {
+          "command": "get-project-portfolio-setting",
+          "has_opts": true,
+          "method": "get_project_portfolio_setting",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_portfolio_setting_gid"
+          ]
+        },
+        {
+          "command": "get-project-portfolio-settings-for-portfolio",
+          "has_opts": true,
+          "method": "get_project_portfolio_settings_for_portfolio",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "portfolio_gid"
+          ]
+        },
+        {
+          "command": "get-project-portfolio-settings-for-project",
+          "has_opts": true,
+          "method": "get_project_portfolio_settings_for_project",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "update-project-portfolio-setting",
+          "has_opts": true,
+          "method": "update_project_portfolio_setting",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_portfolio_setting_gid"
+          ]
+        }
+      ],
+      "group": "project-portfolio-settings"
+    },
+    {
+      "class_name": "ProjectStatusesApi",
+      "commands": [
+        {
+          "command": "create-project-status-for-project",
+          "has_opts": true,
+          "method": "create_project_status_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "delete-project-status",
+          "has_opts": false,
+          "method": "delete_project_status",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "project_status_gid"
+          ]
+        },
+        {
+          "command": "get-project-status",
+          "has_opts": true,
+          "method": "get_project_status",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_status_gid"
+          ]
+        },
+        {
+          "command": "get-project-statuses-for-project",
+          "has_opts": true,
+          "method": "get_project_statuses_for_project",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        }
+      ],
+      "group": "project-statuses"
+    },
+    {
+      "class_name": "ProjectTemplatesApi",
+      "commands": [
+        {
+          "command": "delete-project-template",
+          "has_opts": false,
+          "method": "delete_project_template",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "project_template_gid"
+          ]
+        },
+        {
+          "command": "get-project-template",
+          "has_opts": true,
+          "method": "get_project_template",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_template_gid"
+          ]
+        },
+        {
+          "command": "get-project-templates",
+          "has_opts": true,
+          "method": "get_project_templates",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "team",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-project-templates-for-team",
+          "has_opts": true,
+          "method": "get_project_templates_for_team",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "team_gid"
+          ]
+        },
+        {
+          "command": "instantiate-project",
+          "has_opts": true,
+          "method": "instantiate_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_template_gid"
+          ]
+        }
+      ],
+      "group": "project-templates"
+    },
+    {
+      "class_name": "ProjectsApi",
+      "commands": [
+        {
+          "command": "add-custom-field-setting-for-project",
+          "has_opts": true,
+          "method": "add_custom_field_setting_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "add-followers-for-project",
+          "has_opts": true,
+          "method": "add_followers_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "add-members-for-project",
+          "has_opts": true,
+          "method": "add_members_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "create-project",
+          "has_opts": true,
+          "method": "create_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "create-project-for-team",
+          "has_opts": true,
+          "method": "create_project_for_team",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "team_gid"
+          ]
+        },
+        {
+          "command": "create-project-for-workspace",
+          "has_opts": true,
+          "method": "create_project_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "delete-project",
+          "has_opts": false,
+          "method": "delete_project",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "duplicate-project",
+          "has_opts": true,
+          "method": "duplicate_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "get-project",
+          "has_opts": true,
+          "method": "get_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "get-projects",
+          "has_opts": true,
+          "method": "get_projects",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "archived",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "team",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-projects-for-task",
+          "has_opts": true,
+          "method": "get_projects_for_task",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-projects-for-team",
+          "has_opts": true,
+          "method": "get_projects_for_team",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "archived",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "team_gid"
+          ]
+        },
+        {
+          "command": "get-projects-for-workspace",
+          "has_opts": true,
+          "method": "get_projects_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "archived",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "get-task-counts-for-project",
+          "has_opts": true,
+          "method": "get_task_counts_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "project-save-as-template",
+          "has_opts": true,
+          "method": "project_save_as_template",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "remove-custom-field-setting-for-project",
+          "has_opts": false,
+          "method": "remove_custom_field_setting_for_project",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "remove-followers-for-project",
+          "has_opts": true,
+          "method": "remove_followers_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "remove-members-for-project",
+          "has_opts": true,
+          "method": "remove_members_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        },
+        {
+          "command": "search-projects-for-workspace",
+          "has_opts": true,
+          "method": "search_projects_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "completed",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "completed_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "due_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "sort_ascending",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "sort_by",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "start_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "text",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "update-project",
+          "has_opts": true,
+          "method": "update_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "project_gid"
+          ]
+        }
+      ],
+      "group": "projects"
+    },
+    {
+      "class_name": "RatesApi",
+      "commands": [
+        {
+          "command": "create-rate",
+          "has_opts": true,
+          "method": "create_rate",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-rate",
+          "has_opts": false,
+          "method": "delete_rate",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "rate_gid"
+          ]
+        },
+        {
+          "command": "get-rate",
+          "has_opts": true,
+          "method": "get_rate",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "rate_gid"
+          ]
+        },
+        {
+          "command": "get-rates",
+          "has_opts": true,
+          "method": "get_rates",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "parent",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "resource",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "update-rate",
+          "has_opts": true,
+          "method": "update_rate",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "rate_gid"
+          ]
+        }
+      ],
+      "group": "rates"
+    },
+    {
+      "class_name": "ReactionsApi",
+      "commands": [
+        {
+          "command": "get-reactions-on-object",
+          "has_opts": true,
+          "method": "get_reactions_on_object",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "target",
+            "emoji_base"
+          ]
+        }
+      ],
+      "group": "reactions"
+    },
+    {
+      "class_name": "RolesApi",
+      "commands": [
+        {
+          "command": "create-role",
+          "has_opts": true,
+          "method": "create_role",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-role",
+          "has_opts": false,
+          "method": "delete_role",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "role_gid"
+          ]
+        },
+        {
+          "command": "get-role",
+          "has_opts": true,
+          "method": "get_role",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "role_gid"
+          ]
+        },
+        {
+          "command": "get-roles",
+          "has_opts": true,
+          "method": "get_roles",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "archived",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "update-role",
+          "has_opts": true,
+          "method": "update_role",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "role_gid"
+          ]
+        }
+      ],
+      "group": "roles"
+    },
+    {
+      "class_name": "RulesApi",
+      "commands": [
+        {
+          "command": "trigger-rule",
+          "has_opts": false,
+          "method": "trigger_rule",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "rule_trigger_gid"
+          ]
+        }
+      ],
+      "group": "rules"
+    },
+    {
+      "class_name": "SectionsApi",
+      "commands": [
+        {
+          "command": "add-task-for-section",
+          "has_opts": true,
+          "method": "add_task_for_section",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "section_gid"
+          ]
+        },
+        {
+          "command": "create-section-for-project",
+          "has_opts": true,
+          "method": "create_section_for_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "delete-section",
+          "has_opts": false,
+          "method": "delete_section",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "section_gid"
+          ]
+        },
+        {
+          "command": "get-section",
+          "has_opts": true,
+          "method": "get_section",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "section_gid"
+          ]
+        },
+        {
+          "command": "get-sections-for-project",
+          "has_opts": true,
+          "method": "get_sections_for_project",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "insert-section-for-project",
+          "has_opts": true,
+          "method": "insert_section_for_project",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "update-section",
+          "has_opts": true,
+          "method": "update_section",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "section_gid"
+          ]
+        }
+      ],
+      "group": "sections"
+    },
+    {
+      "class_name": "StatusUpdatesApi",
+      "commands": [
+        {
+          "command": "create-status-for-object",
+          "has_opts": true,
+          "method": "create_status_for_object",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-status",
+          "has_opts": false,
+          "method": "delete_status",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "status_update_gid"
+          ]
+        },
+        {
+          "command": "get-status",
+          "has_opts": true,
+          "method": "get_status",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "status_update_gid"
+          ]
+        },
+        {
+          "command": "get-statuses-for-object",
+          "has_opts": true,
+          "method": "get_statuses_for_object",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "created_since",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "parent"
+          ]
+        }
+      ],
+      "group": "status-updates"
+    },
+    {
+      "class_name": "StoriesApi",
+      "commands": [
+        {
+          "command": "create-story-for-goal",
+          "has_opts": true,
+          "method": "create_story_for_goal",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "create-story-for-task",
+          "has_opts": true,
+          "method": "create_story_for_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "delete-story",
+          "has_opts": false,
+          "method": "delete_story",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "story_gid"
+          ]
+        },
+        {
+          "command": "get-stories-for-goal",
+          "has_opts": true,
+          "method": "get_stories_for_goal",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "goal_gid"
+          ]
+        },
+        {
+          "command": "get-stories-for-task",
+          "has_opts": true,
+          "method": "get_stories_for_task",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-story",
+          "has_opts": true,
+          "method": "get_story",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "story_gid"
+          ]
+        },
+        {
+          "command": "update-story",
+          "has_opts": true,
+          "method": "update_story",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "story_gid"
+          ]
+        }
+      ],
+      "group": "stories"
+    },
+    {
+      "class_name": "TagsApi",
+      "commands": [
+        {
+          "command": "create-tag",
+          "has_opts": true,
+          "method": "create_tag",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "create-tag-for-workspace",
+          "has_opts": true,
+          "method": "create_tag_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "delete-tag",
+          "has_opts": false,
+          "method": "delete_tag",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "tag_gid"
+          ]
+        },
+        {
+          "command": "get-tag",
+          "has_opts": true,
+          "method": "get_tag",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "tag_gid"
+          ]
+        },
+        {
+          "command": "get-tags",
+          "has_opts": true,
+          "method": "get_tags",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-tags-for-task",
+          "has_opts": true,
+          "method": "get_tags_for_task",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-tags-for-workspace",
+          "has_opts": true,
+          "method": "get_tags_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "update-tag",
+          "has_opts": true,
+          "method": "update_tag",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "tag_gid"
+          ]
+        }
+      ],
+      "group": "tags"
+    },
+    {
+      "class_name": "TaskTemplatesApi",
+      "commands": [
+        {
+          "command": "delete-task-template",
+          "has_opts": false,
+          "method": "delete_task_template",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "task_template_gid"
+          ]
+        },
+        {
+          "command": "get-task-template",
+          "has_opts": true,
+          "method": "get_task_template",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_template_gid"
+          ]
+        },
+        {
+          "command": "get-task-templates",
+          "has_opts": true,
+          "method": "get_task_templates",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "project",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "instantiate-task",
+          "has_opts": true,
+          "method": "instantiate_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_template_gid"
+          ]
+        }
+      ],
+      "group": "task-templates"
+    },
+    {
+      "class_name": "TasksApi",
+      "commands": [
+        {
+          "command": "add-dependencies-for-task",
+          "has_opts": false,
+          "method": "add_dependencies_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "add-dependents-for-task",
+          "has_opts": false,
+          "method": "add_dependents_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "add-followers-for-task",
+          "has_opts": true,
+          "method": "add_followers_for_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "add-project-for-task",
+          "has_opts": false,
+          "method": "add_project_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "add-tag-for-task",
+          "has_opts": false,
+          "method": "add_tag_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "create-subtask-for-task",
+          "has_opts": true,
+          "method": "create_subtask_for_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "create-task",
+          "has_opts": true,
+          "method": "create_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-task",
+          "has_opts": false,
+          "method": "delete_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "duplicate-task",
+          "has_opts": true,
+          "method": "duplicate_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-dependencies-for-task",
+          "has_opts": true,
+          "method": "get_dependencies_for_task",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-dependents-for-task",
+          "has_opts": true,
+          "method": "get_dependents_for_task",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-subtasks-for-task",
+          "has_opts": true,
+          "method": "get_subtasks_for_task",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-task",
+          "has_opts": true,
+          "method": "get_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-task-for-custom-id",
+          "has_opts": false,
+          "method": "get_task_for_custom_id",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "workspace_gid",
+            "custom_id"
+          ]
+        },
+        {
+          "command": "get-tasks",
+          "has_opts": true,
+          "method": "get_tasks",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "assignee",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "completed_since",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "modified_since",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "project",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "section",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-tasks-for-project",
+          "has_opts": true,
+          "method": "get_tasks_for_project",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "completed_since",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ]
+        },
+        {
+          "command": "get-tasks-for-section",
+          "has_opts": true,
+          "method": "get_tasks_for_section",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "completed_since",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "section_gid"
+          ]
+        },
+        {
+          "command": "get-tasks-for-tag",
+          "has_opts": true,
+          "method": "get_tasks_for_tag",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "tag_gid"
+          ]
+        },
+        {
+          "command": "get-tasks-for-user-task-list",
+          "has_opts": true,
+          "method": "get_tasks_for_user_task_list",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "completed_since",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_task_list_gid"
+          ]
+        },
+        {
+          "command": "remove-dependencies-for-task",
+          "has_opts": false,
+          "method": "remove_dependencies_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "remove-dependents-for-task",
+          "has_opts": false,
+          "method": "remove_dependents_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "remove-follower-for-task",
+          "has_opts": true,
+          "method": "remove_follower_for_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "remove-project-for-task",
+          "has_opts": false,
+          "method": "remove_project_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "remove-tag-for-task",
+          "has_opts": false,
+          "method": "remove_tag_for_task",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "search-tasks-for-workspace",
+          "has_opts": true,
+          "method": "search_tasks_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "completed",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "completed_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "due_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "has_attachment",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "is_blocked",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "is_blocking",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "is_subtask",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "modified_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "sort_ascending",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "sort_by",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "start_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "text",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "set-parent-for-task",
+          "has_opts": true,
+          "method": "set_parent_for_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "update-task",
+          "has_opts": true,
+          "method": "update_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        }
+      ],
+      "group": "tasks"
+    },
+    {
+      "class_name": "TeamMembershipsApi",
+      "commands": [
+        {
+          "command": "get-team-membership",
+          "has_opts": true,
+          "method": "get_team_membership",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "team_membership_gid"
+          ]
+        },
+        {
+          "command": "get-team-memberships",
+          "has_opts": true,
+          "method": "get_team_memberships",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "team",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-team-memberships-for-team",
+          "has_opts": true,
+          "method": "get_team_memberships_for_team",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "team_gid"
+          ]
+        },
+        {
+          "command": "get-team-memberships-for-user",
+          "has_opts": true,
+          "method": "get_team_memberships_for_user",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_gid",
+            "workspace"
+          ]
+        }
+      ],
+      "group": "team-memberships"
+    },
+    {
+      "class_name": "TeamsApi",
+      "commands": [
+        {
+          "command": "add-user-for-team",
+          "has_opts": true,
+          "method": "add_user_for_team",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "team_gid"
+          ]
+        },
+        {
+          "command": "create-team",
+          "has_opts": true,
+          "method": "create_team",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "get-team",
+          "has_opts": true,
+          "method": "get_team",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "team_gid"
+          ]
+        },
+        {
+          "command": "get-teams-for-user",
+          "has_opts": true,
+          "method": "get_teams_for_user",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_gid",
+            "organization"
+          ]
+        },
+        {
+          "command": "get-teams-for-workspace",
+          "has_opts": true,
+          "method": "get_teams_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "remove-user-for-team",
+          "has_opts": false,
+          "method": "remove_user_for_team",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "team_gid"
+          ]
+        },
+        {
+          "command": "update-team",
+          "has_opts": true,
+          "method": "update_team",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "team_gid"
+          ]
+        }
+      ],
+      "group": "teams"
+    },
+    {
+      "class_name": "TimePeriodsApi",
+      "commands": [
+        {
+          "command": "get-time-period",
+          "has_opts": true,
+          "method": "get_time_period",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "time_period_gid"
+          ]
+        },
+        {
+          "command": "get-time-periods",
+          "has_opts": true,
+          "method": "get_time_periods",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "end_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "start_on",
+              "py_type": "date",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace"
+          ]
+        }
+      ],
+      "group": "time-periods"
+    },
+    {
+      "class_name": "TimeTrackingCategoriesApi",
+      "commands": [
+        {
+          "command": "create-time-tracking-category",
+          "has_opts": true,
+          "method": "create_time_tracking_category",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-time-tracking-category",
+          "has_opts": false,
+          "method": "delete_time_tracking_category",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "time_tracking_category_gid"
+          ]
+        },
+        {
+          "command": "get-time-tracking-categories",
+          "has_opts": true,
+          "method": "get_time_tracking_categories",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "is_archived",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace"
+          ]
+        },
+        {
+          "command": "get-time-tracking-category",
+          "has_opts": true,
+          "method": "get_time_tracking_category",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "time_tracking_category_gid"
+          ]
+        },
+        {
+          "command": "get-time-tracking-entries-for-time-tracking-category",
+          "has_opts": true,
+          "method": "get_time_tracking_entries_for_time_tracking_category",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "end_date",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "start_date",
+              "py_type": "date",
+              "required": false
+            }
+          ],
+          "positional": [
+            "time_tracking_category_gid"
+          ]
+        },
+        {
+          "command": "update-time-tracking-category",
+          "has_opts": true,
+          "method": "update_time_tracking_category",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "time_tracking_category_gid"
+          ]
+        }
+      ],
+      "group": "time-tracking-categories"
+    },
+    {
+      "class_name": "TimeTrackingEntriesApi",
+      "commands": [
+        {
+          "command": "create-time-tracking-entry",
+          "has_opts": true,
+          "method": "create_time_tracking_entry",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "task_gid"
+          ]
+        },
+        {
+          "command": "delete-time-tracking-entry",
+          "has_opts": false,
+          "method": "delete_time_tracking_entry",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "time_tracking_entry_gid"
+          ]
+        },
+        {
+          "command": "get-time-tracking-entries",
+          "has_opts": true,
+          "method": "get_time_tracking_entries",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "attributable_to",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "entered_on_end_date",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "entered_on_start_date",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "portfolio",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "task",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "timesheet_approval_status",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-time-tracking-entries-for-task",
+          "has_opts": true,
+          "method": "get_time_tracking_entries_for_task",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "task_gid"
+          ]
+        },
+        {
+          "command": "get-time-tracking-entry",
+          "has_opts": true,
+          "method": "get_time_tracking_entry",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "time_tracking_entry_gid"
+          ]
+        },
+        {
+          "command": "update-time-tracking-entry",
+          "has_opts": true,
+          "method": "update_time_tracking_entry",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "time_tracking_entry_gid"
+          ]
+        }
+      ],
+      "group": "time-tracking-entries"
+    },
+    {
+      "class_name": "TimesheetApprovalStatusesApi",
+      "commands": [
+        {
+          "command": "create-timesheet-approval-status",
+          "has_opts": true,
+          "method": "create_timesheet_approval_status",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "get-timesheet-approval-status",
+          "has_opts": true,
+          "method": "get_timesheet_approval_status",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "timesheet_approval_status_gid"
+          ]
+        },
+        {
+          "command": "get-timesheet-approval-statuses",
+          "has_opts": true,
+          "method": "get_timesheet_approval_statuses",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "approval_statuses",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "from_date",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "to_date",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace"
+          ]
+        },
+        {
+          "command": "update-timesheet-approval-status",
+          "has_opts": true,
+          "method": "update_timesheet_approval_status",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "timesheet_approval_status_gid"
+          ]
+        }
+      ],
+      "group": "timesheet-approval-statuses"
+    },
+    {
+      "class_name": "TypeaheadApi",
+      "commands": [
+        {
+          "command": "typeahead-for-workspace",
+          "has_opts": true,
+          "method": "typeahead_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "count",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "query",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "type",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid",
+            "resource_type"
+          ]
+        }
+      ],
+      "group": "typeahead"
+    },
+    {
+      "class_name": "UserTaskListsApi",
+      "commands": [
+        {
+          "command": "get-user-task-list",
+          "has_opts": true,
+          "method": "get_user_task_list",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_task_list_gid"
+          ]
+        },
+        {
+          "command": "get-user-task-list-for-user",
+          "has_opts": true,
+          "method": "get_user_task_list_for_user",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_gid",
+            "workspace"
+          ]
+        }
+      ],
+      "group": "user-task-lists"
+    },
+    {
+      "class_name": "UsersApi",
+      "commands": [
+        {
+          "command": "get-favorites-for-user",
+          "has_opts": true,
+          "method": "get_favorites_for_user",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_gid",
+            "resource_type",
+            "workspace"
+          ]
+        },
+        {
+          "command": "get-user",
+          "has_opts": true,
+          "method": "get_user",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_gid"
+          ]
+        },
+        {
+          "command": "get-user-for-workspace",
+          "has_opts": true,
+          "method": "get_user_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid",
+            "user_gid"
+          ]
+        },
+        {
+          "command": "get-users",
+          "has_opts": true,
+          "method": "get_users",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "team",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "get-users-for-team",
+          "has_opts": true,
+          "method": "get_users_for_team",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "team_gid"
+          ]
+        },
+        {
+          "command": "get-users-for-workspace",
+          "has_opts": true,
+          "method": "get_users_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "update-user",
+          "has_opts": true,
+          "method": "update_user",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "user_gid"
+          ]
+        },
+        {
+          "command": "update-user-for-workspace",
+          "has_opts": true,
+          "method": "update_user_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "workspace_gid",
+            "user_gid"
+          ]
+        }
+      ],
+      "group": "users"
+    },
+    {
+      "class_name": "WebhooksApi",
+      "commands": [
+        {
+          "command": "create-webhook",
+          "has_opts": true,
+          "method": "create_webhook",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ]
+        },
+        {
+          "command": "delete-webhook",
+          "has_opts": false,
+          "method": "delete_webhook",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "webhook_gid"
+          ]
+        },
+        {
+          "command": "get-webhook",
+          "has_opts": true,
+          "method": "get_webhook",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "webhook_gid"
+          ]
+        },
+        {
+          "command": "get-webhooks",
+          "has_opts": true,
+          "method": "get_webhooks",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "resource",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace"
+          ]
+        },
+        {
+          "command": "update-webhook",
+          "has_opts": true,
+          "method": "update_webhook",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "webhook_gid"
+          ]
+        }
+      ],
+      "group": "webhooks"
+    },
+    {
+      "class_name": "WorkspaceMembershipsApi",
+      "commands": [
+        {
+          "command": "get-workspace-membership",
+          "has_opts": true,
+          "method": "get_workspace_membership",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_membership_gid"
+          ]
+        },
+        {
+          "command": "get-workspace-memberships-for-user",
+          "has_opts": true,
+          "method": "get_workspace_memberships_for_user",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_gid"
+          ]
+        },
+        {
+          "command": "get-workspace-memberships-for-workspace",
+          "has_opts": true,
+          "method": "get_workspace_memberships_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "user",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        }
+      ],
+      "group": "workspace-memberships"
+    },
+    {
+      "class_name": "WorkspacesApi",
+      "commands": [
+        {
+          "command": "add-user-for-workspace",
+          "has_opts": true,
+          "method": "add_user_for_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "get-workspace",
+          "has_opts": true,
+          "method": "get_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "get-workspace-events",
+          "has_opts": true,
+          "method": "get_workspace_events",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "sync",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "get-workspaces",
+          "has_opts": true,
+          "method": "get_workspaces",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": []
+        },
+        {
+          "command": "remove-user-for-workspace",
+          "has_opts": false,
+          "method": "remove_user_for_workspace",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "workspace_gid"
+          ]
+        },
+        {
+          "command": "update-workspace",
+          "has_opts": true,
+          "method": "update_workspace",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "workspace_gid"
+          ]
+        }
+      ],
+      "group": "workspaces"
+    }
+  ]
+}

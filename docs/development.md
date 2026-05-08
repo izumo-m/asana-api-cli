@@ -12,28 +12,52 @@ pipx install .
 
 ## Project layout
 
-The CLI modules are auto-generated from the SDK by
-[`tools/codegen.py`](../tools/README.md). When the SDK version is bumped, a
-single regeneration picks up any new endpoints.
+The CLI command tree is built **at runtime** by introspecting the installed
+`python-asana` SDK. There is no codegen step. When the SDK is upgraded, the
+CLI surface follows automatically; the snapshot test guards against silent
+breaking changes.
 
 ```
 src/asana_api_cli/
 ├── __init__.py           # Re-exports AsanaSession
-├── session.py            # Thin wrapper around asana.ApiClient (hand-written)
-├── formatter.py          # CLI output formatting (@formatted decorator, hand-written)
-└── cli/                  # CLI layer (auto-generated)
-    ├── __init__.py       # Main group + add_command for each tag
-    ├── tasks.py          # click commands wrapping TasksApi
-    ├── projects.py
-    └── ...               # One file per SDK *Api class
+├── session.py            # Thin wrapper around asana.ApiClient
+├── formatter.py          # CLI output formatting (@formatted decorator)
+├── click_ext.py          # LazyGroup + global-options propagation mixins
+├── version.py            # version_string()
+└── cli.py                # Runtime introspection + click command tree
+
+tests/
+├── test_cli.py                 # Helpers + built-command shape tests
+├── test_cli_surface.py         # Snapshot test (compares against fixture)
+└── fixtures/
+    └── cli_surface.json        # Canonical CLI surface for the bundled SDK
 ```
 
-- **`session.py`** — hand-written. Builds `asana.Configuration` + `ApiClient`
-  and toggles `return_page_iterator` for `--paginate`.
-- **`formatter.py`** — hand-written. Supports `json` / `table` / `csv` / `text`
-  output and `--query` (jq).
-- **`cli/`** — auto-generated. Walks the official SDK's `*Api` classes and
-  emits click command groups.
+- **`session.py`** — builds `asana.Configuration` + `ApiClient`, toggles
+  `return_page_iterator` for `--all-items`, and exposes `resolve_body` /
+  `resolve_workspace`.
+- **`formatter.py`** — supports `json` / `table` / `csv` / `text` output and
+  `--query` (jq).
+- **`click_ext.py`** — `LazyGroup` for cheap top-level help, plus the
+  `GroupWithGlobalOptions` / `CommandWithGlobalOptions` pair that lets
+  `--debug`, `--access-token`, etc. work at any level of the tree.
+- **`cli.py`** — introspects every `*Api` class on the installed `asana`
+  package and builds click commands per method. Method-level introspection
+  is deferred per group so top-level `--help` is cheap.
+
+## Bumping the SDK
+
+1. Edit `dependencies` in `pyproject.toml` to widen the `asana` constraint
+   (e.g. bump the lower bound from `asana>=5.2,<6` to `asana>=5.3,<6` once
+   5.3 ships).
+2. `uv sync` to install the new SDK.
+3. `uv run pytest` — `test_cli_surface.py` will fail with the diff between
+   the new SDK's surface and the recorded fixture.
+4. Review the diff. Note user-visible changes in `CHANGELOG.md`.
+5. Regenerate the fixture (see the docstring at the top of
+   `tests/test_cli_surface.py` for the exact command).
+6. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`,
+   and `CHANGELOG.md` together.
 
 ## Trying shell completion locally
 

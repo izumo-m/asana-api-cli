@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from io import StringIO
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from asana_api_cli.session import (
     DEFAULT_WORKSPACE_ENV,
     resolve_body,
     resolve_workspace,
-    runtime,
 )
 
 
