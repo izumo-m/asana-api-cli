@@ -46,8 +46,8 @@ GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
 def _make_global_option_params() -> list[click.Option]:
     """Build fresh ``click.Option`` instances mirroring the root group's globals.
 
-    Kept in sync with the decorators that ``tools/codegen.py`` emits on
-    ``main``. Fresh instances are returned each call because click stores
+    Kept in sync with the ``@click.option`` decorators on ``main`` in
+    ``cli.py``. Fresh instances are returned each call because click stores
     per-command state on Option objects.
     """
     return [
@@ -104,8 +104,8 @@ def _make_global_option_params() -> list[click.Option]:
 def _apply_global_to_runtime(name: str, value: Any) -> None:
     """Write a single global option value to the shared ``runtime`` singleton.
 
-    Mirrors the body of ``main`` in the generated ``cli/__init__.py``; if the
-    set of global options changes there, update both places.
+    Mirrors the body of ``main`` in ``cli.py``; if the set of global options
+    changes there, update both places.
     """
     if name == "host":
         runtime.host = value
