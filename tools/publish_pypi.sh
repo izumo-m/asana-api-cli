@@ -12,6 +12,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYPROJECT="${ROOT}/pyproject.toml"
 DIST="${ROOT}/dist"
+BUILD="${ROOT}/build"
+EGG_INFO_GLOB="${ROOT}/src/*.egg-info"
 
 # Read current version from pyproject.toml
 version=$(grep -oP '^version\s*=\s*"\K[^"]+' "$PYPROJECT")
@@ -41,8 +43,13 @@ echo "--- Running tests ---"
 }
 echo ""
 
-# Clean previous build artifacts
-rm -rf "$DIST"
+# Clean previous build artifacts. setuptools reuses build/ as a staging dir,
+# so leftover files from a prior layout (e.g. before the v2.0.0 refactor) can
+# end up in the new wheel. Wipe build/, dist/, and egg-info to force a clean
+# build every time.
+rm -rf "$DIST" "$BUILD"
+# shellcheck disable=SC2086
+rm -rf $EGG_INFO_GLOB
 
 # Build
 echo "--- Building ---"
