@@ -15,7 +15,7 @@ from tabulate import tabulate
 
 
 def formatted(f: Any) -> Any:
-    """Decorator that adds --output / --query and auto-formats the returned dict."""
+    """Decorator that adds --output / --query and auto-formats the returned data."""
 
     @click.option(
         "--output",

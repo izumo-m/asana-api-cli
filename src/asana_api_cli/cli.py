@@ -4,9 +4,9 @@ The CLI is built at import time by introspecting every ``*Api`` class exposed
 by the official ``asana`` SDK. Each ``*Api`` class becomes a click subgroup;
 its methods become commands underneath. Method-level introspection is
 deferred per group so top-level ``--help`` does not pay the cost of walking
-every endpoint.
+every method.
 
-Translation rules (these mirror the previous static codegen exactly):
+Translation rules:
 
 * ``TasksApi`` → group ``tasks``; ``AuditLogAPIApi`` → ``audit-log-api``.
 * ``get_tasks`` → command ``get-tasks``.
@@ -24,7 +24,7 @@ Translation rules (these mirror the previous static codegen exactly):
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
-pick up newly added SDK endpoints without releasing a new asana-api-cli.
+pick up newly added SDK methods without releasing a new asana-api-cli.
 """
 
 from __future__ import annotations
@@ -458,7 +458,7 @@ class _ApiGroup(GroupWithGlobalOptions):
 
     Method introspection is deferred until the first ``list_commands`` or
     ``get_command`` call so that top-level ``--help`` does not walk every
-    endpoint.
+    method.
     """
 
     def __init__(self, api_cls: type, **kwargs: Any) -> None:
