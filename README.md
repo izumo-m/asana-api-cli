@@ -101,6 +101,13 @@ export ASANA_ACCESS_TOKEN="1/12345..."
 export ASANA_DEFAULT_WORKSPACE="12345678"   # optional
 ```
 
+On Windows PowerShell:
+
+```powershell
+$env:ASANA_ACCESS_TOKEN = "1/12345..."
+$env:ASANA_DEFAULT_WORKSPACE = "12345678"   # optional
+```
+
 ## Shell completion
 
 `asana-api` is built with Click, which supports dynamic shell completion.
@@ -115,6 +122,9 @@ Then reload the shell (`source ~/.bashrc` or open a new terminal). Pressing
 
 For `zsh` or `fish`, replace `bash_source` with `zsh_source` or `fish_source`
 and add the line to `~/.zshrc` or `~/.config/fish/config.fish` respectively.
+
+Click does not generate PowerShell completion. Windows users can install
+completion under WSL or Git Bash using the `bash_source` line above.
 
 ## Usage
 
@@ -148,6 +158,10 @@ asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PID
 # Output formats
 asana-api tasks get-tasks --project <PID> --output table
 asana-api tasks get-tasks --project <PID> --query '.data' --output csv
+
+# CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
+# Windows, which otherwise displays non-ASCII characters as garbled text.
+asana-api tasks get-tasks --project <PID> --output csv --csv-bom > tasks.csv
 ```
 
 See [Pagination](#pagination) for fetching across pages and

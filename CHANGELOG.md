@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `--csv-bom` flag on commands with CSV output. When set, the output is prefixed with a UTF-8 BOM so Excel on Windows opens it without mojibake. Off by default so Unix pipelines stay clean.
+- `--csv-bom` flag on commands with CSV output. CSV output is UTF-8 without a BOM by default; passing this flag prepends a UTF-8 BOM so Excel on Windows can decode non-ASCII characters correctly. Off by default so Unix pipelines stay clean.
 
 ### Changed
 

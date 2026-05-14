@@ -37,7 +37,10 @@ def formatted(f: Any) -> Any:
         "csv_bom",
         is_flag=True,
         default=False,
-        help="Prepend a UTF-8 BOM to CSV output so Excel on Windows opens it without mojibake",
+        help=(
+            "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
+            "non-ASCII characters correctly"
+        ),
     )
     @functools.wraps(f)
     def wrapper(

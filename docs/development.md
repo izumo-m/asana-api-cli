@@ -123,7 +123,8 @@ for task in tasks_api.get_tasks({"project": "123", "limit": 50}):
     print(task)
 ```
 
-You can also go through `AsanaSession`:
+You can also go through `AsanaSession`, though it exists to serve the CLI
+and may change between releases without notice:
 
 ```python
 from asana_api_cli import AsanaSession
