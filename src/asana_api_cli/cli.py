@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import sys
 from typing import Any
 
 import asana
@@ -388,13 +389,17 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             all_items = paginate = False
             page_size = max_items = None
 
-        body_value = kwargs.pop("body", None) if has_body else None
-        workspace_value = kwargs.pop("workspace", None) if has_workspace else None
+        if has_body:
+            body_value = kwargs.pop("body")  # click marks --body as required
+            parsed_body = resolve_body(body_value)
+        else:
+            parsed_body = None
 
-        parsed_body = resolve_body(body_value) if has_body else None
-        resolved_workspace = (
-            resolve_workspace(workspace_value, required=ws_required) if has_workspace else None
-        )
+        if has_workspace:
+            workspace_value = kwargs.pop("workspace", None)
+            resolved_workspace = resolve_workspace(workspace_value, required=ws_required)
+        else:
+            resolved_workspace = None
 
         if paginate:
             click.echo(
@@ -567,6 +572,16 @@ def main(
     debug: bool,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
+    # JSON output is required to be UTF-8 by RFC 8259, but on Windows the
+    # default stdout encoding is the locale code page (cp932 on Japanese
+    # Windows), which raises UnicodeEncodeError when writing non-ASCII data.
+    # Reconfigure to UTF-8 so the same output works on every platform.
+    # The hasattr guard keeps CliRunner's in-memory streams (used by tests)
+    # from blowing up, since StringIO has no reconfigure().
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
+
     runtime.host = host
     runtime.proxy = proxy
     runtime.verify_ssl = not no_verify_ssl

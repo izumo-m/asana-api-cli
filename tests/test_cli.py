@@ -244,7 +244,7 @@ class TestRootGroup:
         # Resolving a subgroup must trigger lazy method introspection.
         ctx = click.Context(main)
         tasks_group = main.get_command(ctx, "tasks")
-        assert tasks_group is not None
+        assert isinstance(tasks_group, click.Group)
         sub_ctx = click.Context(tasks_group, parent=ctx)
         cmd_names = set(tasks_group.list_commands(sub_ctx))
         assert "get-tasks" in cmd_names

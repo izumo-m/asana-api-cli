@@ -106,6 +106,37 @@ class TestFormatOutputCsv:
         _format_output([], output_format="csv", jq_query=None)
         assert capsys.readouterr().out == ""
 
+    def test_no_carriage_returns_in_csv_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # csv module's default lineterminator is "\r\n", which would interact
+        # with Windows text-mode stdout to produce "\r\r\n". We force "\n"
+        # so the platform layer handles any translation.
+        _format_output(
+            [{"a": "1", "b": "2"}, {"a": "3", "b": "4"}],
+            output_format="csv",
+            jq_query=None,
+        )
+        out = capsys.readouterr().out
+        assert "\r" not in out
+
+    def test_bom_off_by_default(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output([{"a": "1"}], output_format="csv", jq_query=None)
+        out = capsys.readouterr().out
+        assert not out.startswith("\ufeff")
+
+    def test_bom_prepended_when_requested(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output([{"a": "1"}], output_format="csv", jq_query=None, csv_bom=True)
+        out = capsys.readouterr().out
+        assert out.startswith("\ufeff")
+        # BOM must come exactly once, before the header.
+        assert out.count("\ufeff") == 1
+
+    def test_bom_ignored_for_non_csv(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # The flag is wired to every command via the decorator, so passing it
+        # alongside --output json must not corrupt the JSON output.
+        _format_output({"a": 1}, output_format="json", jq_query=None, csv_bom=True)
+        out = capsys.readouterr().out
+        assert not out.startswith("\ufeff")
+
 
 class TestFormatOutputText:
     def test_string_scalar(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -341,6 +372,12 @@ class TestFormattedDecorator:
         assert result.exit_code == 0
         assert "a\n" in result.output
         assert "x\n" in result.output
+
+    def test_csv_bom_flag(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(self._make_cli([{"a": "x"}]), ["--output", "csv", "--csv-bom"])
+        assert result.exit_code == 0
+        assert result.output.startswith("\ufeff")
 
     def test_query_option(self) -> None:
         runner = CliRunner()

@@ -58,7 +58,10 @@ def resolve_body(value: str) -> JsonValue:
 
 @dataclass
 class _Runtime:
-    """Configuration shared globally during a CLI invocation. Updated by the ``main`` callback and the global-option mixins in ``click_ext``."""
+    """Configuration shared globally during a CLI invocation.
+
+    Updated by the ``main`` callback and the global-option mixins in ``click_ext``.
+    """
 
     debug: bool = False
     host: str | None = None
@@ -82,7 +85,8 @@ class AsanaSession:
     ) -> None:
         config = asana.Configuration()
         config.access_token = token
-        # When *use_page_iterator* is True (--all-items), the SDK returns a PageIterator that walks every page.
+        # When *use_page_iterator* is True (--all-items), the SDK returns a
+        # PageIterator that walks every page.
         config.return_page_iterator = use_page_iterator
         # When --page-size is set, override the SDK default per-page size (100).
         if page_size is not None:
@@ -101,7 +105,8 @@ class AsanaSession:
         if runtime.temp_dir:
             config.temp_folder_path = runtime.temp_dir  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.retries is not None:
-            # Build a Retry with the user-specified total and python-asana's default backoff/status_forcelist.
+            # Build a Retry with the user-specified total and python-asana's
+            # default backoff/status_forcelist.
             config.retry_strategy = Retry(
                 total=runtime.retries,
                 backoff_factor=2,

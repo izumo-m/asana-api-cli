@@ -34,7 +34,7 @@ def _reset_runtime() -> None:
     runtime.temp_dir = None
 
 
-def _build_cli() -> click.Command:
+def _build_cli() -> click.Group:
     """Build a 3-level CLI mirroring the real ``asana-api`` shape."""
 
     @click.group(cls=LazyGroup)

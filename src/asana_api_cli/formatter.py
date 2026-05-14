@@ -32,8 +32,21 @@ def formatted(f: Any) -> Any:
         default=None,
         help="jq expression to filter output",
     )
+    @click.option(
+        "--csv-bom",
+        "csv_bom",
+        is_flag=True,
+        default=False,
+        help="Prepend a UTF-8 BOM to CSV output so Excel on Windows opens it without mojibake",
+    )
     @functools.wraps(f)
-    def wrapper(*args: Any, output_format: str, jq_query: str | None, **kwargs: Any) -> None:
+    def wrapper(
+        *args: Any,
+        output_format: str,
+        jq_query: str | None,
+        csv_bom: bool,
+        **kwargs: Any,
+    ) -> None:
         try:
             data = f(*args, **kwargs)
             # Collapse the asana SDK PageIterator / generator into a list
@@ -42,7 +55,7 @@ def formatted(f: Any) -> Any:
                     data = list(data)
         except ApiException as e:
             _handle_api_exception(e)
-        _format_output(data, output_format=output_format, jq_query=jq_query)
+        _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
     return wrapper
 
@@ -90,7 +103,9 @@ def _is_json(text: str) -> bool:
     return True
 
 
-def _format_output(data: Any, *, output_format: str, jq_query: str | None) -> None:
+def _format_output(
+    data: Any, *, output_format: str, jq_query: str | None, csv_bom: bool = False
+) -> None:
     if jq_query:
         try:
             data = jqlib.first(jq_query, data)
@@ -114,7 +129,7 @@ def _format_output(data: Any, *, output_format: str, jq_query: str | None) -> No
     if output_format == "table":
         click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
     elif output_format == "csv":
-        _print_csv(rows)
+        _print_csv(rows, with_bom=csv_bom)
 
 
 def _to_rows(data: Any) -> list[dict[str, Any]] | None:
@@ -151,11 +166,15 @@ def _print_text(data: Any) -> None:
     click.echo(data)
 
 
-def _print_csv(rows: list[dict[str, Any]]) -> None:
+def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:
     if not rows:
         return
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+    if with_bom:
+        buf.write("\ufeff")
+    # lineterminator="\n" avoids Windows text-mode stdout translating the
+    # csv module's default "\r\n" into "\r\r\n".
+    writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()), lineterminator="\n")
     writer.writeheader()
     writer.writerows(rows)
     click.echo(buf.getvalue(), nl=False)
