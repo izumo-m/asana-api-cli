@@ -129,7 +129,7 @@ You can also go through `AsanaSession`:
 from asana_api_cli import AsanaSession
 import asana
 
-session = AsanaSession(token="1/12345...", paginate=True)
+session = AsanaSession(token="1/12345...", use_page_iterator=True)
 tasks_api = asana.TasksApi(session.client)
 for task in tasks_api.get_tasks({"project": "123"}):
     print(task)

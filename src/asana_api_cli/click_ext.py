@@ -172,23 +172,12 @@ class _GlobalOptionsMixin:
         if is_root:
             return
 
-        # Prefer params injected at this level; fall back to the root command's
-        # params for commands that were not built via the mixin classes.
         records: list[tuple[str, str]] = []
         for param in self.params:  # type: ignore[attr-defined]
             if isinstance(param, click.Option) and param.name in GLOBAL_OPTION_NAMES:
                 record = param.get_help_record(ctx)
                 if record is not None:
                     records.append(record)
-        if not records:
-            root_ctx = ctx
-            while root_ctx.parent is not None:
-                root_ctx = root_ctx.parent
-            for param in root_ctx.command.params:
-                if isinstance(param, click.Option):
-                    record = param.get_help_record(root_ctx)
-                    if record is not None:
-                        records.append(record)
         if records:
             with formatter.section("Global Options"):
                 formatter.write_dl(records)

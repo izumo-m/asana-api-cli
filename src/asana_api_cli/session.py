@@ -17,13 +17,16 @@ from pathlib import Path
 from typing import Any
 
 import asana
+import click
 from urllib3.util.retry import Retry
 
 ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
 DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
 
+JsonValue = dict[str, Any] | list[Any] | str | int | float | bool | None
 
-def resolve_body(value: str) -> Any:
+
+def resolve_body(value: str) -> JsonValue:
     """Parse a body argument as JSON.
 
     Supports three input forms:
@@ -38,10 +41,10 @@ def resolve_body(value: str) -> Any:
         try:
             raw = path.read_text(encoding="utf-8")
         except FileNotFoundError:
-            print(f"Body file not found: {path}", file=sys.stderr)
+            click.echo(f"Body file not found: {path}", err=True)
             sys.exit(1)
         except OSError as exc:
-            print(f"Cannot read body file {path}: {exc}", file=sys.stderr)
+            click.echo(f"Cannot read body file {path}: {exc}", err=True)
             sys.exit(1)
     else:
         raw = value
@@ -49,7 +52,7 @@ def resolve_body(value: str) -> Any:
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        print(f"Invalid JSON in body: {exc}", file=sys.stderr)
+        click.echo(f"Invalid JSON in body: {exc}", err=True)
         sys.exit(1)
 
 
@@ -74,11 +77,13 @@ runtime = _Runtime()
 class AsanaSession:
     """Session that holds an ApiClient from the official asana SDK."""
 
-    def __init__(self, token: str, *, paginate: bool = False, page_size: int | None = None) -> None:
+    def __init__(
+        self, token: str, *, use_page_iterator: bool = False, page_size: int | None = None
+    ) -> None:
         config = asana.Configuration()
         config.access_token = token
-        # When *paginate* is True (--all-items), the SDK returns a PageIterator that walks every page.
-        config.return_page_iterator = paginate
+        # When *use_page_iterator* is True (--all-items), the SDK returns a PageIterator that walks every page.
+        config.return_page_iterator = use_page_iterator
         # When --page-size is set, override the SDK default per-page size (100).
         if page_size is not None:
             config.page_limit = page_size
@@ -130,16 +135,18 @@ class AsanaSession:
         return self._client
 
     @classmethod
-    def from_env(cls, *, paginate: bool = False, page_size: int | None = None) -> "AsanaSession":
+    def from_env(
+        cls, *, use_page_iterator: bool = False, page_size: int | None = None
+    ) -> AsanaSession:
         """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
         token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
         if not token:
-            print(
+            click.echo(
                 f"Access token is not set. Pass --access-token or set {ACCESS_TOKEN_ENV}.",
-                file=sys.stderr,
+                err=True,
             )
             sys.exit(1)
-        return cls(token=token, paginate=paginate, page_size=page_size)
+        return cls(token=token, use_page_iterator=use_page_iterator, page_size=page_size)
 
     def fetch_capped(
         self,
@@ -159,7 +166,7 @@ class AsanaSession:
         original = config.return_page_iterator
         config.return_page_iterator = False
         try:
-            page_size_default = self._page_size or 100
+            page_size_default = self._page_size if self._page_size is not None else 100
             items: list[Any] = []
             opts = dict(opts)  # don't mutate the caller's dict
             while len(items) < max_items:
@@ -168,6 +175,9 @@ class AsanaSession:
                 response = api_method(*args, opts)
                 page_data = _extract(response, "data") or []
                 items.extend(page_data)
+                # Empty page with a non-empty offset would loop forever with zero progress.
+                if not page_data:
+                    break
                 next_page = _extract(response, "next_page")
                 offset = _extract(next_page, "offset") if next_page else None
                 if not offset:
@@ -210,9 +220,9 @@ def resolve_workspace(
         ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
         if ws:
             return ws
-        print(
+        click.echo(
             f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
-            file=sys.stderr,
+            err=True,
         )
         sys.exit(1)
     return None

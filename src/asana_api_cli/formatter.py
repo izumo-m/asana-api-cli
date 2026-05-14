@@ -6,12 +6,14 @@ import functools
 import io
 import json
 import sys
-from typing import Any
+from typing import Any, NoReturn
 
 import click
 import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
+
+from asana_api_cli.session import runtime
 
 
 def formatted(f: Any) -> Any:
@@ -45,10 +47,8 @@ def formatted(f: Any) -> Any:
     return wrapper
 
 
-def _handle_api_exception(e: ApiException) -> None:
+def _handle_api_exception(e: ApiException) -> NoReturn:
     """Print an Asana API error in human-readable form and exit."""
-    from asana_api_cli.session import runtime
-
     status = e.status or "error"
     messages: list[str] = []
     body = e.body

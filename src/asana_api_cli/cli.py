@@ -128,6 +128,7 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
     current: _DocParam | None = None
 
     for raw in doc.split("\n"):
+        stripped = raw.strip()
         m = _PARAM_RE.match(raw)
         if m:
             if current is not None:
@@ -139,8 +140,15 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
                 required=False,
             )
             continue
-        if current is not None and raw.strip() and not raw.strip().startswith(":"):
-            current.description = (current.description + " " + raw.strip()).strip()
+        # Any other ``:directive:`` line ends the current param so continuation
+        # text after ``:return:`` etc. is not appended to its description.
+        if stripped.startswith(":"):
+            if current is not None:
+                params[current.name] = current
+                current = None
+            continue
+        if current is not None and stripped:
+            current.description = (current.description + " " + stripped).strip()
 
     if current is not None:
         params[current.name] = current
@@ -269,6 +277,13 @@ def _operations_for(api_cls: type) -> list[_Operation]:
 
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method."""
+    # If the SDK method has no ``opts`` parameter, docstring-derived named
+    # arguments cannot be forwarded — they would be silently dropped at call
+    # time. python-asana 5.x does not produce this combination today.
+    assert op.has_opts or not op.opts_params, (
+        f"{api_cls.__name__}.{op.method_name}: docstring declares params but "
+        f"the method has no `opts` argument; CLI options would be dropped"
+    )
     path_positionals = op.path_positionals
     has_body = op.has_body
     opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
@@ -348,7 +363,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         options.append(
             click.Option(
                 ["--page-size", "page_size"],
-                type=int,
+                type=click.IntRange(min=1, max=100),
                 default=None,
                 help="Items per page (Asana API requires 1-100, default 100)",
             )
@@ -356,7 +371,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         options.append(
             click.Option(
                 ["--max-items", "max_items"],
-                type=int,
+                type=click.IntRange(min=0),
                 default=None,
                 help="Stop after fetching this many items in total",
             )
@@ -399,7 +414,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             effective_page_size = max_items
 
         if paginatable:
-            session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
+            session = AsanaSession.from_env(
+                use_page_iterator=fetch_all, page_size=effective_page_size
+            )
         else:
             session = AsanaSession.from_env()
         api = api_cls(session.client)
@@ -568,7 +585,7 @@ def _register_groups(root: click.Group) -> None:
             _ApiGroup(
                 api_cls=cls,
                 name=_api_class_to_group(cls.__name__).replace("_", "-"),
-                help=f"{cls.__name__[:-3]} commands.",
+                help=f"{cls.__name__[:-3]} commands",
             )
         )
 
