@@ -19,8 +19,8 @@ Translation rules:
 * Methods that accept a ``body`` positional get a required ``--body`` option
   routed through ``resolve_body`` (supports ``@file`` / ``-`` / JSON string).
 * Paginatable methods (those with a ``limit`` doc-param) hide the raw
-  ``--limit`` option in favor of ``--page-size``, and gain ``--all-items``,
-  ``--max-items``, plus the deprecated ``--paginate`` alias.
+  ``--limit`` option in favor of ``--page-size``, and gain ``--all-items``
+  and ``--max-items``.
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
@@ -372,14 +372,6 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
         options.append(
             click.Option(
-                ["--paginate"],
-                is_flag=True,
-                default=False,
-                help="(Deprecated) Alias for --all-items",
-            )
-        )
-        options.append(
-            click.Option(
                 ["--page-size", "page_size"],
                 type=click.IntRange(min=1, max=100),
                 default=None,
@@ -399,11 +391,10 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         # Pop pagination flags first so kwargs only carries SDK params afterwards.
         if paginatable:
             all_items = kwargs.pop("all_items")
-            paginate = kwargs.pop("paginate")
             page_size = kwargs.pop("page_size")
             max_items = kwargs.pop("max_items")
         else:
-            all_items = paginate = False
+            all_items = False
             page_size = max_items = None
 
         if has_body:
@@ -418,17 +409,8 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         else:
             resolved_workspace = None
 
-        if paginate:
-            click.echo(
-                "Warning: --paginate is deprecated; use --all-items instead.",
-                err=True,
-            )
-        fetch_all = all_items or paginate
-        if fetch_all and max_items is not None:
-            raise click.UsageError(
-                "--max-items cannot be combined with --all-items "
-                "(or its deprecated alias --paginate)"
-            )
+        if all_items and max_items is not None:
+            raise click.UsageError("--max-items cannot be combined with --all-items")
 
         # --max-items 0 makes no API call; skip session creation so we don't
         # briefly set Configuration.page_limit = 0 (derived from max_items)
@@ -440,7 +422,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
 
         if paginatable:
             session = AsanaSession.from_env(
-                use_page_iterator=fetch_all, page_size=effective_page_size
+                use_page_iterator=all_items, page_size=effective_page_size
             )
         else:
             session = AsanaSession.from_env()

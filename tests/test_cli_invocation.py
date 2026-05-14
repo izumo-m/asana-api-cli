@@ -284,21 +284,14 @@ class TestPaginationModes:
         assert "limit" not in mock.call_args_list[0].args[0]
         assert json.loads(result.output) == [{"gid": "1"}, {"gid": "2"}]
 
-    def test_paginate_alias_emits_deprecation_warning(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_paginate_alias_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--paginate`` was removed in 2.1.0; the option is no longer accepted."""
         cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            return_value=iter([{"gid": "1"}]),
-        )
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
         result = CliRunner().invoke(cmd, ["--paginate"])
-        assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
-        # CliRunner merges stderr into result.output by default.
-        assert "--paginate is deprecated" in result.output
+        assert result.exit_code != 0
+        assert "No such option: --paginate" in result.output
+        assert mock.call_count == 0
 
     def test_max_items_with_all_items_is_an_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")

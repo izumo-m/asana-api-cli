@@ -181,9 +181,10 @@ class TestBuiltCommands:
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
         assert "--all-items" in flags
-        assert "--paginate" in flags
         assert "--page-size" in flags
         assert "--max-items" in flags
+        # ``--paginate`` (deprecated alias for --all-items) was removed in 2.1.0.
+        assert "--paginate" not in flags
 
     def test_get_tasks_hides_raw_limit(self, get_tasks_cmd: click.Command) -> None:
         # ``--limit`` is replaced by ``--page-size``.
