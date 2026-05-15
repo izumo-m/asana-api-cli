@@ -14,11 +14,13 @@ import pytest
 
 from asana_api_cli.session import (
     DEFAULT_WORKSPACE_ENV,
+    AsanaSession,
     HttpClientPrintRedactor,
     _AUTH_HEADER_RE,
     _default_mask_token,
     resolve_body,
     resolve_workspace,
+    runtime,
 )
 
 
@@ -319,6 +321,79 @@ class TestHttpClientPrintRedactor:
             wrapper = http.client.__dict__["print"]
             wrapper("send:", line)
         assert calls == ["SECRET-VALUE"]
+
+    def test_body_chunks_pass_through_unmodified(self, _clean_http_client_print: None) -> None:
+        """Body chunks must not be redacted, even when their content
+        happens to contain text that looks like an Authorization header.
+
+        Users may legitimately paste a debug log into an Asana task
+        description or comment; that content must round-trip verbatim.
+        The ``_looks_like_request_headers`` guard restricts redaction to
+        chunks starting with ``b'<METHOD> ``, so bodies (JSON,
+        multipart, plain) pass through unchanged.
+        """
+        seen: list[tuple[Any, ...]] = []
+        mask_calls: list[str] = []
+
+        def _capture(*args: Any, **kwargs: Any) -> None:
+            seen.append(args)
+
+        def _mask(token: str) -> str:
+            mask_calls.append(token)
+            return "<MASKED>"
+
+        http.client.print = _capture  # pyright: ignore[reportAttributeAccessIssue]
+        with HttpClientPrintRedactor(mask_fn=_mask):
+            wrapper = http.client.__dict__["print"]
+            # JSON body whose payload literally contains an Authorization
+            # header (e.g. a debug log pasted into a task description).
+            json_body = (
+                r"""b'{"data": {"name": "see Authorization: """
+                r"""Bearer XXXXXXXXXX in log"}}'"""
+            )
+            wrapper("send:", json_body)
+            # Multipart body starts with a boundary, not an HTTP method.
+            multipart_body = (
+                r"b'--BOUNDARY\r\nContent-Disposition: form-data\r\n"
+                r"Authorization: Bearer YYYY\r\n'"
+            )
+            wrapper("send:", multipart_body)
+            # Plain body that simply does not start with a method line.
+            plain_body = r"b'(arbitrary) Authorization: Bearer ZZZZ\r\n'"
+            wrapper("send:", plain_body)
+
+        # The guard prevented the regex/mask from running at all.
+        assert mask_calls == []
+        # All three bodies reached the inner print verbatim.
+        assert seen == [
+            ("send:", json_body),
+            ("send:", multipart_body),
+            ("send:", plain_body),
+        ]
+
+    def test_asana_session_init_failure_uninstalls_redactor(
+        self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If ``ApiClient`` construction raises after the redactor has
+        been installed, ``AsanaSession.__init__`` must uninstall the
+        global ``http.client.print`` patch before re-raising. The
+        caller never receives a session object, so they cannot call
+        ``close()`` themselves — cleanup must happen here or the patch
+        leaks for the lifetime of the process.
+        """
+
+        class _BoomClient:
+            def __init__(self, _config: Any) -> None:
+                raise RuntimeError("simulated SDK init failure")
+
+        monkeypatch.setattr("asana_api_cli.session.asana.ApiClient", _BoomClient)
+        monkeypatch.setattr(runtime, "debug", True)
+
+        pre_print = http.client.__dict__.get("print")
+        with pytest.raises(RuntimeError, match="simulated SDK init failure"):
+            AsanaSession(token="x" * 20)
+        # http.client.print is exactly what it was before the failed init.
+        assert http.client.__dict__.get("print") is pre_print
 
     def test_redacts_real_http_client_send(
         self, _clean_http_client_print: None, capsys: pytest.CaptureFixture[str]

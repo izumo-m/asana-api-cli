@@ -314,12 +314,21 @@ class AsanaSession:
             self._redactor = HttpClientPrintRedactor()
             self._redactor.install()
 
-        self._config = config
-        self._client = asana.ApiClient(config)
-
-        # Configuration has no --timeout knob, so wrap call_api to inject it.
-        if runtime.timeout is not None:
-            self._install_timeout(runtime.timeout)
+        try:
+            self._config = config
+            self._client = asana.ApiClient(config)
+            # Configuration has no --timeout knob, so wrap call_api to inject it.
+            if runtime.timeout is not None:
+                self._install_timeout(runtime.timeout)
+        except Exception:
+            # If construction fails after the redactor was installed, the
+            # caller never gets a session to call close() on, so undo the
+            # global http.client.print patch here rather than leaving it
+            # leaked for the rest of the process.
+            if self._redactor is not None:
+                self._redactor.uninstall()
+                self._redactor = None
+            raise
 
     def _install_timeout(self, timeout: float) -> None:
         """Wrap ApiClient.call_api to inject a default _request_timeout."""
