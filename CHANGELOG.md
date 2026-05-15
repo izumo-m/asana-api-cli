@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-16
+
 ### Added
 
 - `--csv-bom` flag on commands with CSV output. CSV output is UTF-8 without a BOM by default; passing this flag prepends a UTF-8 BOM so Excel on Windows can decode non-ASCII characters correctly. Off by default so Unix pipelines stay clean.
@@ -15,11 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **BREAKING**: Removed `--paginate`, deprecated since v1.5.0. Use `--all-items` instead.
+- `--paginate` (deprecated since v1.5.0; use `--all-items` instead).
 
 ### Changed
 
-- **BREAKING**: Renamed `AsanaSession`'s `paginate` keyword argument to `use_page_iterator` to avoid confusion with the (now removed) `--paginate` CLI flag. Library users calling `AsanaSession(token=..., paginate=True)` must switch to `AsanaSession(token=..., use_page_iterator=True)`.
+- Renamed `AsanaSession`'s `paginate` keyword argument to `use_page_iterator` to avoid confusion with the (now removed) `--paginate` CLI flag. Library users calling `AsanaSession(token=..., paginate=True)` must switch to `AsanaSession(token=..., use_page_iterator=True)`.
 - `--page-size` now validates the value at the CLI layer (1-100 per Asana's API spec) instead of forwarding out-of-range values to the server.
 - `--max-items` now rejects negative values at the CLI layer. `--max-items 0` remains valid and returns `[]` without making any API call.
 - Raised the lower bound on `jq` from `>=1.5` to `>=1.6` so `pipx install asana-api-cli` works on Windows (the `jq` PyPI package started shipping Windows wheels with 1.6.0).
@@ -132,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.5.0...v2.0.0
 [1.5.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.3.0...v1.4.0
