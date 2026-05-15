@@ -329,13 +329,21 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         help_text = _escape_help(dp.description) if dp else ""
         options.append(click.Option([flag], required=True, help=help_text))
 
-    # Unified --workspace option.
+    # Unified --workspace option. The env-var fallback only applies when the
+    # endpoint requires a workspace; for optional-workspace endpoints (e.g.
+    # ``get-tasks``) the CLI deliberately does not auto-fill from the env var,
+    # so the help text differs by case.
     if has_workspace:
+        ws_help = (
+            "Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)"
+            if ws_required
+            else "Workspace GID (optional; not auto-filled from ASANA_DEFAULT_WORKSPACE)"
+        )
         options.append(
             click.Option(
                 ["--workspace"],
                 default=None,
-                help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)",
+                help=ws_help,
             )
         )
 
