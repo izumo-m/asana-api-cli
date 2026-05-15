@@ -321,6 +321,30 @@ class TestPaginationModes:
 # ---------------------------------------------------------------------------
 
 
+class TestGlobalOptionValidation:
+    """Type/range validation on global options that affect runtime state."""
+
+    def test_retries_rejects_negative(self) -> None:
+        """``--retries`` must be a non-negative integer; negative values
+        previously silently disabled retries via urllib3.Retry."""
+        from asana_api_cli.cli import main
+
+        result = CliRunner().invoke(main, ["--retries", "-1"])
+        assert result.exit_code != 0
+        assert "Invalid value" in result.output or "is not in the range" in result.output
+
+    def test_retries_zero_accepted(self) -> None:
+        """``--retries 0`` is valid (disables retries explicitly)."""
+        from asana_api_cli.cli import main
+
+        # Click parses 0 fine; we don't run a subcommand so we expect a
+        # missing-command error rather than a validation error.
+        result = CliRunner().invoke(main, ["--retries", "0"])
+        # Either succeeds (showing help) or fails with "Missing command",
+        # but not with an IntRange validation error.
+        assert "Invalid value" not in result.output
+
+
 class TestDebugRedactorLifecycle:
     """The http.client debug redactor must stay installed for the duration
     of every paginated request, including the lazy per-page HTTP calls that

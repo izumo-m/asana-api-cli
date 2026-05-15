@@ -71,7 +71,7 @@ def _make_global_option_params() -> list[click.Option]:
         ),
         click.Option(
             ["--retries"],
-            type=int,
+            type=click.IntRange(min=0),
             default=None,
             help="Number of retries on 429/5xx responses (default: 5)",
         ),

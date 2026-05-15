@@ -55,6 +55,18 @@ class TestResolveBodyFile:
         with pytest.raises(SystemExit):
             resolve_body(f"@{body_file}")
 
+    def test_non_utf8_file_exits_cleanly(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A binary file (or any non-UTF-8 byte sequence) must produce a
+        clean error message, not a raw ``UnicodeDecodeError`` traceback."""
+        body_file = tmp_path / "binary.bin"
+        body_file.write_bytes(b"\x80\x81\x82")  # invalid UTF-8 start bytes
+        with pytest.raises(SystemExit):
+            resolve_body(f"@{body_file}")
+        err = capsys.readouterr().err
+        assert "not valid UTF-8" in err
+
 
 class TestResolveBodyStdin:
     def test_reads_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:

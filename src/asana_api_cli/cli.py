@@ -461,10 +461,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             method = getattr(api, op.method_name)
             if paginatable and max_items is not None:
                 return session.fetch_capped(method, *call_args, opts=opts, max_items=max_items)
-            if op.has_opts:
-                result = method(*call_args, opts)
-            else:
-                result = method(*call_args)
+            result = method(*call_args, opts) if op.has_opts else method(*call_args)
             # When --all-items is active the SDK returns a PageIterator
             # that lazily issues an HTTP request per page on iteration.
             # The formatter would otherwise iterate it after this ``with``
@@ -559,7 +556,7 @@ class _ApiGroup(GroupWithGlobalOptions):
 )
 @click.option(
     "--retries",
-    type=int,
+    type=click.IntRange(min=0),
     default=None,
     help="Number of retries on 429/5xx responses (default: 5)",
 )

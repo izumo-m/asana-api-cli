@@ -224,6 +224,12 @@ def resolve_body(value: str) -> JsonValue:
         except FileNotFoundError:
             click.echo(f"Body file not found: {path}", err=True)
             sys.exit(1)
+        except UnicodeDecodeError as exc:
+            click.echo(
+                f"Body file {path} is not valid UTF-8: {exc}",
+                err=True,
+            )
+            sys.exit(1)
         except OSError as exc:
             click.echo(f"Cannot read body file {path}: {exc}", err=True)
             sys.exit(1)
