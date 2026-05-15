@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON output containing non-ASCII characters (e.g. Japanese task names) could fail with `UnicodeEncodeError` on Windows where stdout defaults to the locale code page (cp932). The CLI now reconfigures stdout/stderr to UTF-8 at startup, matching the JSON spec's UTF-8 requirement (RFC 8259).
 - CSV output produced doubled line endings (`\r\r\n`) on Windows because the `csv` module's default `\r\n` line terminator combined with text-mode stdout's `\n` → `\r\n` translation. CSV now emits `\n` and lets the stream handle the platform-specific translation.
 - `--workspace` help text said `(falls back to ASANA_DEFAULT_WORKSPACE)` on every endpoint, including those where the env var is not used as a fallback (workspace marked optional in the SDK, e.g. `projects get-projects`, `tasks get-tasks`). The help now differentiates required-workspace endpoints (env-var fallback applies) from optional-workspace endpoints (env var not used).
+- `--all-items --debug` leaked the raw `Authorization` header on every page beyond the first. The SDK's lazy `PageIterator` was iterated by the formatter after the session — and the `http.client` redactor it owns — had already exited the `with` block, so all but the first page's request hit `http.client.print` with the debug redactor uninstalled. The CLI now collapses the iterator inside the session scope so every page request happens while the redactor is still installed.
 
 ## [2.0.0] - 2026-05-08
 

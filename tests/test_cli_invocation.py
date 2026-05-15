@@ -13,6 +13,7 @@ forwarded ``limit=N`` to the SDK even though Asana caps ``limit`` at 100.
 from __future__ import annotations
 
 import copy
+import http.client
 import json
 from collections.abc import Iterator
 from typing import Any
@@ -313,6 +314,56 @@ class TestPaginationModes:
         result = CliRunner().invoke(cmd, ["--offset", "abc123"])
         assert result.exit_code == 0, result.output
         assert mock.call_args_list[0].args[0]["offset"] == "abc123"
+
+
+# ---------------------------------------------------------------------------
+# Debug redactor lifecycle across pagination
+# ---------------------------------------------------------------------------
+
+
+class TestDebugRedactorLifecycle:
+    """The http.client debug redactor must stay installed for the duration
+    of every paginated request, including the lazy per-page HTTP calls that
+    `--all-items` triggers when the formatter iterates the SDK's
+    PageIterator."""
+
+    def test_all_items_with_debug_keeps_redactor_installed_during_iteration(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression for v2.1.0: ``--all-items`` must consume the SDK
+        PageIterator inside the ``AsanaSession`` ``with`` block. If the
+        iterator is consumed after the session exits, the debug redactor
+        is already gone and pages past the first leak the raw
+        Authorization header to stderr.
+        """
+        redactor_states: list[bool] = []
+
+        def _generator() -> Iterator[dict[str, Any]]:
+            for i in range(3):
+                current = http.client.__dict__.get("print")
+                redactor_states.append(getattr(current, "_asana_cli_redactor", False))
+                yield {"gid": str(i)}
+
+        cmd = _build_command("TasksApi", "get_tasks")
+        _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_generator())
+        monkeypatch.setattr(runtime, "debug", True)
+
+        saved_print = http.client.__dict__.get("print")
+        saved_debuglevel = http.client.HTTPConnection.debuglevel
+        try:
+            result = CliRunner().invoke(cmd, ["--all-items"])
+            assert result.exit_code == 0, result.output
+            assert len(redactor_states) == 3
+            assert all(redactor_states), (
+                "redactor must be installed during every PageIterator yield; "
+                f"observed states={redactor_states}"
+            )
+        finally:
+            if saved_print is None:
+                http.client.__dict__.pop("print", None)
+            else:
+                http.client.print = saved_print  # pyright: ignore[reportAttributeAccessIssue]
+            http.client.HTTPConnection.debuglevel = saved_debuglevel
 
 
 # ---------------------------------------------------------------------------

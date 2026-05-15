@@ -462,8 +462,19 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             if paginatable and max_items is not None:
                 return session.fetch_capped(method, *call_args, opts=opts, max_items=max_items)
             if op.has_opts:
-                return method(*call_args, opts)
-            return method(*call_args)
+                result = method(*call_args, opts)
+            else:
+                result = method(*call_args)
+            # When --all-items is active the SDK returns a PageIterator
+            # that lazily issues an HTTP request per page on iteration.
+            # The formatter would otherwise iterate it after this ``with``
+            # block exits — that is, after the debug redactor has been
+            # uninstalled — leaking Authorization headers on every page
+            # past the first. Consume it here so every page request lands
+            # while the session (and its redactor) is still live.
+            if paginatable and all_items:
+                result = list(result)
+            return result
 
     callback = formatted(inner_callback)
 
