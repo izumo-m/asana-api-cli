@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `--csv-bom` flag on commands with CSV output. CSV output is UTF-8 without a BOM by default; passing this flag prepends a UTF-8 BOM so Excel on Windows can decode non-ASCII characters correctly. Off by default so Unix pipelines stay clean.
+- `HttpClientPrintRedactor` exported from `asana_api_cli.session`: a context manager that masks Bearer/Basic Authorization values in `http.client`'s wire-level debug output. Used internally when `--debug` is enabled, and usable standalone (`with HttpClientPrintRedactor(): ...`) for library callers who want the same redaction without the rest of the CLI.
+- `AsanaSession` is now usable as a context manager (`with AsanaSession(token=...) as session: ...`) so the debug redactor is uninstalled cleanly on exit. An explicit `close()` method is also available. Existing code without `with` continues to work (the redactor stays installed for the lifetime of the process, which is fine for one-shot CLI use).
 
 ### Removed
 
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--debug` printed the `Authorization: Bearer …` header (i.e. the access token) verbatim because the SDK enables `http.client`'s wire-level tracing. Bearer/Basic Authorization values are now partially redacted in debug output: only the last six characters of the token survive (e.g. `Authorization: Bearer ...abc123`) so a user juggling multiple accounts (work vs personal) can still tell which token is in use, while tokens shorter than 16 characters are fully redacted as `<REDACTED>`.
 - `fetch_capped` (used by `--max-items`) could loop indefinitely on an empty page with a non-empty `next_page.offset`; it now breaks on zero-progress pages.
 - `--max-items N` with N > 100 returned a 400 from the API instead of auto-paginating, because the CLI forwarded N as the per-page `limit` (Asana caps `limit` at 100). The per-page size is now held at 100 (or the explicit `--page-size`) regardless of `--max-items`, and pages are walked until N items have been collected. Regression since v1.5.0.
 - JSON output containing non-ASCII characters (e.g. Japanese task names) could fail with `UnicodeEncodeError` on Windows where stdout defaults to the locale code page (cp932). The CLI now reconfigures stdout/stderr to UTF-8 at startup, matching the JSON spec's UTF-8 requirement (RFC 8259).

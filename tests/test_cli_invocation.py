@@ -246,7 +246,7 @@ class TestPageSizeWithMaxItems:
 
 
 # ---------------------------------------------------------------------------
-# Pagination: --all-items, --paginate, --offset, single-page default
+# Pagination: default, --all-items, --offset, and the removed --paginate alias
 # ---------------------------------------------------------------------------
 
 

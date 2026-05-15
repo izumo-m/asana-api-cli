@@ -421,39 +421,41 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         effective_page_size = _resolve_effective_page_size(page_size, max_items)
 
         if paginatable:
-            session = AsanaSession.from_env(
+            session_ctx = AsanaSession.from_env(
                 use_page_iterator=all_items, page_size=effective_page_size
             )
         else:
-            session = AsanaSession.from_env()
-        api = api_cls(session.client)
+            session_ctx = AsanaSession.from_env()
 
-        opts: dict[str, Any] = {}
-        for p in non_ws_opts:
-            value = kwargs.pop(p.name, None)
-            if p.required or value is not None:
-                opts[p.name] = value
-        if ws_opt is not None and resolved_workspace is not None:
-            opts[ws_opt.name] = resolved_workspace
+        with session_ctx as session:
+            api = api_cls(session.client)
 
-        # Build positional call args. Body comes first, mirroring the
-        # python-asana convention (e.g.
-        # ``add_followers_for_task(body, task_gid, opts)``).
-        call_args: list[Any] = []
-        if has_body:
-            call_args.append(parsed_body)
-        for name in path_positionals:
-            if _is_workspace_param(name):
-                call_args.append(resolved_workspace)
-            else:
-                call_args.append(kwargs.pop(_option_name(name)))
+            opts: dict[str, Any] = {}
+            for p in non_ws_opts:
+                value = kwargs.pop(p.name, None)
+                if p.required or value is not None:
+                    opts[p.name] = value
+            if ws_opt is not None and resolved_workspace is not None:
+                opts[ws_opt.name] = resolved_workspace
 
-        method = getattr(api, op.method_name)
-        if paginatable and max_items is not None:
-            return session.fetch_capped(method, *call_args, opts=opts, max_items=max_items)
-        if op.has_opts:
-            return method(*call_args, opts)
-        return method(*call_args)
+            # Build positional call args. Body comes first, mirroring the
+            # python-asana convention (e.g.
+            # ``add_followers_for_task(body, task_gid, opts)``).
+            call_args: list[Any] = []
+            if has_body:
+                call_args.append(parsed_body)
+            for name in path_positionals:
+                if _is_workspace_param(name):
+                    call_args.append(resolved_workspace)
+                else:
+                    call_args.append(kwargs.pop(_option_name(name)))
+
+            method = getattr(api, op.method_name)
+            if paginatable and max_items is not None:
+                return session.fetch_capped(method, *call_args, opts=opts, max_items=max_items)
+            if op.has_opts:
+                return method(*call_args, opts)
+            return method(*call_args)
 
     callback = formatted(inner_callback)
 
