@@ -6,16 +6,18 @@ import functools
 import io
 import json
 import sys
-from typing import Any
+from typing import Any, NoReturn
 
 import click
 import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
 
+from asana_api_cli.session import runtime
+
 
 def formatted(f: Any) -> Any:
-    """Decorator that adds --output / --query and auto-formats the returned dict."""
+    """Decorator that adds --output / --query and auto-formats the returned data."""
 
     @click.option(
         "--output",
@@ -30,8 +32,24 @@ def formatted(f: Any) -> Any:
         default=None,
         help="jq expression to filter output",
     )
+    @click.option(
+        "--csv-bom",
+        "csv_bom",
+        is_flag=True,
+        default=False,
+        help=(
+            "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
+            "non-ASCII characters correctly"
+        ),
+    )
     @functools.wraps(f)
-    def wrapper(*args: Any, output_format: str, jq_query: str | None, **kwargs: Any) -> None:
+    def wrapper(
+        *args: Any,
+        output_format: str,
+        jq_query: str | None,
+        csv_bom: bool,
+        **kwargs: Any,
+    ) -> None:
         try:
             data = f(*args, **kwargs)
             # Collapse the asana SDK PageIterator / generator into a list
@@ -40,15 +58,13 @@ def formatted(f: Any) -> Any:
                     data = list(data)
         except ApiException as e:
             _handle_api_exception(e)
-        _format_output(data, output_format=output_format, jq_query=jq_query)
+        _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
     return wrapper
 
 
-def _handle_api_exception(e: ApiException) -> None:
+def _handle_api_exception(e: ApiException) -> NoReturn:
     """Print an Asana API error in human-readable form and exit."""
-    from asana_api_cli.session import runtime
-
     status = e.status or "error"
     messages: list[str] = []
     body = e.body
@@ -90,31 +106,57 @@ def _is_json(text: str) -> bool:
     return True
 
 
-def _format_output(data: Any, *, output_format: str, jq_query: str | None) -> None:
+def _format_output(
+    data: Any, *, output_format: str, jq_query: str | None, csv_bom: bool = False
+) -> None:
+    # ``--query EXPR`` is treated as the equivalent of piping through
+    # ``jq 'EXPR'``: jq may yield 0, 1, or many values and each output
+    # format renders them naturally. When no query is given, the data
+    # is treated as a single yield.
     if jq_query:
         try:
-            data = jqlib.first(jq_query, data)
+            results = jqlib.all(jq_query, data)
         except ValueError as e:
             click.echo(f"Invalid jq expression: {e}", err=True)
             sys.exit(1)
-
-    if output_format == "text":
-        _print_text(data)
-        return
+    else:
+        results = [data]
 
     if output_format == "json":
-        click.echo(json.dumps(data, indent=2, ensure_ascii=False))
+        # Stream of values: each yield is its own JSON document. Matches
+        # external ``jq``'s default output.
+        for v in results:
+            click.echo(json.dumps(v, indent=2, ensure_ascii=False))
         return
 
-    rows = _to_rows(data)
-    if rows is None:
-        click.echo(data)
+    if output_format == "text":
+        for v in results:
+            _print_text(v)
+        return
+
+    # table / csv: collect rows from every yield. If no yield is rowable
+    # (all scalars, e.g. ``.data | length`` or ``.data[] | .name``),
+    # fall through to plain printing per scalar instead. Mixed yields
+    # (some rowable, some scalar) render only the rowable ones — scalars
+    # are dropped silently in that uncommon case.
+    rows: list[dict[str, Any]] = []
+    non_rowable: list[Any] = []
+    for v in results:
+        r = _to_rows(v)
+        if r is None:
+            non_rowable.append(v)
+        else:
+            rows.extend(r)
+
+    if not rows and non_rowable:
+        for v in non_rowable:
+            click.echo(v)
         return
 
     if output_format == "table":
         click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
     elif output_format == "csv":
-        _print_csv(rows)
+        _print_csv(rows, with_bom=csv_bom)
 
 
 def _to_rows(data: Any) -> list[dict[str, Any]] | None:
@@ -151,11 +193,21 @@ def _print_text(data: Any) -> None:
     click.echo(data)
 
 
-def _print_csv(rows: list[dict[str, Any]]) -> None:
+def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:
     if not rows:
         return
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+    if with_bom:
+        buf.write("\ufeff")
+    # Asana responses often have optional fields that appear on some rows
+    # and not others (e.g. ``due_on``). Collect the union of keys across
+    # all rows so no row's data is silently dropped.
+    # ``dict.fromkeys`` preserves insertion order (Python 3.7+), giving a
+    # stable column order based on first appearance.
+    fieldnames = list(dict.fromkeys(key for row in rows for key in row))
+    # lineterminator="\n" avoids Windows text-mode stdout translating the
+    # csv module's default "\r\n" into "\r\r\n".
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\n")
     writer.writeheader()
     writer.writerows(rows)
     click.echo(buf.getvalue(), nl=False)

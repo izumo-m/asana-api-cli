@@ -20,6 +20,7 @@ from asana_api_cli.cli import (
     _operations_for,
     _parse_params,
     _parse_summary,
+    _resolve_effective_page_size,
     _snake,
     main,
 )
@@ -180,9 +181,10 @@ class TestBuiltCommands:
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
         assert "--all-items" in flags
-        assert "--paginate" in flags
         assert "--page-size" in flags
         assert "--max-items" in flags
+        # ``--paginate`` (deprecated alias for --all-items) was removed in 2.1.0.
+        assert "--paginate" not in flags
 
     def test_get_tasks_hides_raw_limit(self, get_tasks_cmd: click.Command) -> None:
         # ``--limit`` is replaced by ``--page-size``.
@@ -208,6 +210,45 @@ class TestBuiltCommands:
         flags = _option_flags(get_tasks_cmd)
         assert "--output" in flags
         assert "--query" in flags
+
+
+# ---------------------------------------------------------------------------
+# Pagination size resolution
+# ---------------------------------------------------------------------------
+
+
+class TestEffectivePageSize:
+    """``_resolve_effective_page_size`` decides the per-page ``limit`` value.
+
+    The Asana API caps ``limit`` at 100, so we must never request more than
+    100 per page even when ``--max-items`` is larger.
+    """
+
+    def test_no_max_items_returns_page_size(self) -> None:
+        assert _resolve_effective_page_size(None, None) is None
+        assert _resolve_effective_page_size(50, None) == 50
+
+    def test_max_items_below_default_shrinks(self) -> None:
+        # max_items=5, page_size unset → request a single page of 5.
+        assert _resolve_effective_page_size(None, 5) == 5
+
+    def test_max_items_above_api_cap_keeps_default(self) -> None:
+        # max_items=250, page_size unset → keep page_size None so fetch_capped
+        # falls back to the 100-per-page default. Returning 250 would push the
+        # API's limit parameter above its 100 ceiling and produce a 400.
+        assert _resolve_effective_page_size(None, 250) is None
+
+    def test_max_items_equal_to_cap_keeps_default(self) -> None:
+        # 100 < 100 is False — no shrink, leave page_size None.
+        assert _resolve_effective_page_size(None, 100) is None
+
+    def test_explicit_page_size_smaller_than_max_items_kept(self) -> None:
+        # User explicitly requested 50/page; auto-page through it.
+        assert _resolve_effective_page_size(50, 250) == 50
+
+    def test_explicit_page_size_larger_than_max_items_shrinks(self) -> None:
+        # No point fetching 50 items just to throw 30 away.
+        assert _resolve_effective_page_size(50, 20) == 20
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +285,7 @@ class TestRootGroup:
         # Resolving a subgroup must trigger lazy method introspection.
         ctx = click.Context(main)
         tasks_group = main.get_command(ctx, "tasks")
-        assert tasks_group is not None
+        assert isinstance(tasks_group, click.Group)
         sub_ctx = click.Context(tasks_group, parent=ctx)
         cmd_names = set(tasks_group.list_commands(sub_ctx))
         assert "get-tasks" in cmd_names

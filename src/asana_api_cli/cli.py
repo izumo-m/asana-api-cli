@@ -4,9 +4,9 @@ The CLI is built at import time by introspecting every ``*Api`` class exposed
 by the official ``asana`` SDK. Each ``*Api`` class becomes a click subgroup;
 its methods become commands underneath. Method-level introspection is
 deferred per group so top-level ``--help`` does not pay the cost of walking
-every endpoint.
+every method.
 
-Translation rules (these mirror the previous static codegen exactly):
+Translation rules:
 
 * ``TasksApi`` → group ``tasks``; ``AuditLogAPIApi`` → ``audit-log-api``.
 * ``get_tasks`` → command ``get-tasks``.
@@ -19,18 +19,19 @@ Translation rules (these mirror the previous static codegen exactly):
 * Methods that accept a ``body`` positional get a required ``--body`` option
   routed through ``resolve_body`` (supports ``@file`` / ``-`` / JSON string).
 * Paginatable methods (those with a ``limit`` doc-param) hide the raw
-  ``--limit`` option in favor of ``--page-size``, and gain ``--all-items``,
-  ``--max-items``, plus the deprecated ``--paginate`` alias.
+  ``--limit`` option in favor of ``--page-size``, and gain ``--all-items``
+  and ``--max-items``.
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
-pick up newly added SDK endpoints without releasing a new asana-api-cli.
+pick up newly added SDK methods without releasing a new asana-api-cli.
 """
 
 from __future__ import annotations
 
 import inspect
 import re
+import sys
 from typing import Any
 
 import asana
@@ -128,6 +129,7 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
     current: _DocParam | None = None
 
     for raw in doc.split("\n"):
+        stripped = raw.strip()
         m = _PARAM_RE.match(raw)
         if m:
             if current is not None:
@@ -139,8 +141,15 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
                 required=False,
             )
             continue
-        if current is not None and raw.strip() and not raw.strip().startswith(":"):
-            current.description = (current.description + " " + raw.strip()).strip()
+        # Any other ``:directive:`` line ends the current param so continuation
+        # text after ``:return:`` etc. is not appended to its description.
+        if stripped.startswith(":"):
+            if current is not None:
+                params[current.name] = current
+                current = None
+            continue
+        if current is not None and stripped:
+            current.description = (current.description + " " + stripped).strip()
 
     if current is not None:
         params[current.name] = current
@@ -267,8 +276,32 @@ def _operations_for(api_cls: type) -> list[_Operation]:
 # ---------------------------------------------------------------------------
 
 
+def _resolve_effective_page_size(page_size: int | None, max_items: int | None) -> int | None:
+    """Return the per-page size to request when ``--max-items`` caps the total.
+
+    Only shrink below the natural per-page size (100, Asana's max) when
+    ``--max-items`` is *smaller* than what we would otherwise request — that
+    way a single trailing page is not wasted. When ``--max-items`` is larger,
+    keep the user's explicit ``--page-size`` (or fall back to the SDK default
+    of 100); shrinking to ``--max-items`` would push the per-request ``limit``
+    above the Asana API cap of 100 and produce a 400 response.
+    """
+    if max_items is None:
+        return page_size
+    if max_items < (page_size or 100):
+        return max_items
+    return page_size
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method."""
+    # If the SDK method has no ``opts`` parameter, docstring-derived named
+    # arguments cannot be forwarded — they would be silently dropped at call
+    # time. python-asana 5.x does not produce this combination today.
+    assert op.has_opts or not op.opts_params, (
+        f"{api_cls.__name__}.{op.method_name}: docstring declares params but "
+        f"the method has no `opts` argument; CLI options would be dropped"
+    )
     path_positionals = op.path_positionals
     has_body = op.has_body
     opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
@@ -296,13 +329,21 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         help_text = _escape_help(dp.description) if dp else ""
         options.append(click.Option([flag], required=True, help=help_text))
 
-    # Unified --workspace option.
+    # Unified --workspace option. The env-var fallback only applies when the
+    # endpoint requires a workspace; for optional-workspace endpoints (e.g.
+    # ``get-tasks``) the CLI deliberately does not auto-fill from the env var,
+    # so the help text differs by case.
     if has_workspace:
+        ws_help = (
+            "Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)"
+            if ws_required
+            else "Workspace GID (optional; not auto-filled from ASANA_DEFAULT_WORKSPACE)"
+        )
         options.append(
             click.Option(
                 ["--workspace"],
                 default=None,
-                help="Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)",
+                help=ws_help,
             )
         )
 
@@ -339,16 +380,8 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
         options.append(
             click.Option(
-                ["--paginate"],
-                is_flag=True,
-                default=False,
-                help="(Deprecated) Alias for --all-items",
-            )
-        )
-        options.append(
-            click.Option(
                 ["--page-size", "page_size"],
-                type=int,
+                type=click.IntRange(min=1, max=100),
                 default=None,
                 help="Items per page (Asana API requires 1-100, default 100)",
             )
@@ -356,7 +389,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         options.append(
             click.Option(
                 ["--max-items", "max_items"],
-                type=int,
+                type=click.IntRange(min=0),
                 default=None,
                 help="Stop after fetching this many items in total",
             )
@@ -366,70 +399,79 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         # Pop pagination flags first so kwargs only carries SDK params afterwards.
         if paginatable:
             all_items = kwargs.pop("all_items")
-            paginate = kwargs.pop("paginate")
             page_size = kwargs.pop("page_size")
             max_items = kwargs.pop("max_items")
         else:
-            all_items = paginate = False
+            all_items = False
             page_size = max_items = None
 
-        body_value = kwargs.pop("body", None) if has_body else None
-        workspace_value = kwargs.pop("workspace", None) if has_workspace else None
+        if has_body:
+            body_value = kwargs.pop("body")  # click marks --body as required
+            parsed_body = resolve_body(body_value)
+        else:
+            parsed_body = None
 
-        parsed_body = resolve_body(body_value) if has_body else None
-        resolved_workspace = (
-            resolve_workspace(workspace_value, required=ws_required) if has_workspace else None
-        )
+        if has_workspace:
+            workspace_value = kwargs.pop("workspace", None)
+            resolved_workspace = resolve_workspace(workspace_value, required=ws_required)
+        else:
+            resolved_workspace = None
 
-        if paginate:
-            click.echo(
-                "Warning: --paginate is deprecated; use --all-items instead.",
-                err=True,
-            )
-        fetch_all = all_items or paginate
-        if fetch_all and max_items is not None:
-            raise click.UsageError(
-                "--max-items cannot be combined with --all-items "
-                "(or its deprecated alias --paginate)"
-            )
+        if all_items and max_items is not None:
+            raise click.UsageError("--max-items cannot be combined with --all-items")
 
-        # Auto-shrink page_size when --max-items is smaller, to avoid overfetch.
-        effective_page_size = page_size
-        if max_items is not None and (page_size is None or page_size > max_items):
-            effective_page_size = max_items
+        # --max-items 0 makes no API call; skip session creation so we don't
+        # briefly set Configuration.page_limit = 0 (derived from max_items)
+        # on a session we immediately discard.
+        if max_items == 0:
+            return []
+
+        effective_page_size = _resolve_effective_page_size(page_size, max_items)
 
         if paginatable:
-            session = AsanaSession.from_env(paginate=fetch_all, page_size=effective_page_size)
+            session_ctx = AsanaSession.from_env(
+                use_page_iterator=all_items, page_size=effective_page_size
+            )
         else:
-            session = AsanaSession.from_env()
-        api = api_cls(session.client)
+            session_ctx = AsanaSession.from_env()
 
-        opts: dict[str, Any] = {}
-        for p in non_ws_opts:
-            value = kwargs.pop(p.name, None)
-            if p.required or value is not None:
-                opts[p.name] = value
-        if ws_opt is not None and resolved_workspace is not None:
-            opts[ws_opt.name] = resolved_workspace
+        with session_ctx as session:
+            api = api_cls(session.client)
 
-        # Build positional call args. Body comes first, mirroring the
-        # python-asana convention (e.g.
-        # ``add_followers_for_task(body, task_gid, opts)``).
-        call_args: list[Any] = []
-        if has_body:
-            call_args.append(parsed_body)
-        for name in path_positionals:
-            if _is_workspace_param(name):
-                call_args.append(resolved_workspace)
-            else:
-                call_args.append(kwargs.pop(_option_name(name)))
+            opts: dict[str, Any] = {}
+            for p in non_ws_opts:
+                value = kwargs.pop(p.name, None)
+                if p.required or value is not None:
+                    opts[p.name] = value
+            if ws_opt is not None and resolved_workspace is not None:
+                opts[ws_opt.name] = resolved_workspace
 
-        method = getattr(api, op.method_name)
-        if paginatable and max_items is not None:
-            return session.fetch_capped(method, *call_args, opts=opts, max_items=max_items)
-        if op.has_opts:
-            return method(*call_args, opts)
-        return method(*call_args)
+            # Build positional call args. Body comes first, mirroring the
+            # python-asana convention (e.g.
+            # ``add_followers_for_task(body, task_gid, opts)``).
+            call_args: list[Any] = []
+            if has_body:
+                call_args.append(parsed_body)
+            for name in path_positionals:
+                if _is_workspace_param(name):
+                    call_args.append(resolved_workspace)
+                else:
+                    call_args.append(kwargs.pop(_option_name(name)))
+
+            method = getattr(api, op.method_name)
+            if paginatable and max_items is not None:
+                return session.fetch_capped(method, *call_args, opts=opts, max_items=max_items)
+            result = method(*call_args, opts) if op.has_opts else method(*call_args)
+            # When --all-items is active the SDK returns a PageIterator
+            # that lazily issues an HTTP request per page on iteration.
+            # The formatter would otherwise iterate it after this ``with``
+            # block exits — that is, after the debug redactor has been
+            # uninstalled — leaking Authorization headers on every page
+            # past the first. Consume it here so every page request lands
+            # while the session (and its redactor) is still live.
+            if paginatable and all_items:
+                result = list(result)
+            return result
 
     callback = formatted(inner_callback)
 
@@ -458,7 +500,7 @@ class _ApiGroup(GroupWithGlobalOptions):
 
     Method introspection is deferred until the first ``list_commands`` or
     ``get_command`` call so that top-level ``--help`` does not walk every
-    endpoint.
+    method.
     """
 
     def __init__(self, api_cls: type, **kwargs: Any) -> None:
@@ -514,7 +556,7 @@ class _ApiGroup(GroupWithGlobalOptions):
 )
 @click.option(
     "--retries",
-    type=int,
+    type=click.IntRange(min=0),
     default=None,
     help="Number of retries on 429/5xx responses (default: 5)",
 )
@@ -550,6 +592,16 @@ def main(
     debug: bool,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
+    # JSON output is required to be UTF-8 by RFC 8259, but on Windows the
+    # default stdout encoding is the locale code page (cp932 on Japanese
+    # Windows), which raises UnicodeEncodeError when writing non-ASCII data.
+    # Reconfigure to UTF-8 so the same output works on every platform.
+    # The hasattr guard keeps CliRunner's in-memory streams (used by tests)
+    # from blowing up, since StringIO has no reconfigure().
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
+
     runtime.host = host
     runtime.proxy = proxy
     runtime.verify_ssl = not no_verify_ssl
@@ -568,7 +620,7 @@ def _register_groups(root: click.Group) -> None:
             _ApiGroup(
                 api_cls=cls,
                 name=_api_class_to_group(cls.__name__).replace("_", "-"),
-                help=f"{cls.__name__[:-3]} commands.",
+                help=f"{cls.__name__[:-3]} commands",
             )
         )
 

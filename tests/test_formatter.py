@@ -106,6 +106,37 @@ class TestFormatOutputCsv:
         _format_output([], output_format="csv", jq_query=None)
         assert capsys.readouterr().out == ""
 
+    def test_no_carriage_returns_in_csv_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # csv module's default lineterminator is "\r\n", which would interact
+        # with Windows text-mode stdout to produce "\r\r\n". We force "\n"
+        # so the platform layer handles any translation.
+        _format_output(
+            [{"a": "1", "b": "2"}, {"a": "3", "b": "4"}],
+            output_format="csv",
+            jq_query=None,
+        )
+        out = capsys.readouterr().out
+        assert "\r" not in out
+
+    def test_bom_off_by_default(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output([{"a": "1"}], output_format="csv", jq_query=None)
+        out = capsys.readouterr().out
+        assert not out.startswith("\ufeff")
+
+    def test_bom_prepended_when_requested(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output([{"a": "1"}], output_format="csv", jq_query=None, csv_bom=True)
+        out = capsys.readouterr().out
+        assert out.startswith("\ufeff")
+        # BOM must come exactly once, before the header.
+        assert out.count("\ufeff") == 1
+
+    def test_bom_ignored_for_non_csv(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # The flag is wired to every command via the decorator, so passing it
+        # alongside --output json must not corrupt the JSON output.
+        _format_output({"a": 1}, output_format="json", jq_query=None, csv_bom=True)
+        out = capsys.readouterr().out
+        assert not out.startswith("\ufeff")
+
 
 class TestFormatOutputText:
     def test_string_scalar(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -169,6 +200,118 @@ class TestFormatOutputJq:
     def test_invalid_jq_exits(self) -> None:
         with pytest.raises(SystemExit):
             _format_output({"a": 1}, output_format="json", jq_query=".[invalid")
+
+
+class TestFormatOutputJqEquivalentToPipe:
+    """``--query EXPR`` is equivalent to ``... | jq 'EXPR'``: every value
+    yielded by jq reaches the output, not just the first. Each output
+    format renders the value stream naturally."""
+
+    def test_json_multi_yield_emits_separate_documents(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """``.data[]`` yields N values; ``--output json`` emits each as
+        its own JSON document, matching external ``jq``'s stream output."""
+        _format_output(
+            {"data": [{"gid": "1"}, {"gid": "2"}, {"gid": "3"}]},
+            output_format="json",
+            jq_query=".data[]",
+        )
+        out = capsys.readouterr().out
+        assert '"gid": "1"' in out
+        assert '"gid": "2"' in out
+        assert '"gid": "3"' in out
+
+    def test_json_single_yield_emits_single_document(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """``.data`` yields the array as one value; the document is just
+        the array (not wrapped in another container)."""
+        _format_output(
+            {"data": [{"gid": "1"}, {"gid": "2"}]},
+            output_format="json",
+            jq_query=".data",
+        )
+        assert json.loads(capsys.readouterr().out) == [{"gid": "1"}, {"gid": "2"}]
+
+    def test_json_zero_yield_emits_nothing(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A query that matches nothing produces no output and does not
+        raise ``StopIteration``."""
+        _format_output(
+            {"data": [{"name": "a"}, {"name": "b"}]},
+            output_format="json",
+            jq_query='.data[] | select(.name == "nonexistent")',
+        )
+        assert capsys.readouterr().out == ""
+
+    def test_table_multi_yield_collects_rows(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output(
+            {"data": [{"gid": "1", "name": "a"}, {"gid": "2", "name": "b"}]},
+            output_format="table",
+            jq_query=".data[]",
+        )
+        out = capsys.readouterr().out
+        # Both rows must appear.
+        assert "1" in out and "a" in out
+        assert "2" in out and "b" in out
+
+    def test_csv_multi_yield_collects_rows(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output(
+            {"data": [{"gid": "1"}, {"gid": "2"}, {"gid": "3"}]},
+            output_format="csv",
+            jq_query=".data[]",
+        )
+        lines = capsys.readouterr().out.strip().splitlines()
+        assert lines == ["gid", "1", "2", "3"]
+
+    def test_text_multi_yield_lines(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output(
+            {"data": [{"name": "a"}, {"name": "b"}, {"name": "c"}]},
+            output_format="text",
+            jq_query=".data[] | .name",
+        )
+        lines = capsys.readouterr().out.strip().splitlines()
+        assert lines == ["a", "b", "c"]
+
+    def test_table_scalar_yields_fall_through(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """When all yields are scalars (no rowable structure), ``--output
+        table`` falls through to plain printing per yield rather than
+        crashing."""
+        _format_output(
+            {"data": [{"name": "a"}, {"name": "b"}]},
+            output_format="table",
+            jq_query=".data[] | .name",
+        )
+        out = capsys.readouterr().out
+        assert "a" in out
+        assert "b" in out
+
+
+class TestCsvFieldnamesUnion:
+    """``--output csv`` collects the union of keys across all rows so that
+    rows with different optional fields all render correctly."""
+
+    def test_extra_keys_on_later_rows_are_kept(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Row 0 has only ``gid``; row 1 also has ``due_on``. The header
+        must include both columns and row 0 must show an empty
+        ``due_on`` cell."""
+        data = [{"gid": "1"}, {"gid": "2", "due_on": "2026-01-01"}]
+        _format_output(data, output_format="csv", jq_query=None)
+        lines = capsys.readouterr().out.strip().splitlines()
+        assert lines[0] == "gid,due_on"
+        assert lines[1] == "1,"
+        assert lines[2] == "2,2026-01-01"
+
+    def test_keys_appear_in_first_seen_order(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Column order should follow first-appearance order across rows."""
+        data = [
+            {"a": "1", "b": "2"},
+            {"a": "3", "c": "4"},  # c first seen here
+            {"a": "5", "b": "6", "c": "7"},
+        ]
+        _format_output(data, output_format="csv", jq_query=None)
+        lines = capsys.readouterr().out.strip().splitlines()
+        assert lines[0] == "a,b,c"
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +484,12 @@ class TestFormattedDecorator:
         assert result.exit_code == 0
         assert "a\n" in result.output
         assert "x\n" in result.output
+
+    def test_csv_bom_flag(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(self._make_cli([{"a": "x"}]), ["--output", "csv", "--csv-bom"])
+        assert result.exit_code == 0
+        assert result.output.startswith("\ufeff")
 
     def test_query_option(self) -> None:
         runner = CliRunner()

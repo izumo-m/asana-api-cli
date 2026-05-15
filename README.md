@@ -1,27 +1,30 @@
 # asana-api-cli
 
-A CLI for the Asana API. It thinly wraps the official
-[python-asana](https://github.com/Asana/python-asana) SDK with click, exposing
-every endpoint as `asana-api <group> <command>`.
+A CLI that exposes **every method of the official
+[`python-asana`](https://github.com/Asana/python-asana) SDK** as
+`asana-api <group> <command>`. The command tree is generated at runtime
+from the installed `asana` package, automatically tracking whatever
+SDK version is installed in the same environment.
 
 ## Why asana-api-cli
 
-- **Near-complete SDK coverage.** Almost every method on every `*Api` class in
-  python-asana is available as a CLI command. The command tree is built at
-  runtime from the installed `asana` package, so new APIs surface as the
-  upstream library evolves — no asana-api-cli release required.
+- **Complete SDK coverage.** Every method of every `*Api` class in
+  `python-asana` becomes a CLI command. Because the tree is introspected
+  from the installed `asana` package, new methods surface the moment
+  upstream ships them — no `asana-api-cli` release required.
 - **Tracks the SDK version you actually use.** Because commands are
-  introspected from whatever `asana` is installed alongside, the CLI surface
-  matches the SDK version pinned in your project. When using asana-api-cli
-  as a dev-dependency, `pip install -U asana` updates the CLI's available
-  endpoints in lockstep with your application code.
+  introspected from whatever `asana` is installed in the same environment,
+  the CLI surface matches the SDK version pinned in your project. When using
+  `asana-api-cli` as a dev-dependency, `pip install -U asana` updates the
+  CLI's available commands in lockstep with your application code.
 - **SDK-compatible arguments and output.** Command arguments map to
-  python-asana method parameters (with minor naming adjustments — hyphens
-  become underscores, group names become PascalCase API classes), and JSON
-  output matches the SDK's response shape. The CLI makes it easy to iterate:
-  try different arguments, inspect the response, and refine until you
-  understand the endpoint's behavior. Once verified, port the call into your
-  Python app — far fewer surprises on the first integration.
+  `python-asana` method parameters (with minor naming adjustments — hyphens
+  become underscores, group names map back to PascalCase `*Api` class
+  names), and JSON output matches the SDK's response shape. The CLI makes
+  it easy to iterate: try different arguments, inspect the response, and
+  refine until you understand the endpoint's behavior. Once verified,
+  translate the call into the equivalent `python-asana` invocation in your
+  app — far fewer surprises on the first integration.
 
 ## Installation
 
@@ -29,14 +32,14 @@ every endpoint as `asana-api <group> <command>`.
 pip install asana-api-cli
 ```
 
-For best results, install asana-api-cli into the same Python environment
+For best results, install `asana-api-cli` into the same Python environment
 that holds your project's `python-asana` so the CLI surface tracks the
 exact SDK version your application uses (see [As a
 dev-dependency](#as-a-dev-dependency) below).
 
 ### As a dev-dependency
 
-If your project already uses `python-asana`, add asana-api-cli to your dev
+If your project already uses `python-asana`, add `asana-api-cli` to your dev
 group so the CLI tracks the same SDK version your application code uses:
 
 ```toml
@@ -55,13 +58,13 @@ asana-api-cli = "*"
 ```
 
 After `uv sync` (or equivalent), `asana-api` resolves to the project's
-`.venv` and introspects whatever `asana` version is locked there. Tests
-prototyped with `asana-api tasks ...` will exactly match the SDK calls in
-your app.
+`.venv` and introspects whatever `asana` version is locked there. Calls
+prototyped with `asana-api tasks ...` translate directly to the SDK calls
+you'll write in your app.
 
 ### Installing globally with pipx
 
-If you would rather isolate asana-api-cli from any project's dependencies
+If you would rather isolate `asana-api-cli` from any project's dependencies
 — for example, when you administer Asana from the shell without writing
 Python — install it with [pipx](https://pipx.pypa.io/):
 
@@ -69,9 +72,9 @@ Python — install it with [pipx](https://pipx.pypa.io/):
 pipx install asana-api-cli
 ```
 
-In this setup the CLI uses the `python-asana` version that shipped with
-the asana-api-cli release; `pipx upgrade asana-api-cli` updates only
-asana-api-cli itself, not the bundled `python-asana`. To pull a newer
+In this setup the CLI uses the `python-asana` version pipx resolved when
+installing `asana-api-cli`; `pipx upgrade asana-api-cli` updates only
+`asana-api-cli` itself, not the bundled `python-asana`. To pull a newer
 `python-asana` into the existing pipx install without reinstalling the
 CLI:
 
@@ -79,23 +82,30 @@ CLI:
 pipx runpip asana-api-cli install -U asana
 ```
 
-The next `asana-api` run sees the new SDK and any newly added endpoints
+The next `asana-api` run sees the new SDK and any newly added methods
 automatically.
 
 ## Environment variables
 
 | Name | Required | Description |
 |------|----------|-------------|
-| `ASANA_ACCESS_TOKEN` | Yes (at runtime only) | Asana Personal Access Token |
+| `ASANA_ACCESS_TOKEN` | Yes (at runtime only) | Asana personal access token |
 | `ASANA_DEFAULT_WORKSPACE` | No | Default workspace GID for endpoints that require it |
 
 The token can be issued from the
 [Asana Developer Console](https://app.asana.com/0/developer-console).
-No token is needed for `--help` or argument-error output.
+No token is needed for `--help` or argument validation errors.
 
 ```bash
 export ASANA_ACCESS_TOKEN="1/12345..."
 export ASANA_DEFAULT_WORKSPACE="12345678"   # optional
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:ASANA_ACCESS_TOKEN = "1/12345..."
+$env:ASANA_DEFAULT_WORKSPACE = "12345678"   # optional
 ```
 
 ## Shell completion
@@ -112,6 +122,9 @@ Then reload the shell (`source ~/.bashrc` or open a new terminal). Pressing
 
 For `zsh` or `fish`, replace `bash_source` with `zsh_source` or `fish_source`
 and add the line to `~/.zshrc` or `~/.config/fish/config.fish` respectively.
+
+Click does not generate PowerShell completion. Windows users can install
+completion under WSL or Git Bash using the `bash_source` line above.
 
 ## Usage
 
@@ -142,9 +155,14 @@ asana-api tasks get-task --task <TASK_GID>
 # Create a task (body is a JSON string)
 asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PID>"]}}'
 
-# Output formats
-asana-api tasks get-tasks --project <PID> --output table
+# Output formats — pair non-JSON formats with `--query '.data'` to unwrap the
+# `{"data": [...]}` envelope into one row per item.
+asana-api tasks get-tasks --project <PID> --query '.data' --output table
 asana-api tasks get-tasks --project <PID> --query '.data' --output csv
+
+# CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
+# Windows, which otherwise displays non-ASCII characters as garbled text.
+asana-api tasks get-tasks --project <PID> --output csv --csv-bom > tasks.csv
 ```
 
 See [Pagination](#pagination) for fetching across pages and
@@ -152,20 +170,21 @@ See [Pagination](#pagination) for fetching across pages and
 
 ### Workspace resolution
 
-Many API endpoints require a workspace. For those endpoints (e.g.
-`get-projects-for-workspace`), the CLI resolves it in this order:
+Many API endpoints require a workspace. For commands wrapping such
+endpoints (e.g. `get-projects-for-workspace`), the CLI resolves it in
+this order:
 
 1. `--workspace <GID>` on the command
 2. `ASANA_DEFAULT_WORKSPACE` environment variable
 
-For endpoints where workspace is optional (e.g. `get-tasks`), the env-var
+For commands where workspace is optional (e.g. `get-tasks`), the env-var
 fallback is **not** used — pass `--workspace` explicitly if needed. This
-prevents conflicts with other scope parameters like `--project` that are
-mutually exclusive with workspace in the Asana API.
+avoids ambiguity with alternative scope parameters like `--project` that
+the Asana API accepts in place of workspace.
 
 ## Pagination
 
-Listing endpoints (e.g. `tasks get-tasks`) return paginated results. The CLI
+List commands (e.g. `tasks get-tasks`) return paginated results. The CLI
 provides four ways to control how much is fetched:
 
 | Option | Behavior |
@@ -179,7 +198,7 @@ provides four ways to control how much is fetched:
 
 `--page-size N` tunes the per-page request size (Asana API requires 1-100,
 default 100). Rarely needed — combine with `--all-items` or `--max-items` only
-when the default doesn't suit (e.g. very large rows or rate-limit tuning).
+when the default doesn't suit (e.g. very large response items).
 
 ```bash
 # Auto-paginate up to 250 items
@@ -202,8 +221,7 @@ asana-api --debug tasks get-tasks --project <PID>
 asana-api tasks get-tasks --project <PID> --debug
 ```
 
-When the same option is given at multiple levels, the more specific (later)
-one wins.
+When the same option is given at multiple levels, the later one wins.
 
 | Option | Description |
 |--------|-------------|
@@ -215,12 +233,12 @@ one wins.
 | `--retries N` | Number of retries on 429/5xx responses (default: 5) |
 | `--timeout SECONDS` | Per-request timeout in seconds |
 | `--temp-dir PATH` | Directory for temporary downloads |
-| `--debug` | Print HTTP request/response to stderr for troubleshooting |
+| `--debug` | Print HTTP request/response traces for troubleshooting (Authorization values are masked). |
 
 ## Development
 
 See [docs/development.md](https://github.com/izumo-m/asana-api-cli/blob/main/docs/development.md)
-for building from source, project layout, and library usage.
+for building from source and project layout.
 
 ## License
 

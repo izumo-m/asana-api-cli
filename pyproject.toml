@@ -1,6 +1,6 @@
 [project]
 name = "asana-api-cli"
-version = "2.0.0"
+version = "2.1.0"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
 readme = "README.md"
@@ -8,7 +8,7 @@ license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.0",
-    "jq>=1.5",
+    "jq>=1.6",
     "tabulate>=0.9",
     "asana>=5.2,<6",
 ]
@@ -24,7 +24,8 @@ asana-api = "asana_api_cli.cli:main"
 
 [dependency-groups]
 dev = [
-    "ruff<1",
+    "ruff>=0.6",
+    "basedpyright>=1.13",
     "pytest>=9,<10",
     "build>=1,<2",
     "twine>=6,<7",
