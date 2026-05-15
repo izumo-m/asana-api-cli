@@ -1,7 +1,7 @@
 # asana-api-cli
 
 A CLI that exposes **every method of the official
-[python-asana](https://github.com/Asana/python-asana) SDK** as
+[`python-asana`](https://github.com/Asana/python-asana) SDK** as
 `asana-api <group> <command>`. The command tree is generated at runtime
 from the installed `asana` package, automatically tracking whatever
 SDK version is installed in the same environment.
@@ -9,21 +9,21 @@ SDK version is installed in the same environment.
 ## Why asana-api-cli
 
 - **Complete SDK coverage.** Every method of every `*Api` class in
-  python-asana becomes a CLI command. Because the tree is introspected
+  `python-asana` becomes a CLI command. Because the tree is introspected
   from the installed `asana` package, new methods surface the moment
-  upstream ships them — no asana-api-cli release required.
+  upstream ships them — no `asana-api-cli` release required.
 - **Tracks the SDK version you actually use.** Because commands are
   introspected from whatever `asana` is installed in the same environment,
   the CLI surface matches the SDK version pinned in your project. When using
-  asana-api-cli as a dev-dependency, `pip install -U asana` updates the
+  `asana-api-cli` as a dev-dependency, `pip install -U asana` updates the
   CLI's available commands in lockstep with your application code.
 - **SDK-compatible arguments and output.** Command arguments map to
-  python-asana method parameters (with minor naming adjustments — hyphens
+  `python-asana` method parameters (with minor naming adjustments — hyphens
   become underscores, group names map back to PascalCase `*Api` class
   names), and JSON output matches the SDK's response shape. The CLI makes
   it easy to iterate: try different arguments, inspect the response, and
   refine until you understand the endpoint's behavior. Once verified,
-  translate the call into the equivalent python-asana invocation in your
+  translate the call into the equivalent `python-asana` invocation in your
   app — far fewer surprises on the first integration.
 
 ## Installation
@@ -32,14 +32,14 @@ SDK version is installed in the same environment.
 pip install asana-api-cli
 ```
 
-For best results, install asana-api-cli into the same Python environment
+For best results, install `asana-api-cli` into the same Python environment
 that holds your project's `python-asana` so the CLI surface tracks the
 exact SDK version your application uses (see [As a
 dev-dependency](#as-a-dev-dependency) below).
 
 ### As a dev-dependency
 
-If your project already uses `python-asana`, add asana-api-cli to your dev
+If your project already uses `python-asana`, add `asana-api-cli` to your dev
 group so the CLI tracks the same SDK version your application code uses:
 
 ```toml
@@ -64,7 +64,7 @@ you'll write in your app.
 
 ### Installing globally with pipx
 
-If you would rather isolate asana-api-cli from any project's dependencies
+If you would rather isolate `asana-api-cli` from any project's dependencies
 — for example, when you administer Asana from the shell without writing
 Python — install it with [pipx](https://pipx.pypa.io/):
 
@@ -73,8 +73,8 @@ pipx install asana-api-cli
 ```
 
 In this setup the CLI uses the `python-asana` version pipx resolved when
-installing asana-api-cli; `pipx upgrade asana-api-cli` updates only
-asana-api-cli itself, not the bundled `python-asana`. To pull a newer
+installing `asana-api-cli`; `pipx upgrade asana-api-cli` updates only
+`asana-api-cli` itself, not the bundled `python-asana`. To pull a newer
 `python-asana` into the existing pipx install without reinstalling the
 CLI:
 
@@ -89,7 +89,7 @@ automatically.
 
 | Name | Required | Description |
 |------|----------|-------------|
-| `ASANA_ACCESS_TOKEN` | Yes (at runtime only) | Asana Personal Access Token |
+| `ASANA_ACCESS_TOKEN` | Yes (at runtime only) | Asana personal access token |
 | `ASANA_DEFAULT_WORKSPACE` | No | Default workspace GID for endpoints that require it |
 
 The token can be issued from the
@@ -233,12 +233,12 @@ When the same option is given at multiple levels, the later one wins.
 | `--retries N` | Number of retries on 429/5xx responses (default: 5) |
 | `--timeout SECONDS` | Per-request timeout in seconds |
 | `--temp-dir PATH` | Directory for temporary downloads |
-| `--debug` | Print HTTP request/response to stderr for troubleshooting |
+| `--debug` | Print HTTP request/response traces for troubleshooting (Authorization values are masked). |
 
 ## Development
 
 See [docs/development.md](https://github.com/izumo-m/asana-api-cli/blob/main/docs/development.md)
-for building from source, project layout, and library usage.
+for building from source and project layout.
 
 ## License
 

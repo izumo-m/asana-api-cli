@@ -20,7 +20,7 @@ breaking changes.
 ```
 src/asana_api_cli/
 ├── __init__.py           # Re-exports AsanaSession
-├── session.py            # Thin wrapper around asana.ApiClient
+├── session.py            # AsanaSession + helpers used by the CLI
 ├── formatter.py          # CLI output formatting (@formatted decorator)
 ├── click_ext.py          # LazyGroup + global-options propagation mixins
 ├── version.py            # version_string()
@@ -34,8 +34,10 @@ tests/
 ```
 
 - **`session.py`** — builds `asana.Configuration` + `ApiClient`, toggles
-  `return_page_iterator` for `--all-items`, and exposes `resolve_body` /
-  `resolve_workspace`.
+  `return_page_iterator` for `--all-items`, masks Authorization headers
+  in `http.client`'s debug output via `HttpClientPrintRedactor` when
+  `--debug` is set, and exposes `resolve_body` / `resolve_workspace` to
+  `cli.py`.
 - **`formatter.py`** — supports `json` / `table` / `csv` / `text` output and
   `--query` (jq).
 - **`click_ext.py`** — `LazyGroup` for cheap top-level help, plus the
@@ -61,7 +63,7 @@ tests/
 
 ## Trying shell completion locally
 
-`asana-api` is built with click, which generates dynamic completion scripts.
+`asana-api` is built with Click, which generates dynamic completion scripts.
 To experiment with completion without touching your real shell config, spawn
 an isolated sub-shell via `uv run` and install completion only inside it:
 
@@ -106,10 +108,25 @@ COMP_WORDS="asana-api tasks get-tasks --" COMP_CWORD=3 \
 
 This prints the candidate list as `type,value` lines.
 
-## Using as a library
+## Library use
 
-This project exists to provide a CLI, but calling the SDK directly from Python
-is the normal approach:
+`asana-api-cli` can also be imported from Python — handy for one-off
+scripts:
+
+```python
+from asana_api_cli import AsanaSession
+import asana
+
+with AsanaSession(token="1/12345...", use_page_iterator=True) as session:
+    tasks_api = asana.TasksApi(session.client)
+    for task in tasks_api.get_tasks({"project": "123"}):
+        print(task)
+```
+
+This is a bonus, not a maintained library API: names and behavior may
+change in any release without notice and without being flagged in
+`CHANGELOG.md`. For anything you plan to keep around, write against the
+official [`asana`](https://github.com/Asana/python-asana) SDK directly:
 
 ```python
 import asana
@@ -120,18 +137,5 @@ client = asana.ApiClient(config)
 
 tasks_api = asana.TasksApi(client)
 for task in tasks_api.get_tasks({"project": "123", "limit": 50}):
-    print(task)
-```
-
-You can also go through `AsanaSession`, though it exists to serve the CLI
-and may change between releases without notice:
-
-```python
-from asana_api_cli import AsanaSession
-import asana
-
-session = AsanaSession(token="1/12345...", use_page_iterator=True)
-tasks_api = asana.TasksApi(session.client)
-for task in tasks_api.get_tasks({"project": "123"}):
     print(task)
 ```
