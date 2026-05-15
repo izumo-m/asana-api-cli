@@ -276,6 +276,23 @@ def _operations_for(api_cls: type) -> list[_Operation]:
 # ---------------------------------------------------------------------------
 
 
+def _resolve_effective_page_size(page_size: int | None, max_items: int | None) -> int | None:
+    """Return the per-page size to request when ``--max-items`` caps the total.
+
+    Only shrink below the natural per-page size (100, Asana's max) when
+    ``--max-items`` is *smaller* than what we would otherwise request — that
+    way a single trailing page is not wasted. When ``--max-items`` is larger,
+    keep the user's explicit ``--page-size`` (or fall back to the SDK default
+    of 100); shrinking to ``--max-items`` would push the per-request ``limit``
+    above the Asana API cap of 100 and produce a 400 response.
+    """
+    if max_items is None:
+        return page_size
+    if max_items < (page_size or 100):
+        return max_items
+    return page_size
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method."""
     # If the SDK method has no ``opts`` parameter, docstring-derived named
@@ -413,10 +430,13 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 "(or its deprecated alias --paginate)"
             )
 
-        # Auto-shrink page_size when --max-items is smaller, to avoid overfetch.
-        effective_page_size = page_size
-        if max_items is not None and (page_size is None or page_size > max_items):
-            effective_page_size = max_items
+        # --max-items 0 makes no API call; skip session creation so we don't
+        # briefly set Configuration.page_limit = 0 (derived from max_items)
+        # on a session we immediately discard.
+        if max_items == 0:
+            return []
+
+        effective_page_size = _resolve_effective_page_size(page_size, max_items)
 
         if paginatable:
             session = AsanaSession.from_env(

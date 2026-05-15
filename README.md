@@ -155,8 +155,9 @@ asana-api tasks get-task --task <TASK_GID>
 # Create a task (body is a JSON string)
 asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PID>"]}}'
 
-# Output formats
-asana-api tasks get-tasks --project <PID> --output table
+# Output formats — pair non-JSON formats with `--query '.data'` to unwrap the
+# `{"data": [...]}` envelope into one row per item.
+asana-api tasks get-tasks --project <PID> --query '.data' --output table
 asana-api tasks get-tasks --project <PID> --query '.data' --output csv
 
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on

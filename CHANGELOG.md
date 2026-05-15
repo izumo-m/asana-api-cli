@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `fetch_capped` (used by `--max-items`) could loop indefinitely on an empty page with a non-empty `next_page.offset`; it now breaks on zero-progress pages.
+- `--max-items N` with N > 100 returned a 400 from the API instead of auto-paginating, because the CLI forwarded N as the per-page `limit` (Asana caps `limit` at 100). The per-page size is now held at 100 (or the explicit `--page-size`) regardless of `--max-items`, and pages are walked until N items have been collected. Regression since v1.5.0.
 - JSON output containing non-ASCII characters (e.g. Japanese task names) could fail with `UnicodeEncodeError` on Windows where stdout defaults to the locale code page (cp932). The CLI now reconfigures stdout/stderr to UTF-8 at startup, matching the JSON spec's UTF-8 requirement (RFC 8259).
 - CSV output produced doubled line endings (`\r\r\n`) on Windows because the `csv` module's default `\r\n` line terminator combined with text-mode stdout's `\n` → `\r\n` translation. CSV now emits `\n` and lets the stream handle the platform-specific translation.
 
