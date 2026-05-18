@@ -3,11 +3,11 @@
 Each test builds a real command via ``_make_command`` against a real
 ``*Api`` class, replaces the underlying SDK method with a ``MagicMock``,
 drives the command through ``CliRunner``, and asserts on what reached the
-SDK (positional args, opts dict, call count).
+SDK (positional args, opts dict, kwargs, call count).
 
 This catches bugs in the argument-plumbing layer that structural tests
-miss -- for example the ``--max-items > 100`` regression where the CLI
-forwarded ``limit=N`` to the SDK even though Asana caps ``limit`` at 100.
+miss -- for example forgetting to forward ``--max-items`` as the SDK's
+``item_limit`` kwarg.
 """
 
 from __future__ import annotations
@@ -91,9 +91,8 @@ def _patch(
 
     ``MagicMock.call_args_list[i].args`` reflects the arguments the CLI
     passed in (without ``self``, since the stub strips it). Mutable args
-    (the ``opts`` dict) are deep-copied before being recorded so that
-    ``fetch_capped``'s in-place mutation across iterations does not collapse
-    every recorded call into the dict's final state.
+    (the ``opts`` dict) are deep-copied before being recorded so each
+    call's snapshot survives any later in-place mutation.
     """
     api_cls = getattr(asana, api_cls_name)
     mock = MagicMock(
@@ -110,140 +109,103 @@ def _patch(
 
 
 # ---------------------------------------------------------------------------
-# Pagination: --max-items size handling (regression area)
+# Pagination: --max-items forwards to the SDK's ``item_limit`` kwarg
 # ---------------------------------------------------------------------------
 
 
-class TestMaxItemsLimitArg:
-    """``--max-items`` must never push ``opts["limit"]`` above the API cap (100)."""
+class TestMaxItemsKwarg:
+    """``--max-items N`` is forwarded as ``item_limit=N`` to the SDK method.
 
-    def test_max_items_250_walks_100_100_50(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Regression: previously this forwarded ``limit=250`` and got a 400."""
-        cmd = _build_command("TasksApi", "get_tasks")
-        responses = [
-            _page([{"gid": str(i)} for i in range(0, 100)], offset="off1"),
-            _page([{"gid": str(i)} for i in range(100, 200)], offset="off2"),
-            _page([{"gid": str(i)} for i in range(200, 250)]),
-        ]
-        mock = _patch(monkeypatch, "TasksApi", "get_tasks", side_effect=responses)
+    The SDK's ``PageIterator`` then caps each per-request ``limit`` to
+    ``min(page_limit, item_limit - count)`` and stops at exactly N items,
+    so the CLI does not need to walk pages itself.
+    """
 
-        result = CliRunner().invoke(cmd, ["--max-items", "250"])
-
-        assert result.exit_code == 0, result.output
-        assert mock.call_count == 3
-        limits = [c.args[0]["limit"] for c in mock.call_args_list]
-        assert limits == [100, 100, 50]
-        # ``offset`` is threaded from each response into the next request.
-        assert "offset" not in mock.call_args_list[0].args[0]
-        assert mock.call_args_list[1].args[0]["offset"] == "off1"
-        assert mock.call_args_list[2].args[0]["offset"] == "off2"
-
-    def test_max_items_exactly_at_cap(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_max_items_passes_item_limit_kwarg(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
         mock = _patch(
             monkeypatch,
             "TasksApi",
             "get_tasks",
-            side_effect=[_page([{"gid": str(i)} for i in range(100)])],
+            return_value=iter([{"gid": str(i)} for i in range(250)]),
         )
-        result = CliRunner().invoke(cmd, ["--max-items", "100"])
+        result = CliRunner().invoke(cmd, ["--max-items", "250"])
         assert result.exit_code == 0, result.output
         assert mock.call_count == 1
-        assert mock.call_args_list[0].args[0]["limit"] == 100
+        assert mock.call_args_list[0].kwargs == {"item_limit": 250}
+        # CLI does not push ``limit`` into opts; that's the SDK's job.
+        assert "limit" not in mock.call_args_list[0].args[0]
+        assert len(json.loads(result.output)) == 250
 
-    def test_max_items_below_cap_one_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_max_items_zero_passes_item_limit_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--max-items 0`` still constructs a session and calls the SDK; the
+        SDK's PageIterator short-circuits and makes no HTTP request."""
         cmd = _build_command("TasksApi", "get_tasks")
         mock = _patch(
             monkeypatch,
             "TasksApi",
             "get_tasks",
-            side_effect=[_page([{"gid": str(i)} for i in range(5)])],
+            return_value=iter([]),
+        )
+        result = CliRunner().invoke(cmd, ["--max-items", "0"])
+        assert result.exit_code == 0, result.output
+        assert mock.call_count == 1
+        assert mock.call_args_list[0].kwargs == {"item_limit": 0}
+        assert json.loads(result.output) == []
+
+    def test_max_items_5_passes_item_limit_5(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_tasks",
+            return_value=iter([{"gid": str(i)} for i in range(5)]),
         )
         result = CliRunner().invoke(cmd, ["--max-items", "5"])
         assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
-        assert mock.call_args_list[0].args[0]["limit"] == 5
-
-    def test_max_items_zero_makes_no_api_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """``--max-items 0`` returns ``[]`` without ever calling the SDK."""
-        cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
-        result = CliRunner().invoke(cmd, ["--max-items", "0"])
-        assert result.exit_code == 0, result.output
-        assert mock.call_count == 0
-        assert json.loads(result.output) == []
+        assert mock.call_args_list[0].kwargs == {"item_limit": 5}
 
 
 # ---------------------------------------------------------------------------
-# Pagination: termination conditions
+# Pagination: --page-size feeds Configuration.page_limit
 # ---------------------------------------------------------------------------
 
 
-class TestMaxItemsTermination:
-    """``fetch_capped`` must terminate even when the server cuts pagination short."""
+class TestPageSizeKwarg:
+    """``--page-size N`` sets ``Configuration.page_limit = N`` for the SDK.
 
-    def test_stops_when_offset_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """No ``next_page.offset`` -> stop, even if ``--max-items`` was larger."""
+    The SDK reads ``page_limit`` to populate ``query_params['limit']`` when
+    the caller did not. We assert by snapshotting the configuration at the
+    moment the SDK method is invoked.
+    """
+
+    def _capture_page_limit_on_call(
+        self, monkeypatch: pytest.MonkeyPatch, return_value: Any
+    ) -> list[int]:
+        captured: list[int] = []
+
+        def patched_get_tasks(self_api: Any, opts: Any, **kwargs: Any) -> Any:
+            captured.append(self_api.api_client.configuration.page_limit)
+            return return_value
+
+        monkeypatch.setattr(asana.TasksApi, "get_tasks", patched_get_tasks)
+        return captured
+
+    def test_page_size_sets_page_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            side_effect=[_page([{"gid": "1"}], offset=None)],
-        )
-        result = CliRunner().invoke(cmd, ["--max-items", "500"])
+        captured = self._capture_page_limit_on_call(monkeypatch, return_value=iter([{"gid": "1"}]))
+        result = CliRunner().invoke(cmd, ["--page-size", "50", "--max-items", "10"])
         assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
-        assert json.loads(result.output) == [{"gid": "1"}]
+        assert captured == [50]
 
-    def test_stops_on_empty_page_with_phantom_offset(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Empty page with a non-empty offset must not loop forever (zero-progress guard)."""
+    def test_no_page_size_keeps_sdk_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Default ``page_limit`` is 100 (the SDK default) when ``--page-size``
+        is not passed."""
         cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            side_effect=[_page([], offset="phantom")],
-        )
-        result = CliRunner().invoke(cmd, ["--max-items", "500"])
+        captured = self._capture_page_limit_on_call(monkeypatch, return_value=_page([]))
+        result = CliRunner().invoke(cmd, [])
         assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
-
-
-# ---------------------------------------------------------------------------
-# Pagination: --page-size interaction with --max-items
-# ---------------------------------------------------------------------------
-
-
-class TestPageSizeWithMaxItems:
-    """``--page-size`` controls per-request size; ``--max-items`` caps the total."""
-
-    def test_page_size_smaller_than_max_items_used_as_limit(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        cmd = _build_command("TasksApi", "get_tasks")
-        responses = [
-            _page([{"gid": str(i)} for i in range(0, 50)], offset="o1"),
-            _page([{"gid": str(i)} for i in range(50, 100)], offset="o2"),
-            _page([{"gid": str(i)} for i in range(100, 120)]),
-        ]
-        mock = _patch(monkeypatch, "TasksApi", "get_tasks", side_effect=responses)
-        result = CliRunner().invoke(cmd, ["--page-size", "50", "--max-items", "120"])
-        assert result.exit_code == 0, result.output
-        assert [c.args[0]["limit"] for c in mock.call_args_list] == [50, 50, 20]
-
-    def test_page_size_larger_than_max_items_shrinks(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            side_effect=[_page([{"gid": str(i)} for i in range(20)])],
-        )
-        result = CliRunner().invoke(cmd, ["--page-size", "50", "--max-items", "20"])
-        assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
-        assert mock.call_args_list[0].args[0]["limit"] == 20
+        assert captured == [100]
 
 
 # ---------------------------------------------------------------------------

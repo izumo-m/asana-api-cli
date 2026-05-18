@@ -286,7 +286,6 @@ class AsanaSession:
         # When --page-size is set, override the SDK default per-page size (100).
         if page_size is not None:
             config.page_limit = page_size
-        self._page_size = page_size
 
         # Apply runtime values to Configuration
         if runtime.host:
@@ -381,54 +380,6 @@ class AsanaSession:
             )
             sys.exit(1)
         return cls(token=token, use_page_iterator=use_page_iterator, page_size=page_size)
-
-    def fetch_capped(
-        self,
-        api_method: Callable[..., Any],
-        *args: Any,
-        opts: dict[str, Any],
-        max_items: int,
-    ) -> list[Any]:
-        """Fetch up to *max_items* items by manually walking ``next_page.offset``.
-
-        The last request is automatically capped to the remaining count so we
-        do not overfetch. Returns a flat list of items, matching the shape
-        produced by ``--all-items``.
-        """
-        # Disable the SDK's PageIterator path for the duration of these calls.
-        config = self._client.configuration
-        original = config.return_page_iterator
-        config.return_page_iterator = False
-        try:
-            page_size_default = self._page_size if self._page_size is not None else 100
-            items: list[Any] = []
-            opts = dict(opts)  # don't mutate the caller's dict
-            while len(items) < max_items:
-                remaining = max_items - len(items)
-                opts["limit"] = min(remaining, page_size_default)
-                response = api_method(*args, opts)
-                page_data = _extract(response, "data") or []
-                items.extend(page_data)
-                # Empty page with a non-empty offset would loop forever with zero progress.
-                if not page_data:
-                    break
-                next_page = _extract(response, "next_page")
-                offset = _extract(next_page, "offset") if next_page else None
-                if not offset:
-                    break
-                opts["offset"] = offset
-            return items[:max_items]
-        finally:
-            config.return_page_iterator = original
-
-
-def _extract(obj: Any, key: str) -> Any:
-    """Read *key* from a SDK response that may be a dict or a typed model."""
-    if obj is None:
-        return None
-    if isinstance(obj, dict):
-        return obj.get(key)
-    return getattr(obj, key, None)
 
 
 def resolve_workspace(

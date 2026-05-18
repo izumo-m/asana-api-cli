@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `--max-items` now uses the SDK's native `item_limit` kwarg instead of the CLI's own page walker, eliminating a class of subtle divergence from SDK pagination semantics. The library helper `AsanaSession.fetch_capped` is removed; library callers should pass `item_limit=N` to the SDK method directly.
+
 ## [2.1.0] - 2026-05-16
 
 ### Added
