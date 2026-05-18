@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-05-19
+
 ### Added
 
 - `--help` for path-positional options whose `_gid` suffix has been stripped (e.g. `task_gid` → `--task`) now shows the original SDK kwarg name as `(SDK kwarg: task_gid)` in the help text, so users can map the CLI flag back to the python-asana API without guessing.
@@ -142,7 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.5.0...v2.0.0
 [1.5.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.4.0...v1.5.0
