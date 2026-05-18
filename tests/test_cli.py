@@ -177,6 +177,13 @@ class TestBuiltCommands:
         # Path positional ``task_gid`` becomes ``--task`` (gid suffix stripped).
         assert "--task" in _option_flags(get_task_cmd)
 
+    def test_renamed_positional_help_shows_sdk_kwarg(self, get_task_cmd: click.Command) -> None:
+        # When ``task_gid`` is exposed as ``--task``, the original SDK kwarg
+        # name must appear in the help text so users can map the CLI flag back
+        # to the python-asana API.
+        task_param = next(p for p in get_task_cmd.params if "--task" in p.opts)
+        assert "task_gid" in (task_param.help or "")
+
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
         assert "--all-items" in flags

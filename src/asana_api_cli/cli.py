@@ -310,6 +310,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         flag = f"--{opt_name.replace('_', '-')}"
         dp = op.params.get(name)
         help_text = _escape_help(dp.description) if dp else ""
+        if name != opt_name:
+            suffix = f"(SDK kwarg: {name})"
+            help_text = f"{help_text} {suffix}".strip() if help_text else suffix
         options.append(click.Option([flag], required=True, help=help_text))
 
     # Unified --workspace option. The env-var fallback only applies when the
