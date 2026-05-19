@@ -671,13 +671,14 @@ def main(
     debug: bool,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
-    # JSON output is required to be UTF-8 by RFC 8259, but on Windows the
-    # default stdout encoding is the locale code page (cp932 on Japanese
-    # Windows), which raises UnicodeEncodeError when writing non-ASCII data.
-    # Reconfigure to UTF-8 so the same output works on every platform.
-    # The hasattr guard keeps CliRunner's in-memory streams (used by tests)
-    # from blowing up, since StringIO has no reconfigure().
-    for stream in (sys.stdout, sys.stderr):
+    # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
+    # stream encodings are the locale code page (e.g. cp932 on Japanese
+    # Windows): stdout/stderr raise UnicodeEncodeError when writing non-ASCII
+    # data, and stdin silently misdecodes a UTF-8 ``--body -`` payload.
+    # Reconfigure all three to UTF-8 so the same input/output works on every
+    # platform. The hasattr guard keeps CliRunner's in-memory streams (used
+    # by tests) from blowing up, since StringIO has no reconfigure().
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
 

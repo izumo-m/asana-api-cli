@@ -216,7 +216,14 @@ def resolve_body(value: str) -> JsonValue:
     - otherwise — parse the string itself as JSON
     """
     if value == "-":
-        raw = sys.stdin.read()
+        try:
+            raw = sys.stdin.read()
+        except UnicodeDecodeError as exc:
+            # stdin is reconfigured to UTF-8 at startup (see cli.py main),
+            # so non-UTF-8 input from a pipe surfaces here instead of being
+            # silently misdecoded with the locale code page.
+            click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
+            sys.exit(1)
     elif value.startswith("@"):
         path = Path(value[1:])
         try:

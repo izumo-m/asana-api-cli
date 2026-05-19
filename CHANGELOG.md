@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--max-items N` aliases to `--item-limit N`.
   Each emits a stderr warning when used. Combining a deprecated alias with its new counterpart (e.g. `--page-size` with `--limit`) is rejected with a usage error. The aliases will be removed in a future release.
 
+### Fixed
+
+- On Windows, `--body -` (read JSON body from stdin) now decodes input as UTF-8 instead of the locale code page (e.g. cp932 on Japanese Windows). Previously, piping a UTF-8 JSON payload with non-ASCII characters could be silently misdecoded into garbled text or surface as an opaque JSON parse error.
+
 ## [2.1.1] - 2026-05-19
 
 ### Added
