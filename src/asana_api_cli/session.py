@@ -276,16 +276,20 @@ class AsanaSession:
     """
 
     def __init__(
-        self, token: str, *, use_page_iterator: bool = False, page_size: int | None = None
+        self, token: str, *, return_page_iterator: bool = True, page_limit: int | None = None
     ) -> None:
         config = asana.Configuration()
         config.access_token = token
-        # When *use_page_iterator* is True (--all-items), the SDK returns a
-        # PageIterator that walks every page.
-        config.return_page_iterator = use_page_iterator
-        # When --page-size is set, override the SDK default per-page size (100).
-        if page_size is not None:
-            config.page_limit = page_size
+        # *return_page_iterator* and *page_limit* mirror the SDK's
+        # ``asana.Configuration`` properties of the same names: with
+        # ``return_page_iterator=True`` (the SDK default) paginatable
+        # methods return an iterator that walks every page; with False
+        # they return a single ``{data, next_page}`` dict per HTTP call.
+        # ``page_limit`` (SDK default 100) is the per-page size used on the
+        # iterator path when ``opts["limit"]`` is not set.
+        config.return_page_iterator = return_page_iterator
+        if page_limit is not None:
+            config.page_limit = page_limit
 
         # Apply runtime values to Configuration
         if runtime.host:
@@ -369,7 +373,7 @@ class AsanaSession:
 
     @classmethod
     def from_env(
-        cls, *, use_page_iterator: bool = False, page_size: int | None = None
+        cls, *, return_page_iterator: bool = True, page_limit: int | None = None
     ) -> AsanaSession:
         """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
         token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
@@ -379,7 +383,7 @@ class AsanaSession:
                 err=True,
             )
             sys.exit(1)
-        return cls(token=token, use_page_iterator=use_page_iterator, page_size=page_size)
+        return cls(token=token, return_page_iterator=return_page_iterator, page_limit=page_limit)
 
 
 def resolve_workspace(

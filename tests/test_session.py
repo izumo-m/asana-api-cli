@@ -453,3 +453,25 @@ class TestHttpClientPrintRedactor:
         # Partial reveal: the last six characters of the token survive.
         assert f"...{token[-6:]}" in captured.out
         assert "X-Test-Trailer: preserved" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# AsanaSession pagination kwargs
+# ---------------------------------------------------------------------------
+
+
+class TestAsanaSessionPaginationKwargs:
+    """``AsanaSession`` exposes ``return_page_iterator`` and ``page_limit``
+    that forward 1:1 to the underlying ``asana.Configuration`` properties of
+    the same name. The defaults (``True`` and ``None``) match the SDK's own
+    defaults so the SDK behavior is preserved when callers omit them."""
+
+    def test_from_env_explicit_kwargs_propagate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ASANA_ACCESS_TOKEN", "x" * 20)
+        with AsanaSession.from_env(return_page_iterator=False, page_limit=50) as session:
+            assert session.client.configuration.return_page_iterator is False
+            assert session.client.configuration.page_limit == 50
+
+    def test_constructor_defaults_match_sdk_defaults(self) -> None:
+        with AsanaSession(token="x" * 20) as session:
+            assert session.client.configuration.return_page_iterator is True

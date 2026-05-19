@@ -409,7 +409,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         want_iter = paginatable and (all_items or max_items is not None)
 
         if paginatable:
-            session_ctx = AsanaSession.from_env(use_page_iterator=want_iter, page_size=page_size)
+            session_ctx = AsanaSession.from_env(
+                return_page_iterator=want_iter, page_limit=page_size
+            )
         else:
             session_ctx = AsanaSession.from_env()
 
