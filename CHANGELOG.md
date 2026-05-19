@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Paginatable commands now expose SDK pagination inputs 1:1 as CLI flags: `--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`. Each maps to a single `opts` key, `Configuration` property, or method kwarg of `python-asana`.
+- Default output of paginatable commands changes shape: without any pagination flag, the command now walks every page automatically and returns a flat list of items (previously returned a single `{data, next_page}` dict from one HTTP call). Pass `--no-return-page-iterator` or `--full-payload` to restore the single-call dict shape.
+
+### Deprecated
+
+- `--all-items`, `--page-size N`, and `--max-items N` are deprecated.
+  - `--all-items` is now a no-op (new default behavior).
+  - `--page-size N` aliases to `--limit N`.
+  - `--max-items N` aliases to `--item-limit N`.
+  Each emits a stderr warning when used. Combining a deprecated alias with its new counterpart (e.g. `--page-size` with `--limit`) is rejected with a usage error. The aliases will be removed in a future release.
+
 ## [2.1.1] - 2026-05-19
 
 ### Added

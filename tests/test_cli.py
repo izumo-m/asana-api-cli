@@ -186,17 +186,21 @@ class TestBuiltCommands:
 
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
-        assert "--all-items" in flags
-        assert "--page-size" in flags
-        assert "--max-items" in flags
+        # v3 primary pagination flags (1:1 with SDK).
+        for expected in (
+            "--limit",
+            "--offset",
+            "--page-limit",
+            "--item-limit",
+            "--no-return-page-iterator",
+            "--full-payload",
+        ):
+            assert expected in flags, f"missing {expected}"
+        # v2 → v3 deprecation aliases (kept until a future release).
+        for expected in ("--all-items", "--page-size", "--max-items"):
+            assert expected in flags, f"missing {expected}"
         # ``--paginate`` (deprecated alias for --all-items) was removed in 2.1.0.
         assert "--paginate" not in flags
-
-    def test_get_tasks_hides_raw_limit(self, get_tasks_cmd: click.Command) -> None:
-        # ``--limit`` is replaced by ``--page-size``.
-        assert "--limit" not in _option_flags(get_tasks_cmd)
-        # ``--offset`` stays as a passthrough for manual pagination.
-        assert "--offset" in _option_flags(get_tasks_cmd)
 
     def test_get_tasks_workspace_option(self, get_tasks_cmd: click.Command) -> None:
         # ``workspace`` opt is exposed as ``--workspace``.
@@ -208,9 +212,19 @@ class TestBuiltCommands:
 
     def test_get_task_no_pagination(self, get_task_cmd: click.Command) -> None:
         flags = _option_flags(get_task_cmd)
-        assert "--all-items" not in flags
-        assert "--page-size" not in flags
-        assert "--max-items" not in flags
+        # Neither v3 primary flags nor v2 deprecation aliases are added on
+        # non-paginatable commands.
+        for unexpected in (
+            "--limit",
+            "--page-limit",
+            "--item-limit",
+            "--no-return-page-iterator",
+            "--full-payload",
+            "--all-items",
+            "--page-size",
+            "--max-items",
+        ):
+            assert unexpected not in flags, f"{unexpected} should not be on non-paginatable cmd"
 
     def test_output_query_options_present(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
