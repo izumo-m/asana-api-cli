@@ -7,205 +7,25 @@ applying the global configuration passed in from the CLI.
 
 from __future__ import annotations
 
-import builtins
 import functools
-import http.client
 import json
 import os
-import re
 import sys
+import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-import urllib.parse
 
 import asana
 import click
 from urllib3.fields import RequestField
 from urllib3.util.retry import Retry
 
+from asana_api_cli.redactor import HttpClientAuthRedactor
+
 ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
 DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
-
-
-# Match ``Authorization: <scheme> <token>`` inside an HTTP request-headers
-# chunk. We never apply this regex to user-controlled data (request body or
-# response body), so the value side just needs to terminate cleanly at the
-# next header boundary: any run of non-whitespace, non-backslash characters
-# stops at real CR/LF (raw form) and at the leading ``\\`` of literal
-# ``\\r\\n`` (``repr`` form). Character set is intentionally not pinned to
-# the shape of today's Asana access tokens — Asana's developer docs
-# explicitly state that token formats are opaque and may change.
-_AUTH_HEADER_RE = re.compile(
-    r"(Authorization:\s*(?:Bearer|Basic))\s+([^\s\\]+)",
-    re.IGNORECASE,
-)
-
-# HTTP request methods that may appear at the start of the headers chunk in
-# ``send: b'<METHOD> ... HTTP/1.1\\r\\n...'``. Used to distinguish that chunk
-# from the body chunk(s) that ``http.client`` prints from a separate
-# ``send()`` call.
-_HTTP_METHODS: tuple[str, ...] = (
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "HEAD",
-    "OPTIONS",
-    "TRACE",
-    "CONNECT",
-)
-
-# Mask reveals the last ``_MASK_SUFFIX_LEN`` characters of the token, but
-# only when the token is at least ``_MASK_MIN_LEN`` long. The threshold
-# caps the leak ratio at 6/16 = 37.5% for unexpectedly short tokens.
-_MASK_MIN_LEN = 16
-_MASK_SUFFIX_LEN = 6
-
-
-def _looks_like_request_headers(repr_bytes: str) -> bool:
-    """Return True if *repr_bytes* is the ``repr()`` of an HTTP request-headers
-    chunk, i.e. starts with ``b'<METHOD> `` (or ``b"<METHOD> ``).
-
-    ``http.client.HTTPConnection.send()`` is called once per chunk it
-    flushes. For typical requests that means one call for the headers
-    block and zero or more calls for the body chunks. Only the headers
-    chunk starts with a method line — body chunks start with whatever the
-    body is (JSON ``{...}``, multipart boundary, raw text, etc.) and may
-    legitimately contain the substring ``Authorization: Bearer ...`` as
-    part of user content (e.g. an Asana task description). Limiting
-    redaction to the headers chunk guarantees the body is never touched.
-    """
-    if not (repr_bytes.startswith("b'") or repr_bytes.startswith('b"')):
-        return False
-    after_quote = repr_bytes[2:]
-    return any(after_quote.startswith(m + " ") for m in _HTTP_METHODS)
-
-
-def _default_mask_token(token: str) -> str:
-    """Return a masked form of *token* suitable for debug output.
-
-    Reveals the last few characters so the user can tell two tokens
-    apart (e.g. work vs personal account) without exposing the bulk of
-    the secret. For unexpectedly short tokens, falls back to a complete
-    redaction.
-
-    Format-agnostic: Asana's developer documentation declares that token
-    formats are opaque and may change without notice, so this function
-    must not depend on the current PAT/OAuth shape.
-    """
-    if len(token) < _MASK_MIN_LEN:
-        return "<REDACTED>"
-    return f"...{token[-_MASK_SUFFIX_LEN:]}"
-
-
-class HttpClientPrintRedactor:
-    """Context manager that redacts ``Authorization`` headers in
-    ``http.client``'s wire-level debug output.
-
-    When ``http.client.HTTPConnection.debuglevel`` is 1 (which the asana
-    SDK sets via ``Configuration.debug = True``), ``http.client`` issues
-    a bare ``print("send:", repr(data))`` on every chunk it flushes to
-    the socket. The first such chunk is the request headers, which
-    carries the Authorization header verbatim.
-
-    Python resolves the bare ``print`` inside ``http.client`` via the
-    module's globals before falling back to builtins, so binding a
-    callable to ``http.client.print`` intercepts every debug print the
-    module makes — without touching ``sys.stdout``.
-
-    Redaction is applied **only** to ``("send:", "b'<METHOD> ...'")``
-    chunks. Body chunks (which may legitimately contain user-supplied
-    text matching ``Authorization: ...``) pass through verbatim.
-
-    Layered patches: if some other library has already patched
-    ``http.client.print``, ``install`` chains through it instead of
-    clobbering it. ``uninstall`` is conservative — it restores the
-    previous ``http.client.print`` only if our wrapper is still the
-    top-of-stack value. If something else has wrapped us in the
-    meantime, ``uninstall`` is a no-op so that outer chain stays intact.
-
-    Usable as a context manager (recommended) or via explicit
-    ``install()`` / ``uninstall()``::
-
-        with HttpClientPrintRedactor():
-            ...  # asana SDK calls or any HTTP traffic with debuglevel=1
-
-        r = HttpClientPrintRedactor()
-        r.install()
-        try:
-            ...
-        finally:
-            r.uninstall()
-    """
-
-    def __init__(self, mask_fn: Callable[[str], str] | None = None) -> None:
-        self._mask_fn: Callable[[str], str] = mask_fn or _default_mask_token
-        self._wrapper: Callable[..., None] | None = None
-
-    def install(self) -> None:
-        """Patch ``http.client.print`` to redact Authorization values.
-
-        Idempotent across instances of this class: if the current
-        ``http.client.print`` is already a wrapper produced by this
-        class, ``install`` is a no-op (the existing chain stays in
-        place and this instance does not take ownership). Otherwise
-        wraps whatever is there — preserving any unrelated patch from
-        another library.
-        """
-        current = http.client.__dict__.get("print")
-        if getattr(current, "_asana_cli_redactor", False):
-            return
-        inner: Callable[..., Any] = current if callable(current) else builtins.print
-        mask_fn = self._mask_fn
-
-        def _redact_match(m: re.Match[str]) -> str:
-            return f"{m.group(1)} {mask_fn(m.group(2))}"
-
-        def _redact_print(*args: Any, **kwargs: Any) -> None:
-            if len(args) >= 2 and args[0] == "send:" and _looks_like_request_headers(str(args[1])):
-                args = (args[0],) + tuple(
-                    _AUTH_HEADER_RE.sub(_redact_match, str(a)) for a in args[1:]
-                )
-            inner(*args, **kwargs)
-
-        _redact_print._asana_cli_redactor = True  # type: ignore[attr-defined]
-        _redact_print._asana_cli_inner = inner  # type: ignore[attr-defined]
-        http.client.print = _redact_print  # pyright: ignore[reportAttributeAccessIssue]
-        self._wrapper = _redact_print
-
-    def uninstall(self) -> None:
-        """Restore the previous ``http.client.print``.
-
-        Only acts if our wrapper is still the top-of-stack value. If
-        another patch was installed on top of us, leaves the chain
-        alone — uninstalling in that case would either drop the outer
-        patch (data loss for that library) or leave its
-        ``_asana_cli_inner`` reference dangling.
-
-        Safe to call multiple times: subsequent calls are no-ops.
-        """
-        wrapper = self._wrapper
-        if wrapper is None:
-            return
-        current = http.client.__dict__.get("print")
-        if current is wrapper:
-            inner = getattr(wrapper, "_asana_cli_inner", builtins.print)
-            if inner is builtins.print:
-                http.client.__dict__.pop("print", None)
-            else:
-                http.client.print = inner  # pyright: ignore[reportAttributeAccessIssue]
-        self._wrapper = None
-
-    def __enter__(self) -> HttpClientPrintRedactor:
-        self.install()
-        return self
-
-    def __exit__(self, *exc: Any) -> None:
-        self.uninstall()
 
 
 class MultibyteFilenameSupport:
@@ -384,7 +204,7 @@ class AsanaSession:
                 status_forcelist=[429, 500, 502, 503, 504],
             )
 
-        self._redactor: HttpClientPrintRedactor | None = None
+        self._redactor: HttpClientAuthRedactor | None = None
         if runtime.debug:
             # The SDK debug setter enables http.client.HTTPConnection.debuglevel
             # and bumps the urllib3/asana loggers to DEBUG. The only path that
@@ -393,7 +213,7 @@ class AsanaSession:
             # Install the redactor AFTER the SDK setup so we wrap whatever
             # http.client.print is at that point.
             config.debug = True
-            self._redactor = HttpClientPrintRedactor()
+            self._redactor = HttpClientAuthRedactor()
             self._redactor.install()
 
         self._multibyte_filenames: MultibyteFilenameSupport | None = None

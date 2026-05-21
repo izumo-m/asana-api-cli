@@ -47,7 +47,7 @@ environment variable. Treat this token as a secret:
 ## Debug output
 
 `asana-api --debug` enables HTTP request/response logging to stderr to help
-diagnose issues. The CLI installs an `HttpClientPrintRedactor` that masks
+diagnose issues. The CLI installs an `HttpClientAuthRedactor` that masks
 the `Authorization` header before printing, so debug logs are safe to copy
 into bug reports.
 

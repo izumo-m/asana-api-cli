@@ -360,7 +360,7 @@ class TestDebugRedactorLifecycle:
         def _generator() -> Iterator[dict[str, Any]]:
             for i in range(3):
                 current = http.client.__dict__.get("print")
-                redactor_states.append(getattr(current, "_asana_cli_redactor", False))
+                redactor_states.append(getattr(current, "_http_client_auth_redactor", False))
                 yield {"gid": str(i)}
 
         cmd = _build_command("TasksApi", "get_tasks")

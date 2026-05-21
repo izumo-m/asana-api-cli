@@ -25,6 +25,7 @@ breaking changes.
 src/asana_api_cli/
 ├── __init__.py
 ├── session.py            # SDK client wrapper + helpers used by the CLI
+├── redactor.py           # http.client debug-output Authorization redactor (stdlib-only, copyable)
 ├── formatter.py          # CLI output formatting (@formatted decorator)
 ├── click_ext.py          # LazyGroup + global-options propagation mixins
 ├── version.py            # version_string()
@@ -43,12 +44,15 @@ tools/
 
 - **`session.py`** — builds `asana.Configuration` + `ApiClient`, forwards
   the `return_page_iterator` and `page_limit` kwargs to the matching SDK
-  `Configuration` properties, masks Authorization headers in
-  `http.client`'s debug output via `HttpClientPrintRedactor` when
-  `--debug` is set, optionally augments multipart uploads with the
-  RFC 5987 `filename*=UTF-8''` parameter via `MultibyteFilenameSupport`
-  when `--multibyte-filenames` is set, and exposes `resolve_body` /
-  `resolve_workspace` to `cli.py`.
+  `Configuration` properties, installs `HttpClientAuthRedactor` (from
+  `redactor.py`) when `--debug` is set, optionally augments multipart
+  uploads with the RFC 5987 `filename*=UTF-8''` parameter via
+  `MultibyteFilenameSupport` when `--multibyte-filenames` is set, and
+  exposes `resolve_body` / `resolve_workspace` to `cli.py`.
+- **`redactor.py`** — stdlib-only module exposing `HttpClientAuthRedactor`,
+  a context manager that masks `Authorization` headers in
+  `http.client`'s wire-level debug output. Has no third-party
+  dependencies so the file is copyable as-is into other projects.
 - **`formatter.py`** — supports `json` / `table` / `csv` / `text` output and
   `--query` (jq).
 - **`click_ext.py`** — `LazyGroup` for cheap top-level help, plus the
