@@ -1,0 +1,466 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
+  response:
+    body:
+      string: '{"data":[{"gid":"1214927854047052","name":"pagination-test"},{"gid":"1215012205678472","name":"pagination-test-small"}],"next_page":null}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '137'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 13:31:20 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=2,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=229,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="VclRDi9ikSAxC8ElouHwva-fw7ysW45q7s1IErcxGgB-lrB6ppxBIQ==",cdn-downstream-fbl;dur=250
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 4de02f7e0312e6ee4d03ffa713b6f14e.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - VclRDi9ikSAxC8ElouHwva-fw7ysW45q7s1IErcxGgB-lrB6ppxBIQ==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '75'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"data": {"name": "pytest-e2e-attachment-parent", "projects": ["1214927854047052"]}}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json; charset=utf-8
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/tasks
+  response:
+    body:
+      string: "{\"data\":{\"gid\":\"1215014484472777\",\"resource_type\":\"task\",\"created_at\":\"2026-05-21T13:31:21.040Z\",\"modified_at\":\"2026-05-21T13:31:21.305Z\",\"name\":\"pytest-e2e-attachment-parent\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/1214927854047052/task/1215014484472777\",\"projects\":[{\"gid\":\"1214927854047052\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"followers\":[{\"gid\":\"1214276200508365\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"1214927779918259\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"1214927854047052\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}]}}"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1070'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 13:31:21 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=1029,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="HMTetX5kPxYDab53V96JPthmaeHEkI90eRQaldwNXgV0gZqgqRsxmg==",cdn-downstream-fbl;dur=1052
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 2f3139232809729dc24811902779108a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - HMTetX5kPxYDab53V96JPthmaeHEkI90eRQaldwNXgV0gZqgqRsxmg==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828;affected=true
+      cache-control:
+      - no-store
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      location:
+      - /api/1.0/tasks/1215014484472777
+      pragma:
+      - no-cache
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.0'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '874'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 201
+      message: Created
+- request:
+    body: "--91626f8cf72a46219c88f6dc6ea3d6d6\r\nContent-Disposition: form-data; name=\"parent\"\r\n\r\n1215014484472777\r\n--91626f8cf72a46219c88f6dc6ea3d6d6\r\nContent-Disposition:
+      form-data; name=\"file\"; filename=\"ascii.txt\"\r\nContent-Type: text/plain\r\n\r\nHello,
+      world!\n\r\n--91626f8cf72a46219c88f6dc6ea3d6d6--\r\n"
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - multipart/form-data; boundary=91626f8cf72a46219c88f6dc6ea3d6d6
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/attachments
+  response:
+    body:
+      string: '{"data":{"gid":"1215014604354165","resource_type":"attachment","name":"ascii.txt","resource_subtype":"asana"}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '110'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 13:31:23 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=293,cdn-upstream-fbl;dur=1278,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="5oz2GLIZBt1Yt9caSfUBYaQ30bppJPOT0rrDdZW2wFpYakx6gtQRow==",cdn-downstream-fbl;dur=1300
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 a0e6840b8e183d8f159cb194a62c98f8.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 5oz2GLIZBt1Yt9caSfUBYaQ30bppJPOT0rrDdZW2wFpYakx6gtQRow==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      cache-control:
+      - no-store
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      pragma:
+      - no-cache
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.0'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '838'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/attachments/1215014604354165
+  response:
+    body:
+      string: '{"data":{"gid":"1215014604354165","created_at":"2026-05-21T13:31:22.700Z","download_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/1215014604354164/fcb63a5ddf3a8371249a47ee068db61a?e=1779372083&v=0&t=Zz94zOyXfhe3iAKN3Rx5GnWJR3QjRBGFMjWmmIrcHGE","host":"asana","name":"ascii.txt","parent":{"gid":"1215014484472777","name":"pytest-e2e-attachment-parent","resource_type":"task","resource_subtype":"default_task"},"permanent_url":"https://app.asana.com/app/asana/-/get_asset?asset_id=1215014604354165","resource_type":"attachment","resource_subtype":"asana","view_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/1215014604354164/fcb63a5ddf3a8371249a47ee068db61a?e=1779372083&v=0&t=Zz94zOyXfhe3iAKN3Rx5GnWJR3QjRBGFMjWmmIrcHGE"}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '754'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 13:31:23 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=288,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="JbM2OSBp0wtzm1JTX9rqY9c0_QKYRQG2edsv75zaUK6-DECAv1EDjg==",cdn-downstream-fbl;dur=307
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 ee788c63da10bd5eab6954ad5eda1484.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - JbM2OSBp0wtzm1JTX9rqY9c0_QKYRQG2edsv75zaUK6-DECAv1EDjg==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '138'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: DELETE
+    uri: https://app.asana.com/api/1.0/attachments/1215014604354165
+  response:
+    body:
+      string: '{"data":{}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '11'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 13:31:24 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=2,cdn-upstream-connect;dur=296,cdn-upstream-fbl;dur=812,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="ycA_IY-x6Ne0XbQvhs5erElUetAgPGGXE-eDvnArBReG_XwFU8LNcw==",cdn-downstream-fbl;dur=830
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 3081b2b6964f02c0e56dc0b5d6d1a43a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - ycA_IY-x6Ne0XbQvhs5erElUetAgPGGXE-eDvnArBReG_XwFU8LNcw==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      cache-control:
+      - no-store
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      pragma:
+      - no-cache
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.0'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '363'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: DELETE
+    uri: https://app.asana.com/api/1.0/tasks/1215014484472777
+  response:
+    body:
+      string: '{"data":{}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '11'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 13:31:25 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=697,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="vVmlx_F9Fz3T_kFY6Mmghcki1tmtOk16b0YHdqWgflC6SrZllaTLGQ==",cdn-downstream-fbl;dur=717
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 a0ab8fad44e7d16e458ba0843ec3ded6.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - vVmlx_F9Fz3T_kFY6Mmghcki1tmtOk16b0YHdqWgflC6SrZllaTLGQ==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      cache-control:
+      - no-store
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      pragma:
+      - no-cache
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.0'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '547'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

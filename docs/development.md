@@ -33,16 +33,22 @@ src/asana_api_cli/
 tests/
 ├── test_cli*.py                # CLI shape, invocation, and surface snapshot
 ├── test_*.py                   # Per-module unit tests (formatter, session, ...)
+├── e2e/                        # Real-API tests (opt-in); see tests/e2e/README.md
 └── fixtures/
     └── cli_surface.json        # Canonical CLI surface for the bundled SDK
+
+tools/
+└── e2e_init.py                 # One-time fixture provisioner for tests/e2e/
 ```
 
 - **`session.py`** — builds `asana.Configuration` + `ApiClient`, forwards
   the `return_page_iterator` and `page_limit` kwargs to the matching SDK
   `Configuration` properties, masks Authorization headers in
   `http.client`'s debug output via `HttpClientPrintRedactor` when
-  `--debug` is set, and exposes `resolve_body` / `resolve_workspace` to
-  `cli.py`.
+  `--debug` is set, optionally augments multipart uploads with the
+  RFC 5987 `filename*=UTF-8''` parameter via `MultibyteFilenameSupport`
+  when `--multibyte-filenames` is set, and exposes `resolve_body` /
+  `resolve_workspace` to `cli.py`.
 - **`formatter.py`** — supports `json` / `table` / `csv` / `text` output and
   `--query` (jq).
 - **`click_ext.py`** — `LazyGroup` for cheap top-level help, plus the

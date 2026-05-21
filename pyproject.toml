@@ -30,6 +30,8 @@ dev = [
     "build>=1,<2",
     "twine>=6,<7",
     "vermin>=1.6,<2",
+    "vcrpy>=6",
+    "pytest-recording>=0.13",
 ]
 
 [build-system]
