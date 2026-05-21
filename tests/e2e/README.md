@@ -2,8 +2,9 @@
 
 These tests run the CLI against the real Asana API and record HTTP traffic to
 cassettes via [vcrpy](https://vcrpy.readthedocs.io/) + [pytest-recording].
-They are **skipped by default**. Set `ASANA_PYTEST_ENABLE_E2E=1` to enable
-collection — required for both record and replay modes.
+The default `pytest` invocation **replays from the committed cassettes**, so
+no Asana account or network access is needed to run the full suite. Opt-in
+flags switch to live API access; see [Running](#running) below.
 
 ## What this covers
 
@@ -18,9 +19,8 @@ collection — required for both record and replay modes.
 
 | Name | When required | Purpose |
 |---|---|---|
-| `ASANA_PYTEST_ENABLE_E2E` | always | Non-empty value enables collection of e2e tests. |
 | `ASANA_ACCESS_TOKEN` | live mode | Personal access token. Replay auto-injects a dummy token if absent — vcrpy never hits the network. |
-| `ASANA_PYTEST_WORKSPACE` | live mode, and replay tests that reference `workspace_gid` | GID of the workspace under test. Cassettes store this as `${WORKSPACE_GID}` and substitute it back at load time. Treat the workspace as **test-dedicated** — CRUD tests create and delete projects / tasks in it. |
+| `ASANA_PYTEST_WORKSPACE` | live mode | GID of the workspace under test. Treat as **test-dedicated** — CRUD tests create and delete projects / tasks in it. Cassettes store the gid as `${WORKSPACE_GID}` and substitute it back at load time; replay falls back to the literal `WORKSPACE_GID` sentinel if the env is unset. |
 
 ## One-time provisioning (live mode only)
 
@@ -45,19 +45,44 @@ The first full run takes roughly 12 minutes (1500 task creations × 0.5 s).
 
 ## Running
 
-`pytest-recording` reuses cassettes unless `--record-mode` is given.
+Two project-specific flags select the mode:
 
 | Goal | Command |
 |---|---|
-| Replay (offline, no real token needed) | `ASANA_PYTEST_ENABLE_E2E=1 uv run pytest tests/e2e/` |
-| Record from scratch | `rm -rf tests/e2e/cassettes && ASANA_PYTEST_ENABLE_E2E=1 uv run pytest --record-mode=all tests/e2e/` |
-| Record only missing interactions | `ASANA_PYTEST_ENABLE_E2E=1 uv run pytest --record-mode=once tests/e2e/` |
-| Re-record a single test (always delete the file first) | `rm tests/e2e/cassettes/<dir>/<test>.yaml && ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> uv run pytest --record-mode=all tests/e2e/<file>::<test>` |
+| Replay from committed cassettes (default) | `uv run pytest` |
+| Live API access, do not touch cassettes | `uv run pytest --live` |
+| Live + overwrite cassettes (regenerate) | `uv run pytest --live --record` |
 
-> **Important**: `--record-mode=all` **appends** to any existing cassette;
-> delete the cassette file first for a clean recording.
+`--record` without `--live` is rejected as a usage error.
+
+Live modes require `ASANA_ACCESS_TOKEN` + `ASANA_PYTEST_WORKSPACE` to be
+set; tests that need a workspace gid skip automatically when it is
+missing.
+
+To re-record a subset of cassettes (e.g. after changing the CLI
+surface), delete the affected files first — `--record` writes new
+interactions but does not prune stale ones:
+
+```bash
+rm tests/e2e/cassettes/<dir>/<test>.yaml
+uv run pytest --live --record tests/e2e/<file>::<test>
+```
 
 After re-recording, review `git diff tests/e2e/cassettes/` and commit.
+
+### Escape hatch: pytest-recording native flags
+
+The underlying [pytest-recording] flags still work for advanced
+workflows:
+
+- `--record-mode=once` (record only new interactions)
+- `--record-mode=new_episodes` (append new interactions to existing
+  cassettes)
+- `--disable-recording` (vcrpy off entirely — equivalent to `--live`)
+
+Live-mode detection in fixtures considers all three of `--live`,
+`--record-mode != none`, and `--disable-recording`, so the same
+workspace / token requirements apply regardless of which flag you use.
 
 ## Account-neutral templating
 

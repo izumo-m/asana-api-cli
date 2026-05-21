@@ -5,7 +5,7 @@
 ## Always apply
 
 - **English** for committed files.
-- Before committing Python changes, resolve `uv run basedpyright` errors, then run `uv run ruff format .`.
+- Before committing Python changes, run `uv run basedpyright` (no path arguments — it must scan the whole project) and resolve every error, then run `uv run ruff format .`.
 - Before committing user-facing changes, update `CHANGELOG.md`'s `[Unreleased]` section.
 - Use a [Conventional Commits](https://www.conventionalcommits.org/) prefix (`feat:` / `fix:` / `docs:` / `chore:` / `refactor:` / `test:` etc.) in every commit subject, matching the existing `git log`.
 - If you state a rule or caveat in an answer, every subsequent command/example in the same answer must follow it. (See user-memory `feedback-apply-own-rules`.)

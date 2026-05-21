@@ -181,7 +181,9 @@ class TestBuiltCommands:
         # When ``task_gid`` is exposed as ``--task``, the original SDK kwarg
         # name must appear in the help text so users can map the CLI flag back
         # to the python-asana API.
-        task_param = next(p for p in get_task_cmd.params if "--task" in p.opts)
+        task_param = next(
+            p for p in get_task_cmd.params if isinstance(p, click.Option) and "--task" in p.opts
+        )
         assert "task_gid" in (task_param.help or "")
 
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:

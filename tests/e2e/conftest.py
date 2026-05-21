@@ -1,7 +1,23 @@
 """Configuration for end-to-end tests.
 
-Both record and replay modes require ``ASANA_PYTEST_ENABLE_E2E`` to be set;
-otherwise every test under ``tests/e2e/`` is skipped at collection time.
+The ``--live`` / ``--record`` flags themselves are registered in
+``tests/conftest.py`` (so they appear in ``pytest --help`` without
+having to collect under ``tests/e2e/`` first). This file provides the
+e2e-only pieces: fixtures, vcr_config, resource-type masking and the
+``${VAR}`` templating layer for cassette portability.
+
+Modes:
+
+- ``pytest`` (default): replay from committed cassettes, no network, no
+  real token needed.
+- ``pytest --live``: hit the real Asana API but do not write cassettes
+  (use this to verify cassettes still match current API behavior).
+- ``pytest --live --record``: hit the real API and overwrite cassettes
+  (the cassette-regeneration workflow).
+
+The pytest-recording native flags (``--record-mode`` / ``--disable-recording``)
+remain available as an escape hatch when used alone, and are honored by
+the same live-mode detection.
 
 Account-dependent values are templated into the cassette as ``${VAR}``
 placeholders by an in-place patch of vcrpy's YAML serializer (see
@@ -10,7 +26,7 @@ and substituted back at load time. PII fields are first masked to the
 binding value by the ``resource_type``-aware response hook so the
 cassette never contains the real email / name / photo.
 
-See ``tests/e2e/README.md`` for usage.
+See ``tests/e2e/README.md`` for the full workflow.
 """
 
 from __future__ import annotations
@@ -28,11 +44,29 @@ from vcr.serializers import yamlserializer
 
 from asana_api_cli.cli import main
 
-E2E_ENABLED_ENV = "ASANA_PYTEST_ENABLE_E2E"
 WORKSPACE_ENV = "ASANA_PYTEST_WORKSPACE"
 
 _E2E_ROOT = Path(__file__).parent.resolve()
 _PLACEHOLDER_RE = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+
+
+# ---------- mode detection (options registered in tests/conftest.py) --------
+
+
+def _is_live_mode(config: pytest.Config) -> bool:
+    """True when the test session will hit the real network.
+
+    Considers both this conftest's ``--live`` flag and the
+    pytest-recording native options (``--record-mode`` / ``--disable-recording``)
+    so an escape-hatch user gets the same fixture behavior.
+    """
+    if config.getoption("--live", default=False):
+        return True
+    if config.getoption("--disable-recording", default=False):
+        return True
+    record_mode = config.getoption("--record-mode", default="none") or "none"
+    return record_mode != "none"
+
 
 # Template variable -> binding value.
 # WORKSPACE_GID comes from env (per-account); the others are fixed literals
@@ -57,19 +91,6 @@ def _bindings() -> dict[str, str]:
         b["WORKSPACE_GID"] = ws
     b.update(_dynamic_bindings)
     return b
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    if os.environ.get(E2E_ENABLED_ENV):
-        return
-    skip = pytest.mark.skip(reason=f"e2e disabled; set {E2E_ENABLED_ENV}=1 to enable")
-    for item in items:
-        try:
-            item_path = Path(str(item.fspath)).resolve()
-        except (OSError, ValueError):
-            continue
-        if _E2E_ROOT in item_path.parents or item_path == _E2E_ROOT:
-            item.add_marker(skip)
 
 
 # ---------- PII masking (resource_type aware) -------------------------------
@@ -192,11 +213,21 @@ def vcr_config() -> dict[str, Any]:
 
 
 @pytest.fixture
-def workspace_gid() -> str:
+def workspace_gid(request: pytest.FixtureRequest) -> str:
+    """The workspace GID under test.
+
+    In live mode the real env value is required (no env -> skip with a
+    helpful message). In replay mode the env is optional: when unset,
+    return the ``"WORKSPACE_GID"`` sentinel string that the deserializer
+    also falls back to for unbound ``${WORKSPACE_GID}`` placeholders, so
+    requests and cassette entries line up on the same literal.
+    """
     gid = os.environ.get(WORKSPACE_ENV)
-    if not gid:
-        pytest.skip(f"{WORKSPACE_ENV} not set")
-    return gid
+    if gid:
+        return gid
+    if _is_live_mode(request.config):
+        pytest.skip(f"{WORKSPACE_ENV} required for --live mode")
+    return "WORKSPACE_GID"
 
 
 PAGINATION_PROJECT_NAME = "pagination-test"
@@ -325,15 +356,14 @@ def attachment_parent_task(pagination_project_gid: str, created_tasks: list[str]
 
 
 @pytest.fixture(autouse=True)
-def _ensure_token_for_replay(request: pytest.FixtureRequest):
+def _ensure_token(request: pytest.FixtureRequest):
     """Inject a dummy ASANA_ACCESS_TOKEN in replay mode if none is set.
 
     The CLI refuses to start without a token; replay does not actually use it
-    since vcrpy intercepts the HTTP layer.
+    since vcrpy intercepts the HTTP layer. Live mode requires a real token —
+    we don't paper over a missing one because the SDK call would then 401.
     """
-    record_mode = request.config.getoption("--record-mode", default=None)
-    is_replay = record_mode in (None, "none")
-    if is_replay and not os.environ.get("ASANA_ACCESS_TOKEN"):
+    if not _is_live_mode(request.config) and not os.environ.get("ASANA_ACCESS_TOKEN"):
         os.environ["ASANA_ACCESS_TOKEN"] = "replay-dummy-token"
         try:
             yield
