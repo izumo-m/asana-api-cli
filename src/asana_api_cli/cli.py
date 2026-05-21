@@ -344,7 +344,17 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # Remaining opts params (excluding workspace).
     for p in non_ws_opts:
         flag = f"--{p.name.replace('_', '-')}"
-        kw: dict[str, Any] = {"help": _escape_help(p.description)}
+        help_text = _escape_help(p.description)
+        # ``--limit`` is the per-page size sent to the server; users
+        # routinely confuse it with a total cap. Point them at
+        # ``--item-limit`` to avoid that pitfall.
+        if p.name == "limit":
+            help_text = (
+                f"{help_text} (This caps each HTTP request, not the total "
+                "number of items returned across pages — use --item-limit "
+                "for a total cap.)"
+            )
+        kw: dict[str, Any] = {"help": help_text}
         click_type = _click_type(p.py_type)
         if click_type is not None:
             kw["type"] = click_type
