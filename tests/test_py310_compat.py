@@ -7,6 +7,7 @@ require a newer Python than 3.10 (e.g. 3.11+ stdlib imports like
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -14,17 +15,23 @@ from pathlib import Path
 import pytest
 
 SRC_DIR = Path(__file__).resolve().parent.parent / "src"
-VERMIN_BIN = Path(sys.executable).parent / "vermin"
+
+# Use ``shutil.which`` so the lookup is OS-agnostic: on Windows it
+# resolves ``vermin.exe`` via PATHEXT, on POSIX it finds plain
+# ``vermin``. Searching the venv's bin/Scripts directory keeps the
+# resolution deterministic regardless of any global PATH state.
+VERMIN_BIN = shutil.which("vermin", path=str(Path(sys.executable).parent))
 
 
 @pytest.mark.skipif(
-    not VERMIN_BIN.exists(),
+    VERMIN_BIN is None,
     reason="vermin is not installed (dev dependency)",
 )
 def test_src_is_python_3_10_compatible() -> None:
+    assert VERMIN_BIN is not None  # narrowed by the skipif marker
     result = subprocess.run(
         [
-            str(VERMIN_BIN),
+            VERMIN_BIN,
             "--target=3.10-",
             "--violations",
             "--no-tips",
