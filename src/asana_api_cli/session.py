@@ -19,12 +19,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import urllib.parse
+
 import asana
 import click
+from urllib3.fields import RequestField
 from urllib3.util.retry import Retry
 
 ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
 DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
+
 
 # Match ``Authorization: <scheme> <token>`` inside an HTTP request-headers
 # chunk. We never apply this regex to user-controlled data (request body or
@@ -204,6 +208,67 @@ class HttpClientPrintRedactor:
         self.uninstall()
 
 
+class MultibyteFilenameSupport:
+    """Context manager that augments ``urllib3.fields.RequestField`` to
+    emit the RFC 5987 ``filename*=UTF-8''<percent-encoded>`` parameter of
+    ``Content-Disposition`` whenever a multipart field has a non-ASCII
+    filename.
+
+    Asana's attachment endpoint requires the ``filename*=`` form to
+    decode non-ASCII filenames correctly; without it the server treats
+    the ``filename="..."`` value as a literal and stores it as mojibake
+    or percent-encoded text. The official ``python-asana`` SDK (via
+    urllib3's default multipart formatter) does not emit ``filename*=`` —
+    this is a long-standing upstream gap (Asana forum discussion since
+    2022-12, unresolved as of 2026-05).
+
+    Off by default to preserve strict SDK parity. The CLI enables it
+    when ``--multibyte-filenames`` is set; library callers can use it
+    standalone::
+
+        with MultibyteFilenameSupport():
+            # urllib3-based uploads in this block emit filename*=
+            ...
+    """
+
+    def __init__(self) -> None:
+        self._original: Callable[..., None] | None = None
+
+    def install(self) -> None:
+        if self._original is not None:
+            return
+        self._original = RequestField.make_multipart
+        original = self._original
+
+        def _patched(
+            field: RequestField,
+            content_disposition: str | None = None,
+            content_type: str | None = None,
+            content_location: str | None = None,
+        ) -> None:
+            original(field, content_disposition, content_type, content_location)
+            filename = field._filename  # pyright: ignore[reportPrivateUsage]
+            if filename and any(ord(c) > 127 for c in filename):
+                encoded = urllib.parse.quote(filename, safe="")
+                existing = field.headers.get("Content-Disposition") or ""
+                field.headers["Content-Disposition"] = existing + f"; filename*=utf-8''{encoded}"
+
+        RequestField.make_multipart = _patched  # pyright: ignore[reportAttributeAccessIssue]
+
+    def uninstall(self) -> None:
+        if self._original is None:
+            return
+        RequestField.make_multipart = self._original  # pyright: ignore[reportAttributeAccessIssue]
+        self._original = None
+
+    def __enter__(self) -> MultibyteFilenameSupport:
+        self.install()
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.uninstall()
+
+
 JsonValue = dict[str, Any] | list[Any] | str | int | float | bool | None
 
 
@@ -266,6 +331,7 @@ class _Runtime:
     timeout: float | None = None
     access_token: str | None = None
     temp_dir: str | None = None
+    multibyte_filenames: bool = False
 
 
 runtime = _Runtime()
@@ -330,6 +396,11 @@ class AsanaSession:
             self._redactor = HttpClientPrintRedactor()
             self._redactor.install()
 
+        self._multibyte_filenames: MultibyteFilenameSupport | None = None
+        if runtime.multibyte_filenames:
+            self._multibyte_filenames = MultibyteFilenameSupport()
+            self._multibyte_filenames.install()
+
         try:
             self._config = config
             self._client = asana.ApiClient(config)
@@ -337,13 +408,16 @@ class AsanaSession:
             if runtime.timeout is not None:
                 self._install_timeout(runtime.timeout)
         except Exception:
-            # If construction fails after the redactor was installed, the
+            # If construction fails after the patches were installed, the
             # caller never gets a session to call close() on, so undo the
-            # global http.client.print patch here rather than leaving it
-            # leaked for the rest of the process.
+            # global patches here rather than leaving them leaked for the
+            # rest of the process.
             if self._redactor is not None:
                 self._redactor.uninstall()
                 self._redactor = None
+            if self._multibyte_filenames is not None:
+                self._multibyte_filenames.uninstall()
+                self._multibyte_filenames = None
             raise
 
     def _install_timeout(self, timeout: float) -> None:
@@ -362,7 +436,8 @@ class AsanaSession:
         return self._client
 
     def close(self) -> None:
-        """Uninstall the debug redactor (if any).
+        """Uninstall any global patches installed for this session
+        (debug redactor, multibyte-filename multipart patch).
 
         Safe to call multiple times. Prefer using the session as a
         context manager (``with AsanaSession(...) as session: ...``)
@@ -371,6 +446,9 @@ class AsanaSession:
         if self._redactor is not None:
             self._redactor.uninstall()
             self._redactor = None
+        if self._multibyte_filenames is not None:
+            self._multibyte_filenames.uninstall()
+            self._multibyte_filenames = None
 
     def __enter__(self) -> AsanaSession:
         return self

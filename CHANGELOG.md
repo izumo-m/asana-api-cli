@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--multibyte-filenames` global flag for attachment uploads. When set, the CLI emits the RFC 5987 `filename*=UTF-8''<percent-encoded>` parameter of `Content-Disposition` in addition to the standard `filename=`, so Asana correctly decodes non-ASCII filenames (Japanese, Cyrillic, Greek, etc.). Off by default to preserve strict SDK parity — the upstream `python-asana` SDK does not emit `filename*=`, which has been a known gap since 2022 ([Asana Forum thread](https://forum.asana.com/t/attachment-names-uploaded-with-asana-api-are-garbled-on-asanaweb/286200)).
+
 ### Changed
 
 - Paginatable commands now expose SDK pagination inputs 1:1 as CLI flags: `--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`. Each maps to a single `opts` key, `Configuration` property, or method kwarg of `python-asana`.

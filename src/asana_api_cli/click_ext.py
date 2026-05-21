@@ -39,6 +39,7 @@ GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
         "access_token",
         "temp_dir",
         "debug",
+        "multibyte_filenames",
     }
 )
 
@@ -98,6 +99,15 @@ def _make_global_option_params() -> list[click.Option]:
             default=False,
             help="Print HTTP request/response to stderr for troubleshooting",
         ),
+        click.Option(
+            ["--multibyte-filenames", "multibyte_filenames"],
+            is_flag=True,
+            default=False,
+            help=(
+                "Emit RFC 5987 filename*=UTF-8'' on multipart uploads "
+                "(needed for non-ASCII attachment filenames)"
+            ),
+        ),
     ]
 
 
@@ -126,6 +136,8 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.temp_dir = value
     elif name == "debug":
         runtime.debug = value
+    elif name == "multibyte_filenames":
+        runtime.multibyte_filenames = value
 
 
 def _consume_global_options(ctx: click.Context) -> None:

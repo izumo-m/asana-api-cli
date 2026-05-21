@@ -659,6 +659,17 @@ class _ApiGroup(GroupWithGlobalOptions):
     default=False,
     help="Print HTTP request/response to stderr for troubleshooting",
 )
+@click.option(
+    "--multibyte-filenames",
+    "multibyte_filenames",
+    is_flag=True,
+    default=False,
+    help=(
+        "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
+        "attachment uploads whose filename contains non-ASCII characters; "
+        "off by default to match the underlying SDK behavior."
+    ),
+)
 def main(
     host: str | None,
     proxy: str | None,
@@ -669,6 +680,7 @@ def main(
     access_token: str | None,
     temp_dir: str | None,
     debug: bool,
+    multibyte_filenames: bool,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
@@ -692,6 +704,7 @@ def main(
         runtime.access_token = access_token
     runtime.temp_dir = temp_dir
     runtime.debug = debug
+    runtime.multibyte_filenames = multibyte_filenames
 
 
 def _register_groups(root: click.Group) -> None:
