@@ -418,7 +418,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 is_flag=True,
                 default=False,
                 help=(
-                    "[Deprecated v3.0] No-op; walking all pages is now the "
+                    "[Deprecated v3.0] No-op; walking every page is now the "
                     "default. Removed in a future release."
                 ),
             )
@@ -462,7 +462,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         # Deprecated v2.x aliases: warn and resolve to the v3 flag.
         if all_items:
             click.echo(
-                "warning: --all-items is deprecated; walking all pages is "
+                "warning: --all-items is deprecated; walking every page is "
                 "now the default (will be removed in a future release)",
                 err=True,
             )

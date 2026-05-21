@@ -140,14 +140,14 @@ asana-api workspaces get-workspaces
 asana-api projects get-projects-for-workspace
 asana-api projects get-projects --workspace <WORKSPACE_GID>
 
-# List tasks (first page only by default)
+# List every task in a project (walks every page by default)
 asana-api tasks get-tasks --project <PROJECT_GID>
 
 # Preview the first few items
-asana-api tasks get-tasks --project <PROJECT_GID> --max-items 5
+asana-api tasks get-tasks --project <PROJECT_GID> --item-limit 5
 
-# Fetch every item across pages
-asana-api tasks get-tasks --project <PROJECT_GID> --all-items
+# One HTTP call: return the first page + the next_page cursor
+asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload
 
 # Single task
 asana-api tasks get-task --task <TASK_GID>
@@ -184,32 +184,49 @@ the Asana API accepts in place of workspace.
 
 ## Pagination
 
-List commands (e.g. `tasks get-tasks`) return paginated results. The CLI
-provides four ways to control how much is fetched:
+Paginatable commands like `tasks get-tasks` expose every pagination input
+of the `python-asana` SDK as a CLI flag. Each flag maps 1:1 to an SDK
+`Configuration` property, `opts` key, or method kwarg, so you can probe
+SDK behavior from the shell before writing any Python.
 
-| Option | Behavior |
-|--------|----------|
-| (none) | Fetch a single page (Asana default: 100 items) |
-| `--max-items N` | Fetch up to N items, auto-paginating across pages. The last request is automatically capped to the remaining count. |
-| `--all-items` | Fetch every page until the server reports no more |
-| `--offset <TOKEN>` | Manual pagination: pass the `next_page.offset` token from the previous response |
-
-`--max-items` and `--all-items` are mutually exclusive.
-
-`--page-size N` tunes the per-page request size (Asana API requires 1-100,
-default 100). Rarely needed — combine with `--all-items` or `--max-items` only
-when the default doesn't suit (e.g. very large response items).
+| CLI flag | SDK input | Effect |
+|----------|-----------|--------|
+| (none) | — | SDK default: walks every page automatically and outputs a flat JSON list of items |
+| `--limit N` | `opts["limit"]` | Per-page size sent to the server (Asana API requires 1-100) |
+| `--offset <TOKEN>` | `opts["offset"]` | Pagination cursor (the `next_page.offset` from a previous response) |
+| `--page-limit N` | `Configuration.page_limit` | Per-page size used when `--limit` is not set (SDK default: 100). Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
+| `--item-limit N` | kwarg `item_limit=N` | Stop after N items have been collected. Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
+| `--no-return-page-iterator` | `Configuration.return_page_iterator = False` | Disables auto-pagination; the command runs one HTTP request and outputs the raw `{data, next_page}` dict |
+| `--full-payload` | kwarg `full_payload=True` | Same effect as `--no-return-page-iterator` (per-call kwarg form) |
 
 ```bash
-# Auto-paginate up to 250 items
-asana-api tasks get-tasks --project <PID> --max-items 250
+# Default: walk every page, return a flat list of items
+asana-api tasks get-tasks --project <PID>
 
-# Fetch everything
-asana-api tasks get-tasks --project <PID> --all-items
+# Cap the result to the first 250 items
+asana-api tasks get-tasks --project <PID> --item-limit 250
 
-# Manual pagination using the offset token
+# Single HTTP call: one page + next_page cursor
+asana-api tasks get-tasks --project <PID> --limit 100 --no-return-page-iterator
+
+# Resume from a cursor
 asana-api tasks get-tasks --project <PID> --offset <TOKEN>
 ```
+
+### Deprecated flags (v2.x → v3.0)
+
+The following v2 flags are retained as deprecation aliases. Each emits a
+stderr warning and forwards to the corresponding v3 flag; they will be
+removed in a future release.
+
+| Deprecated | Replacement |
+|------------|-------------|
+| `--all-items` | (no-op; walking every page is now the default) |
+| `--page-size N` | `--limit N` |
+| `--max-items N` | `--item-limit N` |
+
+Combining a deprecated alias with its v3 counterpart (e.g. `--page-size`
+together with `--limit`) is rejected with a usage error.
 
 ## Global options
 

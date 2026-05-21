@@ -27,6 +27,12 @@ uv run pytest
   uv run ruff check .
   ```
 
+- Type-check with `basedpyright`:
+
+  ```bash
+  uv run basedpyright
+  ```
+
 - Messages printed to the console (errors, help text, etc.) must be written
   in English.
 

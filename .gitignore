@@ -12,3 +12,4 @@ dist/
 htmlcov/
 CLAUDE.local.md
 .claude/
+_local/

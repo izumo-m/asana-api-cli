@@ -2,7 +2,11 @@
 
 For contributor setup (cloning, `uv sync`, running tests, code style, PR
 rules), see [`CONTRIBUTING.md`](../CONTRIBUTING.md). This document covers
-the internal architecture and how to use `asana-api-cli` as a library.
+the internal architecture.
+
+The `asana_api_cli` package is internal to the CLI. Importing it directly
+from Python is possible but unsupported — names and behavior may change
+in any release without notice.
 
 ## Install from source
 
@@ -19,23 +23,24 @@ breaking changes.
 
 ```
 src/asana_api_cli/
-├── __init__.py           # Re-exports AsanaSession
-├── session.py            # AsanaSession + helpers used by the CLI
+├── __init__.py
+├── session.py            # SDK client wrapper + helpers used by the CLI
 ├── formatter.py          # CLI output formatting (@formatted decorator)
 ├── click_ext.py          # LazyGroup + global-options propagation mixins
 ├── version.py            # version_string()
 └── cli.py                # Runtime introspection + click command tree
 
 tests/
-├── test_cli.py                 # Helpers + built-command shape tests
-├── test_cli_surface.py         # Snapshot test (compares against fixture)
+├── test_cli*.py                # CLI shape, invocation, and surface snapshot
+├── test_*.py                   # Per-module unit tests (formatter, session, ...)
 └── fixtures/
     └── cli_surface.json        # Canonical CLI surface for the bundled SDK
 ```
 
-- **`session.py`** — builds `asana.Configuration` + `ApiClient`, toggles
-  `return_page_iterator` for `--all-items`, masks Authorization headers
-  in `http.client`'s debug output via `HttpClientPrintRedactor` when
+- **`session.py`** — builds `asana.Configuration` + `ApiClient`, forwards
+  the `return_page_iterator` and `page_limit` kwargs to the matching SDK
+  `Configuration` properties, masks Authorization headers in
+  `http.client`'s debug output via `HttpClientPrintRedactor` when
   `--debug` is set, and exposes `resolve_body` / `resolve_workspace` to
   `cli.py`.
 - **`formatter.py`** — supports `json` / `table` / `csv` / `text` output and
@@ -49,17 +54,8 @@ tests/
 
 ## Bumping the SDK
 
-1. Edit `dependencies` in `pyproject.toml` to raise the lower bound of the
-   `asana` constraint (e.g. from `asana>=5.2,<6` to `asana>=5.3,<6` once
-   5.3 ships).
-2. `uv sync` to install the new SDK.
-3. `uv run pytest` — if the SDK surface changed, `test_cli_surface.py`
-   fails with the diff against the recorded fixture.
-4. Review the diff. Note user-visible changes in `CHANGELOG.md`.
-5. Regenerate the fixture (see the docstring at the top of
-   `tests/test_cli_surface.py` for the exact command).
-6. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`,
-   and `CHANGELOG.md` together.
+See [`architecture.md`](architecture.md#cli-surface-snapshot-test) for the
+procedure and how the CLI surface snapshot test guards the change.
 
 ## Trying shell completion locally
 
@@ -107,35 +103,3 @@ COMP_WORDS="asana-api tasks get-tasks --" COMP_CWORD=3 \
 ```
 
 This prints the candidate list as `type,value` lines.
-
-## Library use
-
-`asana-api-cli` can also be imported from Python — handy for one-off
-scripts:
-
-```python
-from asana_api_cli import AsanaSession
-import asana
-
-with AsanaSession(token="1/12345...", use_page_iterator=True) as session:
-    tasks_api = asana.TasksApi(session.client)
-    for task in tasks_api.get_tasks({"project": "123"}):
-        print(task)
-```
-
-This is a bonus, not a maintained library API: names and behavior may
-change in any release without notice and without being flagged in
-`CHANGELOG.md`. For anything you plan to keep around, write against the
-official [`asana`](https://github.com/Asana/python-asana) SDK directly:
-
-```python
-import asana
-
-config = asana.Configuration()
-config.access_token = "1/12345..."
-client = asana.ApiClient(config)
-
-tasks_api = asana.TasksApi(client)
-for task in tasks_api.get_tasks({"project": "123", "limit": 50}):
-    print(task)
-```
