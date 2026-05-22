@@ -53,6 +53,7 @@ from asana_api_cli.session import (
     resolve_workspace,
     runtime,
 )
+from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
 from asana_api_cli.version import version_string
 
 
@@ -654,10 +655,38 @@ class _ApiGroup(GroupWithGlobalOptions):
     help="Set Configuration.ssl_ca_cert (path to a PEM bundle of trusted CA certs).",
 )
 @click.option(
-    "--retries",
-    type=click.IntRange(min=0),
+    "--cert-file",
+    "cert_file",
     default=None,
-    help="Number of retries on 429/5xx responses (default: 5)",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Set Configuration.cert_file (client TLS certificate for mTLS).",
+)
+@click.option(
+    "--key-file",
+    "key_file",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Set Configuration.key_file (client TLS private key for mTLS).",
+)
+@click.option(
+    "--assert-hostname/--no-assert-hostname",
+    "assert_hostname",
+    default=None,
+    help=(
+        "Set Configuration.assert_hostname (SDK default: None → urllib3 default). Tri-state toggle."
+    ),
+)
+@click.option(
+    "--retry-strategy",
+    "retry_strategy_overrides",
+    default=None,
+    callback=click_callback(schema=RETRY_FIELD_SCHEMA),
+    help=(
+        "Override Configuration.retry_strategy fields. VALUE: "
+        "'k1=v1,k2=v2,...', JSON object, or @path. See urllib3 "
+        "Retry docs. List-typed fields (allowed_methods, "
+        "status_forcelist, remove_headers_on_redirect) require JSON."
+    ),
 )
 @click.option(
     "--request-timeout",
@@ -667,10 +696,60 @@ class _ApiGroup(GroupWithGlobalOptions):
     help="Per-request timeout in seconds (SDK kwarg: _request_timeout).",
 )
 @click.option(
+    "--connection-pool-maxsize",
+    "connection_pool_maxsize",
+    type=click.IntRange(min=1),
+    default=None,
+    help=(
+        "Set Configuration.connection_pool_maxsize (SDK default: "
+        "cpu_count * 5). Max urllib3 connections cached per host."
+    ),
+)
+@click.option(
     "--access-token",
     "access_token",
     default=None,
     help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)",
+)
+@click.option(
+    "--username",
+    "username",
+    default=None,
+    help=(
+        "Set Configuration.username (HTTP Basic auth user). No-op as of "
+        "python-asana 5.2.4: SDK does not read it in the request path; "
+        "Asana only accepts Bearer-token auth (see --access-token)."
+    ),
+)
+@click.option(
+    "--password",
+    "password",
+    default=None,
+    help=(
+        "Set Configuration.password (HTTP Basic auth password). No-op as "
+        "of python-asana 5.2.4: same reason as --username."
+    ),
+)
+@click.option(
+    "--api-key",
+    "api_key",
+    default=None,
+    callback=click_callback(),
+    help=(
+        "Set Configuration.api_key (dict). VALUE: 'k1=v1,k2=v2,...', "
+        "JSON object, or @path. No-op as of python-asana 5.2.4: SDK only "
+        "uses personalAccessToken auth."
+    ),
+)
+@click.option(
+    "--api-key-prefix",
+    "api_key_prefix",
+    default=None,
+    callback=click_callback(),
+    help=(
+        "Set Configuration.api_key_prefix (dict). Same input format as "
+        "--api-key. No-op as of python-asana 5.2.4."
+    ),
 )
 @click.option(
     "--temp-folder-path",
@@ -678,6 +757,28 @@ class _ApiGroup(GroupWithGlobalOptions):
     default=None,
     type=click.Path(file_okay=False),
     help="Set Configuration.temp_folder_path (directory for temporary downloads).",
+)
+@click.option(
+    "--safe-chars-for-path-param",
+    "safe_chars_for_path_param",
+    default=None,
+    help=(
+        "Set Configuration.safe_chars_for_path_param (extra chars treated "
+        "as safe when percent-encoding path parameters)."
+    ),
+)
+@click.option(
+    "--logger-format",
+    "logger_format",
+    default=None,
+    help="Set Configuration.logger_format (Python logging format string).",
+)
+@click.option(
+    "--logger-file",
+    "logger_file",
+    default=None,
+    type=click.Path(dir_okay=False),
+    help="Set Configuration.logger_file (path SDK loggers write to when set).",
 )
 @click.option(
     "--debug",
@@ -702,10 +803,21 @@ def main(
     proxy: str | None,
     verify_ssl: bool | None,
     ssl_ca_cert: str | None,
-    retries: int | None,
+    cert_file: str | None,
+    key_file: str | None,
+    assert_hostname: bool | None,
+    retry_strategy_overrides: dict[str, Any] | None,
     request_timeout: float | None,
+    connection_pool_maxsize: int | None,
     access_token: str | None,
+    username: str | None,
+    password: str | None,
+    api_key: dict[str, str] | None,
+    api_key_prefix: dict[str, str] | None,
     temp_folder_path: str | None,
+    safe_chars_for_path_param: str | None,
+    logger_format: str | None,
+    logger_file: str | None,
     debug: bool,
     multibyte_filenames: bool,
 ) -> None:
@@ -729,11 +841,22 @@ def main(
     if verify_ssl is not None:
         runtime.verify_ssl = verify_ssl
     runtime.ssl_ca_cert = ssl_ca_cert
-    runtime.retries = retries
+    runtime.cert_file = cert_file
+    runtime.key_file = key_file
+    runtime.assert_hostname = assert_hostname
+    runtime.retry_strategy_overrides = retry_strategy_overrides
     runtime.request_timeout = request_timeout
+    runtime.connection_pool_maxsize = connection_pool_maxsize
     if access_token:
         runtime.access_token = access_token
+    runtime.username = username
+    runtime.password = password
+    runtime.api_key = api_key
+    runtime.api_key_prefix = api_key_prefix
     runtime.temp_folder_path = temp_folder_path
+    runtime.safe_chars_for_path_param = safe_chars_for_path_param
+    runtime.logger_format = logger_format
+    runtime.logger_file = logger_file
     runtime.debug = debug
     runtime.multibyte_filenames = multibyte_filenames
 

@@ -28,10 +28,21 @@ def _reset_runtime() -> None:
     runtime.proxy = None
     runtime.verify_ssl = True
     runtime.ssl_ca_cert = None
-    runtime.retries = None
+    runtime.cert_file = None
+    runtime.key_file = None
+    runtime.assert_hostname = None
+    runtime.retry_strategy_overrides = None
     runtime.request_timeout = None
+    runtime.connection_pool_maxsize = None
     runtime.access_token = None
+    runtime.username = None
+    runtime.password = None
+    runtime.api_key = None
+    runtime.api_key_prefix = None
     runtime.temp_folder_path = None
+    runtime.safe_chars_for_path_param = None
+    runtime.logger_format = None
+    runtime.logger_file = None
 
 
 def _build_cli() -> click.Group:
@@ -145,10 +156,22 @@ class TestGlobalOptionNamesInventory:
             "proxy",
             "verify_ssl",
             "ssl_ca_cert",
-            "retries",
+            "cert_file",
+            "key_file",
+            "assert_hostname",
+            "retry_strategy_overrides",
             "request_timeout",
+            "connection_pool_maxsize",
             "access_token",
+            "username",
+            "password",
+            "api_key",
+            "api_key_prefix",
             "temp_folder_path",
+            "safe_chars_for_path_param",
+            "logger_format",
+            "logger_file",
+            "multibyte_filenames",
         ):
             assert name in GLOBAL_OPTION_NAMES
 

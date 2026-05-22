@@ -51,10 +51,21 @@ def _isolated_runtime(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             "proxy",
             "verify_ssl",
             "ssl_ca_cert",
-            "retries",
+            "cert_file",
+            "key_file",
+            "assert_hostname",
+            "retry_strategy_overrides",
             "request_timeout",
+            "connection_pool_maxsize",
             "access_token",
+            "username",
+            "password",
+            "api_key",
+            "api_key_prefix",
             "temp_folder_path",
+            "safe_chars_for_path_param",
+            "logger_format",
+            "logger_file",
         )
     }
     try:
@@ -319,25 +330,37 @@ class TestDeprecationAliases:
 class TestGlobalOptionValidation:
     """Type/range validation on global options that affect runtime state."""
 
-    def test_retries_rejects_negative(self) -> None:
-        """``--retries`` must be a non-negative integer; negative values
-        previously silently disabled retries via urllib3.Retry."""
+    def test_retry_strategy_total_zero_accepted(self) -> None:
+        """``--retry-strategy total=0`` parses fine (disables retries explicitly)."""
         from asana_api_cli.cli import main
 
-        result = CliRunner().invoke(main, ["--retries", "-1"])
+        result = CliRunner().invoke(main, ["--retry-strategy", "total=0"])
+        # Either succeeds (showing help) or fails with "Missing command",
+        # but never with a parser error.
+        assert "Invalid value" not in result.output
+
+    def test_retry_strategy_rejects_unknown_field(self) -> None:
+        """Unknown retry fields must be rejected before any SDK call."""
+        from asana_api_cli.cli import main
+
+        result = CliRunner().invoke(main, ["--retry-strategy", "bogus=1"])
+        assert result.exit_code != 0
+        assert "Unknown field" in result.output
+
+    def test_retry_strategy_list_field_in_shorthand_rejected(self) -> None:
+        """List-typed fields require the JSON form."""
+        from asana_api_cli.cli import main
+
+        result = CliRunner().invoke(main, ["--retry-strategy", "status_forcelist=429"])
+        assert result.exit_code != 0
+        assert "list type" in result.output
+
+    def test_connection_pool_maxsize_rejects_zero(self) -> None:
+        from asana_api_cli.cli import main
+
+        result = CliRunner().invoke(main, ["--connection-pool-maxsize", "0"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output or "is not in the range" in result.output
-
-    def test_retries_zero_accepted(self) -> None:
-        """``--retries 0`` is valid (disables retries explicitly)."""
-        from asana_api_cli.cli import main
-
-        # Click parses 0 fine; we don't run a subcommand so we expect a
-        # missing-command error rather than a validation error.
-        result = CliRunner().invoke(main, ["--retries", "0"])
-        # Either succeeds (showing help) or fails with "Missing command",
-        # but not with an IntRange validation error.
-        assert "Invalid value" not in result.output
 
 
 class TestDebugRedactorLifecycle:

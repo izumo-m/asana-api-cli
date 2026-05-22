@@ -27,6 +27,7 @@ fields cannot be confused by readers of the command line.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -178,3 +179,25 @@ def _coerce_value(key: str, raw: str, expected: type | tuple[type, ...]) -> Any:
     raise click.BadParameter(
         f"Field {key!r} has {type_name} type; use the JSON form ('{{...}}' or @file)."
     )
+
+
+def click_callback(
+    *,
+    schema: dict[str, type | tuple[type, ...]] | None = None,
+) -> Callable[[click.Context, click.Parameter, str | None], dict[str, Any] | None]:
+    """Build a Click ``callback`` that parses a structured option value.
+
+    Returns the original ``None`` untouched when the user did not supply
+    the flag, so a missing value never trips the parser's empty-string
+    guard. Otherwise delegates to :func:`parse_structured_arg` with the
+    supplied schema.
+    """
+
+    def _cb(
+        _ctx: click.Context, _param: click.Parameter, value: str | None
+    ) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        return parse_structured_arg(value, schema=schema)
+
+    return _cb

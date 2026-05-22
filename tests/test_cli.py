@@ -265,13 +265,32 @@ class TestRootGroup:
             "--verify-ssl",
             "--no-verify-ssl",
             "--ssl-ca-cert",
-            "--retries",
+            "--cert-file",
+            "--key-file",
+            "--assert-hostname",
+            "--no-assert-hostname",
+            "--retry-strategy",
             "--request-timeout",
+            "--connection-pool-maxsize",
             "--access-token",
+            "--username",
+            "--password",
+            "--api-key",
+            "--api-key-prefix",
             "--temp-folder-path",
+            "--safe-chars-for-path-param",
+            "--logger-format",
+            "--logger-file",
             "--debug",
+            "--multibyte-filenames",
         ):
-            assert expected in flags
+            assert expected in flags, f"missing {expected}"
+
+    def test_main_does_not_have_removed_options(self) -> None:
+        """Old v2 names dropped in v3 must not resurface accidentally."""
+        flags = _option_flags(main)
+        for absent in ("--retries", "--timeout", "--ca-cert", "--temp-dir"):
+            assert absent not in flags, f"{absent} should be removed"
 
     def test_subgroup_help_resolves(self) -> None:
         # Resolving a subgroup must trigger lazy method introspection.

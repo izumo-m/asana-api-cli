@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `--multibyte-filenames` global flag for attachment uploads. When set, the CLI emits the RFC 5987 `filename*=UTF-8''<percent-encoded>` parameter of `Content-Disposition` in addition to the standard `filename=`, so Asana correctly decodes non-ASCII filenames (Japanese, Cyrillic, Greek, etc.). Off by default to preserve strict SDK parity — the upstream `python-asana` SDK does not emit `filename*=`, which has been a known gap since 2022 ([Asana Forum thread](https://forum.asana.com/t/attachment-names-uploaded-with-asana-api-are-garbled-on-asanaweb/286200)).
+- Eleven new global options that expose previously-unreachable `asana.Configuration` properties, so every settable Configuration property now has a 1:1 CLI flag:
+  - `--cert-file PATH` / `--key-file PATH` (`Configuration.cert_file` / `Configuration.key_file`) for client-side mTLS.
+  - `--assert-hostname` / `--no-assert-hostname` tri-state toggle (`Configuration.assert_hostname`).
+  - `--connection-pool-maxsize N` (`Configuration.connection_pool_maxsize`).
+  - `--safe-chars-for-path-param S` (`Configuration.safe_chars_for_path_param`).
+  - `--logger-format FMT` / `--logger-file PATH` (`Configuration.logger_format` / `Configuration.logger_file`).
+  - `--username USER` / `--password PASS` (`Configuration.username` / `Configuration.password`) — **no-op as of python-asana 5.2.4**: the SDK only uses Bearer-token auth, so these properties stay inert; the `--help` text says so explicitly.
+  - `--api-key VALUE` / `--api-key-prefix VALUE` (`Configuration.api_key` / `Configuration.api_key_prefix`) — same no-op caveat. VALUE accepts shorthand `k=v,k=v`, a JSON object `{...}`, or `@path` to a JSON file.
+- `--retry-strategy VALUE` global flag replacing the old `--retries N`. Overrides any field of `Configuration.retry_strategy` (16 user-settable `urllib3.util.retry.Retry` fields); shorthand handles scalar fields and list-typed fields (`allowed_methods`, `status_forcelist`, `remove_headers_on_redirect`) require the JSON form. Unspecified fields keep their python-asana defaults.
 
 ### Changed
 
@@ -20,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--temp-dir` → `--temp-folder-path` (`Configuration.temp_folder_path`)
   - `--ca-cert` → `--ssl-ca-cert` (`Configuration.ssl_ca_cert`)
   - `--timeout` → `--request-timeout` (per-call kwarg `_request_timeout`)
+  - `--retries N` → `--retry-strategy total=N` (subsumed by the new structured `--retry-strategy` flag that can override every `urllib3.Retry` field).
   - `--no-verify-ssl` is now part of the toggle `--verify-ssl / --no-verify-ssl` (`Configuration.verify_ssl`). The old `--no-verify-ssl` form still works and behaves the same; passing `--verify-ssl` lets a script restore the SDK default on top of an existing `--no-verify-ssl` (e.g. from a wrapper).
 - Paginatable commands' `--no-return-page-iterator` flag is likewise now part of the toggle `--return-page-iterator / --no-return-page-iterator` (`Configuration.return_page_iterator`). Unspecified means the SDK default (iterator path) is used.
 
