@@ -98,7 +98,7 @@ Then try interactive completion:
 asana-api tasks get-tasks --<TAB><TAB>      # all options, including --debug etc.
 asana-api tasks get-tasks --de<TAB>         # completes to --debug
 asana-api tasks --<TAB><TAB>                # global options also work on subgroups
-asana-api tasks get-tasks --ca-cert <TAB>   # path completion for FILE-typed options
+asana-api tasks get-tasks --ssl-ca-cert <TAB>   # path completion for FILE-typed options
 ```
 
 Exit with `exit` (or Ctrl-D) to drop completion and return to your normal

@@ -39,32 +39,87 @@ In the **"SDK destination"** column:
   codebase. These flags are also cataloged in
   [`sdk-deviations.md`](sdk-deviations.md).
 
-The **"Flag-name parity"** column flags rows where the CLI name does
-*not* match the SDK input name. Used as input to future renaming
-decisions — current state only; this doc does not propose changes.
+Every built-in non-extension flag below matches the SDK input name 1:1.
+That parity is the active rule per
+[constitution #1](principles.md#constitution): renaming or adding a
+flag must keep it isomorphic to the underlying `Configuration`
+property (or document the deviation in `sdk-deviations.md`).
 
 ## Global options (`cli.py:main`)
 
-| Flag | SDK destination | Mapping mechanism | Flag-name parity |
-|---|---|---|---|
-| `--host URL` | `asana.Configuration.host` | Direct property (`session.py:189`) | ✓ matches `host` |
-| `--proxy URL` | `asana.Configuration.proxy` | Direct property (`session.py:191`) | ✓ matches `proxy` |
-| `--no-verify-ssl` | `asana.Configuration.verify_ssl` | Direct property, negated (`session.py:193`) | △ negated form of `verify_ssl` (Click convention for booleans) |
-| `--ca-cert PATH` | `asana.Configuration.ssl_ca_cert` | Direct property (`session.py:195`) | ✗ SDK name is `ssl_ca_cert` |
-| `--retries N` | `asana.Configuration.retry_strategy.total` | Struct member: builds a `urllib3.util.retry.Retry(total=N, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])` (`session.py:201-205`); `backoff_factor` and `status_forcelist` are hard-coded CLI choices, not exposed | △ surfaces only the `total` field of a struct; full SDK surface (`retry_strategy=Retry(...)`) has no clean flag name |
-| `--timeout SECONDS` | per-call kwarg `_request_timeout` | Per-call kwarg: `ApiClient.call_api` is wrapped to inject `_request_timeout=N` on every invocation (`session.py:243-252`) | △ SDK kwarg name is `_request_timeout` (leading underscore is SDK-internal); the flag drops both the underscore and the `request_` prefix |
-| `--access-token TOKEN` | `asana.Configuration.access_token` | Direct property (`session.py:175`). Default source is `$ASANA_ACCESS_TOKEN` (`session.py:284`) | ✓ matches `access_token` |
-| `--temp-dir PATH` | `asana.Configuration.temp_folder_path` | Direct property (`session.py:197`) | ✗ SDK name is `temp_folder_path` |
-| `--debug` | `asana.Configuration.debug = True` | Direct property (`session.py:215`). Also installs `HttpClientAuthRedactor` (`session.py:216-217`) — a security override per [constitution #2](principles.md#constitution); see [`sdk-deviations.md`](sdk-deviations.md) "Personal access token in --debug output" | ✓ matches `debug` |
-| `--multibyte-filenames` | *(none)* | CLI-only. Installs `MultibyteFilenameSupport` which patches `urllib3.fields.RequestField.make_multipart` to emit RFC 5987 `filename*=UTF-8''<percent-encoded>` (`session.py:31-89`). Cataloged in [`sdk-deviations.md`](sdk-deviations.md) | n/a (extension) |
+| Flag | SDK destination | Mapping mechanism |
+|---|---|---|
+| `--host URL` | `Configuration.host` | Direct property |
+| `--proxy URL` | `Configuration.proxy` | Direct property |
+| `--verify-ssl / --no-verify-ssl` | `Configuration.verify_ssl` | Direct property. Tri-state toggle: unspecified leaves the SDK default (True) intact |
+| `--ssl-ca-cert PATH` | `Configuration.ssl_ca_cert` | Direct property |
+| `--cert-file PATH` | `Configuration.cert_file` | Direct property (client TLS cert for mTLS) |
+| `--key-file PATH` | `Configuration.key_file` | Direct property (client TLS key for mTLS) |
+| `--assert-hostname / --no-assert-hostname` | `Configuration.assert_hostname` | Direct property. Tri-state toggle |
+| `--retry-strategy VALUE` | `Configuration.retry_strategy` | Struct member: parsed via `parse_structured_arg` with `RETRY_FIELD_SCHEMA`; applied with `Configuration.retry_strategy.new(**overrides)` so unspecified fields keep the SDK defaults |
+| `--request-timeout SECONDS` | per-call kwarg `_request_timeout` | Per-call kwarg: `ApiClient.call_api` is wrapped to inject `_request_timeout=N` on every invocation (`session.py:_install_timeout`) |
+| `--connection-pool-maxsize N` | `Configuration.connection_pool_maxsize` | Direct property |
+| `--access-token TOKEN` | `Configuration.access_token` | Direct property. Default source is `$ASANA_ACCESS_TOKEN` |
+| `--username USER` | `Configuration.username` | Direct property. **No-op as of python-asana 5.2.4** — see [no-op disclosure](#no-op-auth-properties) below |
+| `--password PASS` | `Configuration.password` | Direct property. **No-op as of python-asana 5.2.4** |
+| `--api-key VALUE` | `Configuration.api_key` | Direct property (dict). Value parsed by `parse_structured_arg`. **No-op as of python-asana 5.2.4** |
+| `--api-key-prefix VALUE` | `Configuration.api_key_prefix` | Direct property (dict). **No-op as of python-asana 5.2.4** |
+| `--temp-folder-path PATH` | `Configuration.temp_folder_path` | Direct property |
+| `--safe-chars-for-path-param S` | `Configuration.safe_chars_for_path_param` | Direct property |
+| `--logger-format FMT` | `Configuration.logger_format` | Direct property |
+| `--logger-file PATH` | `Configuration.logger_file` | Direct property |
+| `--debug` | `Configuration.debug = True` | Direct property. Also installs `HttpClientAuthRedactor` — a security override per [constitution #2](principles.md#constitution); see [`sdk-deviations.md`](sdk-deviations.md) "Personal access token in --debug output" |
+| `--multibyte-filenames` | *(none)* | CLI-only. Installs `MultibyteFilenameSupport` which patches `urllib3.fields.RequestField.make_multipart` to emit RFC 5987 `filename*=UTF-8''<percent-encoded>`. Cataloged in [`sdk-deviations.md`](sdk-deviations.md) |
+
+### Structured value format (`--api-key`, `--api-key-prefix`, `--retry-strategy`)
+
+These three options share a single VALUE format dispatched by the first
+character:
+
+- `{...}` — parse as a JSON object.
+- `@<path>` — read the file at `<path>` and parse it as a JSON object.
+- otherwise — parse as shorthand `key=value[,key=value...]`.
+
+Shorthand supports scalar values only (`int` / `float` / `bool` /
+`str`). Fields whose declared type is a list — for `--retry-strategy`
+those are `allowed_methods`, `status_forcelist`, and
+`remove_headers_on_redirect` — must be passed via the JSON or `@file`
+form, since commas inside list values would collide with the
+shorthand pair separator. Bool values in shorthand accept only `true`
+or `false` (case-insensitive); `1` / `0` are intentionally rejected so
+they cannot be confused with int fields.
+
+Implementation lives in `src/asana_api_cli/structured_arg.py`.
+
+### No-op auth properties
+
+`--username`, `--password`, `--api-key`, and `--api-key-prefix` are
+exposed for parity with `asana.Configuration` but are **inert in the
+request path** as of python-asana 5.2.4: every generated `*Api` method
+calls `update_params_for_auth` with `auth_settings = ['personalAccessToken']`
+only, and `Configuration.auth_settings()` returns only the `token`
+entry. The four properties remain on the Configuration object but no
+header is ever emitted from them. The CLI surfaces them so future SDK
+versions that wire them up start working without a CLI release; the
+`--help` text pins the python-asana version so the disclosure is
+re-verified whenever the SDK is bumped (see [`architecture.md`](architecture.md#when-bumping-the-asana-dependency)).
+
+### stdin (`-`) restriction
+
+Only `--body` is wired to read JSON from stdin (`-`). The structured
+config options (`--api-key`, `--api-key-prefix`, `--retry-strategy`)
+intentionally do *not* accept `-` because multiple options requesting
+stdin from a single invocation produces evaluation-order-dependent
+silent bugs. To pipe a structured config value, use bash process
+substitution: `--api-key @<(echo '{"k":"v"}')`.
 
 ## Output formatter options (`formatter.py:formatted`)
 
-| Flag | SDK destination | Mapping mechanism | Flag-name parity |
-|---|---|---|---|
-| `--output FORMAT` | *(none)* | CLI-only. `json` / `table` / `csv` / `text` rendering by `_format_output`. Default `json` is canonical/lossless | n/a (extension) |
-| `--query EXPR` | *(none)* | CLI-only. Pipes the response through `jq` (`jqlib.all`) | n/a (extension) |
-| `--csv-bom` | *(none)* | CLI-only. Prepends UTF-8 BOM in `_print_csv` | n/a (extension) |
+| Flag | SDK destination | Mapping mechanism |
+|---|---|---|
+| `--output FORMAT` | *(none)* | CLI-only. `json` / `table` / `csv` / `text` rendering by `_format_output`. Default `json` is canonical/lossless |
+| `--query EXPR` | *(none)* | CLI-only. Pipes the response through `jq` (`jqlib.all`) |
+| `--csv-bom` | *(none)* | CLI-only. Prepends UTF-8 BOM in `_print_csv` |
 
 All three are also cataloged in [`sdk-deviations.md`](sdk-deviations.md).
 
@@ -80,12 +135,12 @@ come from the docstring, not from `_make_command`), see
 > editing one, keep the other in sync; a follow-up may replace
 > architecture.md's table with a link to here.
 
-| Flag | SDK destination | Mapping mechanism | Flag-name parity |
-|---|---|---|---|
-| `--no-return-page-iterator` | `asana.Configuration.return_page_iterator = False` | Forwarded through `AsanaSession(return_page_iterator=False)` (`session.py:183`) | △ negated form of `return_page_iterator` (Click convention for booleans) |
-| `--page-limit N` | `asana.Configuration.page_limit` | Forwarded through `AsanaSession(page_limit=N)` (`session.py:185`) | ✓ matches `page_limit` |
-| `--item-limit N` | per-call kwarg `item_limit` | Forwarded as a method kwarg by `_make_command` | ✓ matches `item_limit` |
-| `--full-payload` | per-call kwarg `full_payload=True` | Forwarded as a method kwarg by `_make_command` | ✓ matches `full_payload` |
+| Flag | SDK destination | Mapping mechanism |
+|---|---|---|
+| `--return-page-iterator / --no-return-page-iterator` | `Configuration.return_page_iterator` | Forwarded through `AsanaSession(return_page_iterator=...)`. Tri-state toggle: unspecified leaves the SDK default (True) intact |
+| `--page-limit N` | `Configuration.page_limit` | Forwarded through `AsanaSession(page_limit=N)` |
+| `--item-limit N` | per-call kwarg `item_limit` | Forwarded as a method kwarg by `_make_command` |
+| `--full-payload` | per-call kwarg `full_payload=True` | Forwarded as a method kwarg by `_make_command` |
 
 ### v2 deprecation aliases (paginatable, deprecated in v3.0)
 
@@ -97,25 +152,3 @@ Scheduled for removal in a future release.
 | `--all-items` | *(no-op)* | *(none)* — walking every page is now the default; was a CLI-only feature in v2 with no SDK counterpart |
 | `--page-size N` | `--limit N` | SDK `opts["limit"]` (auto-generated from docstring) |
 | `--max-items N` | `--item-limit N` | per-call kwarg `item_limit` |
-
-## Naming parity status (summary)
-
-Rows above marked **✗** in "Flag-name parity":
-
-- `--ca-cert` → SDK `ssl_ca_cert`
-- `--temp-dir` → SDK `temp_folder_path`
-
-Rows marked **△** (parity-debatable):
-
-- `--no-verify-ssl` / `--no-return-page-iterator` — `--no-*` boolean
-  negation is a Click convention; the SDK property name itself is
-  preserved.
-- `--retries` — surfaces only one field of `Configuration.retry_strategy`
-  (`Retry.total`); SDK's full struct has no clean single-flag mapping.
-- `--timeout` — SDK kwarg `_request_timeout`. The leading underscore is
-  an SDK-internal convention; the public alternative `--request-timeout`
-  would track the SDK more closely.
-
-A future revision decides which of these to rename (parity-first stance
-per [constitution #1](principles.md#constitution)). This document
-records current state only.

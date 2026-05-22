@@ -35,14 +35,30 @@ Method-level introspection is **deferred per group**: top-level `asana-api --hel
 
 **What the manifest tracks**: only docstring-derived parameters (`op.opts_params`). Synthetic options invented inside `_make_command` (pagination control flags like `--page-limit` / `--item-limit` / `--no-return-page-iterator` / `--full-payload`, deprecation aliases like `--all-items`) do **not** appear in the manifest. Adding such a flag does not require regenerating the fixture.
 
-When bumping the `asana` dependency:
+## When bumping the `asana` dependency
 
 1. Edit `dependencies` in `pyproject.toml` to raise the lower bound.
 2. `uv sync` to install the new SDK.
 3. `uv run pytest` — failures in `test_cli_surface.py` print the diff.
 4. Review the diff; describe user-visible changes in `CHANGELOG.md`.
 5. Regenerate the fixture (exact command in `tests/test_cli_surface.py`'s module docstring).
-6. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`, and `CHANGELOG.md` together.
+6. Verify the no-op disclosure on `--username` / `--password` / `--api-key` /
+   `--api-key-prefix` still holds for the new SDK. These four flags are
+   exposed for `Configuration` parity but are inert in python-asana 5.2.4
+   because every `*Api` method passes
+   `auth_settings = ['personalAccessToken']` only. Re-check with:
+
+   ```bash
+   grep -rh "auth_settings = \[" .venv/lib/python*/site-packages/asana/api/ | sort -u
+   ```
+
+   If the output is anything other than the single
+   `auth_settings = ['personalAccessToken']` line, the disclosure in
+   the `--help` text (and `docs/cli-sdk-mapping.md` /
+   `docs/sdk-deviations.md`) needs to be updated to reflect what the
+   new SDK actually wires up. Bump the python-asana version pin in the
+   `--help` strings too.
+7. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`, and `CHANGELOG.md` together.
 
 ## Output formats
 
@@ -62,7 +78,7 @@ Paginatable commands (those whose SDK method has a `:param limit:`) expose every
 | `--offset T` | `opts["offset"]` |
 | `--page-limit N` | `Configuration.page_limit` |
 | `--item-limit N` | kwarg `item_limit=N` |
-| `--no-return-page-iterator` | `Configuration.return_page_iterator = False` |
+| `--return-page-iterator` / `--no-return-page-iterator` | `Configuration.return_page_iterator` |
 | `--full-payload` | kwarg `full_payload=True` |
 
 Default behavior is the SDK iterator path — the CLI walks every page and prints a flat list of items. `--all-items`, `--page-size`, `--max-items` are kept as v2 deprecation aliases that emit a stderr warning and forward to the equivalent flag above.

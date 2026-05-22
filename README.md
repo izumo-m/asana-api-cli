@@ -196,7 +196,7 @@ SDK behavior from the shell before writing any Python.
 | `--offset <TOKEN>` | `opts["offset"]` | Pagination cursor (the `next_page.offset` from a previous response) |
 | `--page-limit N` | `Configuration.page_limit` | Per-page size used when `--limit` is not set (SDK default: 100). Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
 | `--item-limit N` | kwarg `item_limit=N` | Stop after N items have been collected. Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
-| `--no-return-page-iterator` | `Configuration.return_page_iterator = False` | Disables auto-pagination; the command runs one HTTP request and outputs the raw `{data, next_page}` dict |
+| `--return-page-iterator` / `--no-return-page-iterator` | `Configuration.return_page_iterator` | Toggle for the SDK iterator path (SDK default: on). `--no-return-page-iterator` disables auto-pagination — the command runs one HTTP request and outputs the raw `{data, next_page}` dict |
 | `--full-payload` | kwarg `full_payload=True` | Same effect as `--no-return-page-iterator` (per-call kwarg form) |
 
 ```bash
@@ -240,18 +240,35 @@ asana-api tasks get-tasks --project <PID> --debug
 
 When the same option is given at multiple levels, the later one wins.
 
+Every non-extension flag below maps 1:1 to a property of
+`asana.Configuration` (or a per-call SDK kwarg) — see
+[`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md)
+for the exact destination of each.
+
 | Option | Description |
 |--------|-------------|
 | `--access-token TOKEN` | Asana personal access token (default: `$ASANA_ACCESS_TOKEN`) |
 | `--host URL` | Override API base URL (default: `https://app.asana.com/api/1.0`) |
 | `--proxy URL` | HTTP/HTTPS proxy URL |
-| `--no-verify-ssl` | Disable TLS certificate verification (insecure) |
-| `--ca-cert PATH` | Path to a PEM bundle of trusted CA certificates |
-| `--retries N` | Number of retries on 429/5xx responses (default: 5) |
-| `--timeout SECONDS` | Per-request timeout in seconds |
-| `--temp-dir PATH` | Directory for temporary downloads |
+| `--verify-ssl / --no-verify-ssl` | Toggle TLS certificate verification (SDK default: on) |
+| `--ssl-ca-cert PATH` | Path to a PEM bundle of trusted CA certificates |
+| `--cert-file PATH` | Client TLS certificate for mTLS |
+| `--key-file PATH` | Client TLS private key for mTLS |
+| `--assert-hostname / --no-assert-hostname` | Toggle urllib3 hostname assertion (SDK default: unset → urllib3 default) |
+| `--retry-strategy VALUE` | Override `Configuration.retry_strategy` fields. `VALUE` accepts shorthand (`total=5,backoff_factor=1.5,raise_on_status=false`), a JSON object (`'{"total":5,"status_forcelist":[429,500]}'`), or `@path` to a JSON file. List-typed fields require the JSON form. See [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#structured-value-format-api-key-api-key-prefix-retry-strategy) for the field list |
+| `--request-timeout SECONDS` | Per-request timeout in seconds |
+| `--connection-pool-maxsize N` | Max urllib3 connections cached per host (SDK default: cpu_count × 5) |
+| `--temp-folder-path PATH` | Directory for temporary downloads |
+| `--safe-chars-for-path-param S` | Extra characters treated as safe when percent-encoding path parameters |
+| `--logger-format FMT` | Python logging format string for the SDK loggers |
+| `--logger-file PATH` | Path the SDK loggers write to when set |
 | `--multibyte-filenames` | Emit RFC 5987 `filename*=UTF-8''<percent-encoded>` on multipart uploads so Asana decodes non-ASCII attachment filenames correctly |
-| `--debug` | Print HTTP request/response traces for troubleshooting (Authorization values are masked). |
+| `--debug` | Print HTTP request/response traces to stderr for troubleshooting (`Authorization` values are masked) |
+
+Asana only accepts Bearer-token authentication, so `--username`,
+`--password`, `--api-key`, and `--api-key-prefix` are also exposed for
+1:1 parity with `Configuration` but are inert as of python-asana 5.2.4
+— see the disclosure in [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#no-op-auth-properties).
 
 ## Development
 

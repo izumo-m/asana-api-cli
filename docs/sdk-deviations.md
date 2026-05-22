@@ -26,8 +26,8 @@ CLI-only flag means adding both a row here and the marker to the help
 text; removing one without the other is a bug.
 
 Flags that *remap* an existing SDK input to a different CLI surface
-(e.g. `--timeout` remapping the SDK's `_request_timeout` per-call kwarg
-to a global flag) are not marked — the underlying feature exists in the
+(e.g. `--request-timeout` remapping the SDK's `_request_timeout`
+per-call kwarg to a global flag) are not marked — the underlying feature exists in the
 SDK, only the surface differs. Behavior-only deviations such as the
 `--debug` token redaction (constitution #2) are likewise not marked,
 because the flag itself is SDK-derived; the deviation is enforced by a
@@ -41,12 +41,39 @@ stronger principle.
 | `_return_http_data_only` kwarg | Not exposed (v3.0) | The `(data, status, headers)` tuple shape is incompatible with the formatter pipeline (dict / list only). `--debug` exposes HTTP wire info as a workaround. Re-evaluation deferred to a future minor release | — |
 | `_preload_content` kwarg | Not exposed (v3.0) | Raw `urllib3.HTTPResponse` cannot be rendered by the formatter pipeline. Same reasoning as `_return_http_data_only` | — |
 
+## Configuration properties that cannot be set from the CLI
+
+Every other `asana.Configuration` property has a 1:1 CLI flag (see
+[`cli-sdk-mapping.md`](cli-sdk-mapping.md)). The properties below have
+no flag because their values are Python objects that cannot be
+constructed from a command-line string.
+
+| SDK property | Type | Reason |
+|---|---|---|
+| `Configuration.refresh_api_key_hook` | Python callable | Functions cannot be supplied as a CLI argument |
+| `Configuration.logger` | `dict[str, logging.Logger]` | Live `Logger` instances cannot be constructed from a CLI argument; tuning the log format / file is still possible via `--logger-format` / `--logger-file` |
+| `Configuration.logger_stream_handler` | `logging.StreamHandler` | Handler instance |
+| `Configuration.logger_file_handler` | `logging.FileHandler` | Handler instance |
+| `urllib3.util.retry.Retry.history` | `tuple[RequestHistory, ...]` | Retry's internal execution log, not a configuration knob — explicitly excluded from `--retry-strategy`'s field set |
+
+## Personal-access-token leakage and the no-op auth properties
+
+`--username`, `--password`, `--api-key`, and `--api-key-prefix` exist for
+1:1 parity with `Configuration.username` / `password` / `api_key` /
+`api_key_prefix`, but as of python-asana 5.2.4 they are **inert in the
+request path**: every generated `*Api` method passes
+`auth_settings = ['personalAccessToken']`, so only `Configuration.access_token`
+actually emits a header. The `--help` text of each of those four flags
+calls this out explicitly with a python-asana version pin so the
+disclosure is re-verified when the SDK is bumped (see
+[`architecture.md`](architecture.md#when-bumping-the-asana-dependency)).
+
 ## CLI behavior that differs from raw SDK behavior
 
 | Area | SDK behavior | CLI behavior | Reason | Code anchor |
 |---|---|---|---|---|
 | Personal access token in `--debug` output (`Authorization: Bearer <token>` / `Basic <token>`) | Printed verbatim by `http.client`'s wire-level `print()` when debug level is set; the SDK's own loggers do not log headers, but `http.client` does | The token is masked before the line is written (mask format: see `_default_mask_token`) | Constitution #2 (security overrides parity). Personal access tokens must never appear in user-visible output, so debug logs stay safe to paste into bug reports | `HttpClientAuthRedactor` and `_default_mask_token` in `redactor.py`; installed by `AsanaSession.__init__` when `--debug` is set |
-| `_request_timeout` per-call kwarg | Per-call kwarg on each SDK method | Surfaced as the global `--timeout` flag; the session wraps `ApiClient.call_api` to inject the kwarg | A CLI invocation is a single API call from the user's perspective, so a global flag is more ergonomic than a per-method surface | `--timeout` option in `cli.py:main`; `AsanaSession._install_timeout` in `session.py` |
+| `_request_timeout` per-call kwarg | Per-call kwarg on each SDK method | Surfaced as the global `--request-timeout` flag; the session wraps `ApiClient.call_api` to inject the kwarg | A CLI invocation is a single API call from the user's perspective, so a global flag is more ergonomic than a per-method surface | `--request-timeout` option in `cli.py:main`; `AsanaSession._install_timeout` in `session.py` |
 | Multipart filename with non-ASCII characters | Emits `filename="..."` only; non-ASCII bytes round-trip is undefined | Emits the RFC 5987 `filename*=UTF-8''<percent-encoded>` parameter alongside `filename=` when `--multibyte-filenames` is set | SDK gap: the Asana API needs RFC 5987 to round-trip non-ASCII attachment names. Opt-in so default upload semantics do not change silently | `--multibyte-filenames` option in `cli.py:main`; `MultibyteFilenameSupport` in `session.py` |
 | Default pagination return shape | `Configuration.return_page_iterator = True` produces a `PageIterator` (iterator object) | The iterator is walked to completion (`list(result)`) inside the session context and printed as a flat list of items | (1) An unwalked iterator cannot be serialized to stdout — the CLI must materialize a complete payload. (2) Materializing inside the session context keeps `HttpClientAuthRedactor` active for every page request; lazy iteration after the session exits would leak `Authorization` headers on pages 2..N (constitution #2 tie-in) | `_make_command` in `cli.py` (`paginatable and not no_return_page_iterator and not full_payload` branch) |
 | `--output FORMAT` | (Not in SDK — SDK returns Python objects) | Renders the response into one of `json` / `table` / `csv` / `text` (default `json` — canonical, lossless) | Shell ergonomics: CLI output must be text. The four formats serve different consumer types (machines via JSON, humans via table, spreadsheets via CSV, scripts via text) | `--output` option and `_format_output` in `formatter.py` |
