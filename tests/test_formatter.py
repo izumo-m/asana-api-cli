@@ -43,6 +43,12 @@ class TestToRows:
         assert _to_rows(42) is None
         assert _to_rows(None) is None
 
+    def test_mixed_list_returns_none(self) -> None:
+        # A mixed dict/scalar list has no clean column layout; the caller
+        # falls through to plain printing instead of crashing csv.DictWriter.
+        assert _to_rows([{"a": 1}, "scalar"]) is None
+        assert _to_rows([1, {"a": 1}]) is None
+
 
 # ---------------------------------------------------------------------------
 # _format_output

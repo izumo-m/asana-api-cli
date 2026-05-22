@@ -164,9 +164,13 @@ def _to_rows(data: Any) -> list[dict[str, Any]] | None:
     if isinstance(data, list):
         if not data:
             return []
-        if isinstance(data[0], dict):
+        # A jq yield can produce a mixed list (e.g. `[.data[0], .data | length]`)
+        # which has no clean column layout. Require homogeneous shape.
+        if all(isinstance(item, dict) for item in data):
             return data
-        return [{"value": v} for v in data]
+        if not any(isinstance(item, dict) for item in data):
+            return [{"value": v} for v in data]
+        return None
     if isinstance(data, dict):
         return [data]
     return None

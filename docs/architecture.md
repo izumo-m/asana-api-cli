@@ -4,17 +4,18 @@
 
 ## File layout
 
-The source tree is deliberately small. Five hand-written modules under `src/asana_api_cli/`:
+The source tree is deliberately small. Six hand-written modules under `src/asana_api_cli/`:
 
 | File | Role |
 |---|---|
 | `cli.py` | Runtime introspection + Click command tree |
-| `session.py` | SDK client + debug redactor + body/workspace resolution helpers |
+| `session.py` | SDK client + body/workspace resolution helpers; installs the debug redactor and the multibyte-filename patch |
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text`) + the `@formatted` decorator |
 | `click_ext.py` | `LazyGroup` for cheap top-level `--help`; mixins propagating global options to subgroups |
+| `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output (stdlib-only, copyable) |
 | `version.py` | `version_string()` used by `--version` |
 
-If you find yourself wanting to add a sixth module, reconsider — the current shape keeps cognitive load low. Add to one of these five unless the new concern truly doesn't fit any of them.
+If you find yourself wanting to add a seventh module, reconsider — the current shape keeps cognitive load low. Add to one of these six unless the new concern truly doesn't fit any of them.
 
 ## How commands are constructed
 

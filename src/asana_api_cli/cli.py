@@ -163,6 +163,9 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
             p.required = True
             p.description = p.description.replace("(required)", "").strip()
 
+    # `_PARAM_RE` already drops the SDK's `:param async_req bool` line (no
+    # colon after the type, so the regex never matches). Kept as a guard in
+    # case the SDK docstring format changes to the colon form.
     params.pop("async_req", None)
     return params
 

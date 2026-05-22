@@ -250,6 +250,7 @@ When the same option is given at multiple levels, the later one wins.
 | `--retries N` | Number of retries on 429/5xx responses (default: 5) |
 | `--timeout SECONDS` | Per-request timeout in seconds |
 | `--temp-dir PATH` | Directory for temporary downloads |
+| `--multibyte-filenames` | Emit RFC 5987 `filename*=UTF-8''<percent-encoded>` on multipart uploads so Asana decodes non-ASCII attachment filenames correctly |
 | `--debug` | Print HTTP request/response traces for troubleshooting (Authorization values are masked). |
 
 ## Development
