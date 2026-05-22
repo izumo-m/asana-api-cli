@@ -147,7 +147,7 @@ class _Runtime:
     debug: bool = False
     host: str | None = None
     proxy: str | None = None
-    verify_ssl: bool = True
+    verify_ssl: bool | None = None
     ssl_ca_cert: str | None = None
     request_timeout: float | None = None
     access_token: str | None = None
@@ -202,8 +202,11 @@ class AsanaSession:
             config.host = runtime.host
         if runtime.proxy:
             config.proxy = runtime.proxy  # pyright: ignore[reportAttributeAccessIssue]
-        if not runtime.verify_ssl:
-            config.verify_ssl = False
+        if runtime.verify_ssl is not None:
+            # Honor both sides of the toggle: --no-verify-ssl writes False,
+            # --verify-ssl writes True (pinning the SDK default even if the
+            # SDK later changes its own default).
+            config.verify_ssl = runtime.verify_ssl
         if runtime.ssl_ca_cert:
             config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.temp_folder_path:
@@ -230,10 +233,13 @@ class AsanaSession:
             config.api_key = runtime.api_key  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.api_key_prefix is not None:
             config.api_key_prefix = runtime.api_key_prefix  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.retry_strategy_overrides:
+        if runtime.retry_strategy_overrides is not None:
             # Start from the SDK's default Retry instance so unspecified
             # fields keep their python-asana defaults (e.g. total=5,
             # backoff_factor=2, status_forcelist=[429,500,502,503,504]).
+            # An empty dict (e.g. `--retry-strategy '{}'`) yields a copy
+            # with no field overridden — semantically a no-op, but still
+            # honored as "user did pass the flag".
             config.retry_strategy = config.retry_strategy.new(  # pyright: ignore[reportAttributeAccessIssue]
                 **runtime.retry_strategy_overrides
             )

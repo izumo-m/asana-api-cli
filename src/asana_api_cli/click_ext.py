@@ -111,7 +111,9 @@ def _make_global_option_params() -> list[click.Option]:
             callback=click_callback(schema=RETRY_FIELD_SCHEMA),
             help=(
                 "Override Configuration.retry_strategy fields. VALUE: "
-                "'k1=v1,k2=v2,...', JSON object, or @path."
+                "'k1=v1,k2=v2,...', JSON object, or @path. See urllib3 "
+                "Retry docs. List-typed fields (allowed_methods, "
+                "status_forcelist, remove_headers_on_redirect) require JSON."
             ),
         ),
         click.Option(
@@ -126,7 +128,7 @@ def _make_global_option_params() -> list[click.Option]:
             default=None,
             help=(
                 "Set Configuration.connection_pool_maxsize (SDK default: "
-                "cpu_count * 5). Max urllib3 connections per host."
+                "cpu_count * 5). Max urllib3 connections cached per host."
             ),
         ),
         click.Option(
@@ -140,7 +142,8 @@ def _make_global_option_params() -> list[click.Option]:
             help=(
                 "Set Configuration.username (HTTP Basic auth user). No-op "
                 "as of python-asana 5.2.4: SDK does not read it in the "
-                "request path; Asana only accepts Bearer-token auth."
+                "request path; Asana only accepts Bearer-token auth (see "
+                "--access-token)."
             ),
         ),
         click.Option(
@@ -158,7 +161,7 @@ def _make_global_option_params() -> list[click.Option]:
             help=(
                 "Set Configuration.api_key (dict). VALUE: "
                 "'k1=v1,k2=v2,...', JSON object, or @path. No-op as of "
-                "python-asana 5.2.4."
+                "python-asana 5.2.4: SDK only uses personalAccessToken auth."
             ),
         ),
         click.Option(

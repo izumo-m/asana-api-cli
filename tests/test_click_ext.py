@@ -26,7 +26,7 @@ def _reset_runtime() -> None:
     runtime.debug = False
     runtime.host = None
     runtime.proxy = None
-    runtime.verify_ssl = True
+    runtime.verify_ssl = None
     runtime.ssl_ca_cert = None
     runtime.cert_file = None
     runtime.key_file = None
@@ -43,6 +43,7 @@ def _reset_runtime() -> None:
     runtime.safe_chars_for_path_param = None
     runtime.logger_format = None
     runtime.logger_file = None
+    runtime.multibyte_filenames = False
 
 
 def _build_cli() -> click.Group:

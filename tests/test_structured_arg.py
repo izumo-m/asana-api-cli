@@ -147,6 +147,23 @@ class TestSchemaValidation:
         assert parse_structured_arg("redirect=false", schema=schema) == {"redirect": False}
         assert parse_structured_arg("redirect=5", schema=schema) == {"redirect": 5}
 
+    def test_tuple_type_numeric_str_returns_int_not_bool(self) -> None:
+        """``redirect=1`` must return int 1 (not bool True): urllib3's
+        ``Retry(redirect=1)`` means "allow one redirect" whereas
+        ``Retry(redirect=True)`` means "use the default redirect count" —
+        the bool-vs-int distinction is semantically load-bearing.
+        """
+        schema: dict[str, type | tuple[type, ...]] = {"redirect": (bool, int)}
+        result = parse_structured_arg("redirect=1", schema=schema)
+        assert result == {"redirect": 1}
+        assert isinstance(result["redirect"], int)
+        assert not isinstance(result["redirect"], bool)
+        # And the negative case for completeness.
+        result = parse_structured_arg("redirect=0", schema=schema)
+        assert result == {"redirect": 0}
+        assert isinstance(result["redirect"], int)
+        assert not isinstance(result["redirect"], bool)
+
 
 class TestRetryFieldSchema:
     """The exported ``RETRY_FIELD_SCHEMA`` is used by ``--retry-strategy``.

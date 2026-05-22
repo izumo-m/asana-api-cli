@@ -66,6 +66,7 @@ def _isolated_runtime(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             "safe_chars_for_path_param",
             "logger_format",
             "logger_file",
+            "multibyte_filenames",
         )
     }
     try:
