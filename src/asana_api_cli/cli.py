@@ -835,15 +835,18 @@ def main(
 
     runtime.host = host
     runtime.proxy = proxy
-    # Toggle is tri-state (--verify-ssl / --no-verify-ssl / unset). Only the
-    # explicit forms touch the runtime so the SDK default (True) survives
-    # when neither side of the toggle is on the command line.
+    # Both verify_ssl and assert_hostname are tri-state toggles (positive /
+    # negative / unset). Guard so the unset case does not clobber a value
+    # set by an earlier code path; symmetry with how the leaf-level
+    # propagation in ``click_ext._consume_global_options`` skips the
+    # default ``None``.
     if verify_ssl is not None:
         runtime.verify_ssl = verify_ssl
     runtime.ssl_ca_cert = ssl_ca_cert
     runtime.cert_file = cert_file
     runtime.key_file = key_file
-    runtime.assert_hostname = assert_hostname
+    if assert_hostname is not None:
+        runtime.assert_hostname = assert_hostname
     runtime.retry_strategy_overrides = retry_strategy_overrides
     runtime.request_timeout = request_timeout
     runtime.connection_pool_maxsize = connection_pool_maxsize

@@ -209,8 +209,10 @@ def _make_global_option_params() -> list[click.Option]:
             is_flag=True,
             default=False,
             help=(
-                "Emit RFC 5987 filename*=UTF-8'' on multipart uploads "
-                "(needed for non-ASCII attachment filenames)"
+                "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
+                "attachment uploads whose filename contains non-ASCII characters; "
+                "off by default to match the underlying SDK behavior. "
+                "[asana-api extension]"
             ),
         ),
     ]
