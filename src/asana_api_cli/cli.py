@@ -20,11 +20,11 @@ Translation rules:
   routed through ``resolve_body`` (supports ``@file`` / ``-`` / JSON string).
 * Paginatable methods (those with a ``limit`` doc-param) expose ``--limit``,
   ``--offset``, ``--page-limit``, ``--item-limit``,
-  ``--no-return-page-iterator``, and ``--full-payload``. Each maps 1:1 to a
-  python-asana SDK input (opts key, ``Configuration`` property, or method
-  kwarg) so the CLI works as a thin probe for SDK behavior. v2.x flags
-  ``--all-items``, ``--page-size``, and ``--max-items`` are retained as
-  deprecation aliases that warn and forward.
+  ``--return-page-iterator/--no-return-page-iterator``, and ``--full-payload``.
+  Each maps 1:1 to a python-asana SDK input (opts key, ``Configuration``
+  property, or method kwarg) so the CLI works as a thin probe for SDK
+  behavior. v2.x flags ``--all-items``, ``--page-size``, and ``--max-items``
+  are retained as deprecation aliases that warn and forward.
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
@@ -372,13 +372,13 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     if paginatable:
         options.append(
             click.Option(
-                ["--no-return-page-iterator", "no_return_page_iterator"],
-                is_flag=True,
-                default=False,
+                ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
+                default=None,
                 help=(
-                    "Set Configuration.return_page_iterator=False. The SDK "
-                    "returns a single {data, next_page} dict from one HTTP "
-                    "call instead of an iterator. Equivalent to --full-payload."
+                    "Set Configuration.return_page_iterator (default: True). "
+                    "--no-return-page-iterator makes the SDK return a single "
+                    "{data, next_page} dict from one HTTP call instead of an "
+                    "iterator. Equivalent to --full-payload."
                 ),
             )
         )
@@ -391,7 +391,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                     "Set Configuration.page_limit (SDK default: 100). Used "
                     "as the per-page size when --limit is not set and the "
                     "iterator path is taken (i.e. when neither "
-                    "--no-return-page-iterator nor --full-payload is given)."
+                    "--no-return-page-iterator nor --full-payload is set)."
                 ),
             )
         )
@@ -460,7 +460,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         # non-paginatable commands so the listify check below need not
         # re-guard them.
         if paginatable:
-            no_return_page_iterator = kwargs.pop("no_return_page_iterator")
+            return_page_iterator: bool | None = kwargs.pop("return_page_iterator")
             page_limit = kwargs.pop("page_limit")
             item_limit = kwargs.pop("item_limit")
             full_payload = kwargs.pop("full_payload")
@@ -468,9 +468,13 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             page_size = kwargs.pop("page_size")
             max_items = kwargs.pop("max_items")
         else:
-            no_return_page_iterator = full_payload = False
+            return_page_iterator = None
+            full_payload = False
             page_limit = item_limit = page_size = max_items = None
             all_items = False
+        # Unspecified ⇒ SDK default (True). Tracked as a separate name so
+        # the original tri-state survives for any future logic that needs it.
+        effective_iter = True if return_page_iterator is None else return_page_iterator
 
         # Deprecated v2.x aliases: warn and resolve to the v3 flag.
         if all_items:
@@ -516,7 +520,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
 
         if paginatable:
             session_ctx = AsanaSession.from_env(
-                return_page_iterator=not no_return_page_iterator,
+                return_page_iterator=effective_iter,
                 page_limit=page_limit,
             )
         else:
@@ -561,7 +565,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             # headers on every page past the first. Consume it here so every
             # page request lands while the session (and its redactor) is
             # still live.
-            if paginatable and not no_return_page_iterator and not full_payload:
+            if paginatable and effective_iter and not full_payload:
                 result = list(result)
             return result
 
@@ -634,17 +638,20 @@ class _ApiGroup(GroupWithGlobalOptions):
 )
 @click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")
 @click.option(
-    "--no-verify-ssl",
-    is_flag=True,
-    default=False,
-    help="Disable TLS certificate verification (insecure)",
+    "--verify-ssl/--no-verify-ssl",
+    "verify_ssl",
+    default=None,
+    help=(
+        "Set Configuration.verify_ssl (SDK default: True). Pass "
+        "--no-verify-ssl to disable TLS certificate verification (insecure)."
+    ),
 )
 @click.option(
-    "--ca-cert",
-    "ca_cert",
+    "--ssl-ca-cert",
+    "ssl_ca_cert",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Path to a PEM bundle of trusted CA certificates",
+    help="Set Configuration.ssl_ca_cert (path to a PEM bundle of trusted CA certs).",
 )
 @click.option(
     "--retries",
@@ -652,7 +659,13 @@ class _ApiGroup(GroupWithGlobalOptions):
     default=None,
     help="Number of retries on 429/5xx responses (default: 5)",
 )
-@click.option("--timeout", type=float, default=None, help="Per-request timeout in seconds")
+@click.option(
+    "--request-timeout",
+    "request_timeout",
+    type=float,
+    default=None,
+    help="Per-request timeout in seconds (SDK kwarg: _request_timeout).",
+)
 @click.option(
     "--access-token",
     "access_token",
@@ -660,11 +673,11 @@ class _ApiGroup(GroupWithGlobalOptions):
     help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)",
 )
 @click.option(
-    "--temp-dir",
-    "temp_dir",
+    "--temp-folder-path",
+    "temp_folder_path",
     default=None,
     type=click.Path(file_okay=False),
-    help="Directory for temporary downloads",
+    help="Set Configuration.temp_folder_path (directory for temporary downloads).",
 )
 @click.option(
     "--debug",
@@ -687,12 +700,12 @@ class _ApiGroup(GroupWithGlobalOptions):
 def main(
     host: str | None,
     proxy: str | None,
-    no_verify_ssl: bool,
-    ca_cert: str | None,
+    verify_ssl: bool | None,
+    ssl_ca_cert: str | None,
     retries: int | None,
-    timeout: float | None,
+    request_timeout: float | None,
     access_token: str | None,
-    temp_dir: str | None,
+    temp_folder_path: str | None,
     debug: bool,
     multibyte_filenames: bool,
 ) -> None:
@@ -710,13 +723,17 @@ def main(
 
     runtime.host = host
     runtime.proxy = proxy
-    runtime.verify_ssl = not no_verify_ssl
-    runtime.ssl_ca_cert = ca_cert
+    # Toggle is tri-state (--verify-ssl / --no-verify-ssl / unset). Only the
+    # explicit forms touch the runtime so the SDK default (True) survives
+    # when neither side of the toggle is on the command line.
+    if verify_ssl is not None:
+        runtime.verify_ssl = verify_ssl
+    runtime.ssl_ca_cert = ssl_ca_cert
     runtime.retries = retries
-    runtime.timeout = timeout
+    runtime.request_timeout = request_timeout
     if access_token:
         runtime.access_token = access_token
-    runtime.temp_dir = temp_dir
+    runtime.temp_folder_path = temp_folder_path
     runtime.debug = debug
     runtime.multibyte_filenames = multibyte_filenames
 

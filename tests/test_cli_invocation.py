@@ -52,9 +52,9 @@ def _isolated_runtime(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             "verify_ssl",
             "ssl_ca_cert",
             "retries",
-            "timeout",
+            "request_timeout",
             "access_token",
-            "temp_dir",
+            "temp_folder_path",
         )
     }
     try:

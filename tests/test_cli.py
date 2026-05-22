@@ -165,9 +165,17 @@ def create_task_cmd(tasks_cls: type, tasks_ops: list[_Operation]) -> click.Comma
 
 
 def _option_flags(cmd: click.Command) -> set[str]:
+    """Collect every command-line declaration accepted by the command.
+
+    For ``--x/--no-x`` toggles, both the positive (``--x`` in ``p.opts``)
+    and the negative (``--no-x`` in ``p.secondary_opts``) are reachable
+    on the command line, so both go into the returned set.
+    """
     flags: set[str] = set()
     for p in cmd.params:
         for decl in p.opts:
+            flags.add(decl)
+        for decl in getattr(p, "secondary_opts", []):
             flags.add(decl)
     return flags
 
@@ -254,12 +262,13 @@ class TestRootGroup:
         for expected in (
             "--host",
             "--proxy",
+            "--verify-ssl",
             "--no-verify-ssl",
-            "--ca-cert",
+            "--ssl-ca-cert",
             "--retries",
-            "--timeout",
+            "--request-timeout",
             "--access-token",
-            "--temp-dir",
+            "--temp-folder-path",
             "--debug",
         ):
             assert expected in flags

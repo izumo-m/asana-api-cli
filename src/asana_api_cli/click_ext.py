@@ -32,12 +32,12 @@ GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
     {
         "host",
         "proxy",
-        "no_verify_ssl",
-        "ca_cert",
+        "verify_ssl",
+        "ssl_ca_cert",
         "retries",
-        "timeout",
+        "request_timeout",
         "access_token",
-        "temp_dir",
+        "temp_folder_path",
         "debug",
         "multibyte_filenames",
     }
@@ -59,16 +59,19 @@ def _make_global_option_params() -> list[click.Option]:
         ),
         click.Option(["--proxy"], default=None, help="HTTP/HTTPS proxy URL"),
         click.Option(
-            ["--no-verify-ssl"],
-            is_flag=True,
-            default=False,
-            help="Disable TLS certificate verification (insecure)",
+            ["--verify-ssl/--no-verify-ssl", "verify_ssl"],
+            default=None,
+            help=(
+                "Set Configuration.verify_ssl (SDK default: True). Pass "
+                "--no-verify-ssl to disable TLS certificate verification "
+                "(insecure)."
+            ),
         ),
         click.Option(
-            ["--ca-cert", "ca_cert"],
+            ["--ssl-ca-cert", "ssl_ca_cert"],
             default=None,
             type=click.Path(exists=True, dir_okay=False),
-            help="Path to a PEM bundle of trusted CA certificates",
+            help="Set Configuration.ssl_ca_cert (path to a PEM bundle of trusted CA certs).",
         ),
         click.Option(
             ["--retries"],
@@ -77,10 +80,10 @@ def _make_global_option_params() -> list[click.Option]:
             help="Number of retries on 429/5xx responses (default: 5)",
         ),
         click.Option(
-            ["--timeout"],
+            ["--request-timeout", "request_timeout"],
             type=float,
             default=None,
-            help="Per-request timeout in seconds",
+            help="Per-request timeout in seconds (SDK kwarg: _request_timeout).",
         ),
         click.Option(
             ["--access-token", "access_token"],
@@ -88,10 +91,10 @@ def _make_global_option_params() -> list[click.Option]:
             help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)",
         ),
         click.Option(
-            ["--temp-dir", "temp_dir"],
+            ["--temp-folder-path", "temp_folder_path"],
             default=None,
             type=click.Path(file_okay=False),
-            help="Directory for temporary downloads",
+            help="Set Configuration.temp_folder_path (directory for temporary downloads).",
         ),
         click.Option(
             ["--debug"],
@@ -121,19 +124,22 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.host = value
     elif name == "proxy":
         runtime.proxy = value
-    elif name == "no_verify_ssl":
-        runtime.verify_ssl = not value
-    elif name == "ca_cert":
+    elif name == "verify_ssl":
+        # Click guarantees the toggle yields True / False once the user
+        # picked a side; the None default is filtered out by the
+        # COMMANDLINE-source check in ``_consume_global_options``.
+        runtime.verify_ssl = value
+    elif name == "ssl_ca_cert":
         runtime.ssl_ca_cert = value
     elif name == "retries":
         runtime.retries = value
-    elif name == "timeout":
-        runtime.timeout = value
+    elif name == "request_timeout":
+        runtime.request_timeout = value
     elif name == "access_token":
         if value:
             runtime.access_token = value
-    elif name == "temp_dir":
-        runtime.temp_dir = value
+    elif name == "temp_folder_path":
+        runtime.temp_folder_path = value
     elif name == "debug":
         runtime.debug = value
     elif name == "multibyte_filenames":

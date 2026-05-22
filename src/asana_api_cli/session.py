@@ -148,9 +148,9 @@ class _Runtime:
     verify_ssl: bool = True
     ssl_ca_cert: str | None = None
     retries: int | None = None
-    timeout: float | None = None
+    request_timeout: float | None = None
     access_token: str | None = None
-    temp_dir: str | None = None
+    temp_folder_path: str | None = None
     multibyte_filenames: bool = False
 
 
@@ -193,8 +193,8 @@ class AsanaSession:
             config.verify_ssl = False
         if runtime.ssl_ca_cert:
             config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.temp_dir:
-            config.temp_folder_path = runtime.temp_dir  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.temp_folder_path:
+            config.temp_folder_path = runtime.temp_folder_path  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.retries is not None:
             # Build a Retry with the user-specified total and python-asana's
             # default backoff/status_forcelist.
@@ -224,9 +224,10 @@ class AsanaSession:
         try:
             self._config = config
             self._client = asana.ApiClient(config)
-            # Configuration has no --timeout knob, so wrap call_api to inject it.
-            if runtime.timeout is not None:
-                self._install_timeout(runtime.timeout)
+            # Configuration has no per-request-timeout knob, so wrap
+            # call_api to inject it on every invocation.
+            if runtime.request_timeout is not None:
+                self._install_timeout(runtime.request_timeout)
         except Exception:
             # If construction fails after the patches were installed, the
             # caller never gets a session to call close() on, so undo the

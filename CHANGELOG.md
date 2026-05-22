@@ -14,8 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `--help` text of every CLI-only flag (`--multibyte-filenames`, `--output`, `--query`, `--csv-bom`) now ends with an `[asana-api extension]` marker so users can distinguish CLI additions from SDK-derived options at a glance. The convention is documented in [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
-- Paginatable commands now expose SDK pagination inputs 1:1 as CLI flags: `--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`. Each maps to a single `opts` key, `Configuration` property, or method kwarg of `python-asana`.
+- Paginatable commands now expose SDK pagination inputs 1:1 as CLI flags: `--limit`, `--offset`, `--page-limit`, `--item-limit`, `--return-page-iterator` / `--no-return-page-iterator`, `--full-payload`. Each maps to a single `opts` key, `Configuration` property, or method kwarg of `python-asana`.
 - Default output of paginatable commands changes shape: without any pagination flag, the command now walks every page automatically and returns a flat list of items. Pass `--no-return-page-iterator` or `--full-payload` to get a single `{data, next_page}` dict from one HTTP call instead.
+- **BREAKING**: Several global option flags were renamed so each one matches the underlying `asana.Configuration` property name 1:1 (no deprecation aliases are kept — this is a `develop-v3` major bump):
+  - `--temp-dir` → `--temp-folder-path` (`Configuration.temp_folder_path`)
+  - `--ca-cert` → `--ssl-ca-cert` (`Configuration.ssl_ca_cert`)
+  - `--timeout` → `--request-timeout` (per-call kwarg `_request_timeout`)
+  - `--no-verify-ssl` is now part of the toggle `--verify-ssl / --no-verify-ssl` (`Configuration.verify_ssl`). The old `--no-verify-ssl` form still works and behaves the same; passing `--verify-ssl` lets a script restore the SDK default on top of an existing `--no-verify-ssl` (e.g. from a wrapper).
+- Paginatable commands' `--no-return-page-iterator` flag is likewise now part of the toggle `--return-page-iterator / --no-return-page-iterator` (`Configuration.return_page_iterator`). Unspecified means the SDK default (iterator path) is used.
 
 ### Deprecated
 

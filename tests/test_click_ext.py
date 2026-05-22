@@ -29,9 +29,9 @@ def _reset_runtime() -> None:
     runtime.verify_ssl = True
     runtime.ssl_ca_cert = None
     runtime.retries = None
-    runtime.timeout = None
+    runtime.request_timeout = None
     runtime.access_token = None
-    runtime.temp_dir = None
+    runtime.temp_folder_path = None
 
 
 def _build_cli() -> click.Group:
@@ -143,12 +143,12 @@ class TestGlobalOptionNamesInventory:
             "debug",
             "host",
             "proxy",
-            "no_verify_ssl",
-            "ca_cert",
+            "verify_ssl",
+            "ssl_ca_cert",
             "retries",
-            "timeout",
+            "request_timeout",
             "access_token",
-            "temp_dir",
+            "temp_folder_path",
         ):
             assert name in GLOBAL_OPTION_NAMES
 
