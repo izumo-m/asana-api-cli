@@ -364,6 +364,155 @@ class TestGlobalOptionValidation:
         assert "Invalid value" in result.output or "is not in the range" in result.output
 
 
+# ---------------------------------------------------------------------------
+# Tri-state toggle plumbing (--verify-ssl/--no-verify-ssl,
+# --assert-hostname/--no-assert-hostname)
+# ---------------------------------------------------------------------------
+
+
+class TestTriStateToggles:
+    """Toggles with ``default=None`` must distinguish three states:
+    explicit True (user passed the positive form), explicit False (user
+    passed the negative form), and unset (user passed neither).
+
+    ``main()`` guards the unset case so the runtime singleton is not
+    clobbered with ``None`` over a value an earlier code path may have
+    set. ``AsanaSession`` mirrors the guard so it only writes
+    ``config.<prop>`` when the runtime carries an explicit value.
+
+    These tests invoke ``main`` with a subcommand path ending in
+    ``--help``: Click runs the root group callback (which writes to
+    ``runtime``) before descending into the subcommand, and the leaf
+    ``--help`` then short-circuits without touching the SDK — exactly
+    what we want for an option-plumbing test.
+    """
+
+    def test_verify_ssl_explicit_true(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.verify_ssl = None
+        result = CliRunner().invoke(main, ["--verify-ssl", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, result.output
+        assert runtime.verify_ssl is True
+
+    def test_no_verify_ssl_explicit_false(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.verify_ssl = None
+        result = CliRunner().invoke(main, ["--no-verify-ssl", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, result.output
+        assert runtime.verify_ssl is False
+
+    def test_verify_ssl_unset_does_not_clobber_existing_runtime_value(self) -> None:
+        """Regression for the round-1 review fix: when ``main()`` runs
+        without either side of the toggle, it must NOT overwrite a value
+        already in ``runtime.verify_ssl`` (set by a higher-priority source).
+        Pre-set to False, invoke main with no toggle on the command line;
+        the guard must leave it intact."""
+        from asana_api_cli.cli import main
+
+        runtime.verify_ssl = False
+        result = CliRunner().invoke(main, ["tasks", "get-task", "--help"])
+        assert result.exit_code == 0, result.output
+        assert runtime.verify_ssl is False
+
+    def test_assert_hostname_explicit_true(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.assert_hostname = None
+        result = CliRunner().invoke(main, ["--assert-hostname", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, result.output
+        assert runtime.assert_hostname is True
+
+    def test_no_assert_hostname_explicit_false(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.assert_hostname = None
+        result = CliRunner().invoke(main, ["--no-assert-hostname", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, result.output
+        assert runtime.assert_hostname is False
+
+    def test_assert_hostname_unset_does_not_clobber_existing_runtime_value(self) -> None:
+        """Same regression shape as ``verify_ssl`` — round-2 review added
+        the ``is not None`` guard to ``main()`` for symmetry."""
+        from asana_api_cli.cli import main
+
+        runtime.assert_hostname = True
+        result = CliRunner().invoke(main, ["tasks", "get-task", "--help"])
+        assert result.exit_code == 0, result.output
+        assert runtime.assert_hostname is True
+
+
+# ---------------------------------------------------------------------------
+# --retry-strategy reaches session.py and exercises Retry.new()
+# ---------------------------------------------------------------------------
+
+
+class TestRetryStrategyReachesSession:
+    """End-to-end plumbing for ``--retry-strategy``: the parsed overrides
+    must reach ``AsanaSession.__init__`` and be applied via
+    ``Configuration.retry_strategy.new(**overrides)``.
+
+    Tests invoke a leaf command built by ``_build_command`` so the
+    global-option pickup goes through ``CommandWithGlobalOptions.invoke``
+    (which is what powers the leaf-level reach of every global option)
+    rather than through ``main``. The retry override semantics are
+    identical in both paths.
+    """
+
+    def test_empty_object_still_invokes_new(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Regression for the round-1 fix changing ``if runtime...:`` to
+        ``if runtime... is not None:``. Passing ``--retry-strategy '{}'``
+        is an intentional "user did pass the flag" signal — the session
+        must call ``.new()`` (even though the resulting Retry is
+        observationally identical to the SDK default)."""
+        from urllib3.util.retry import Retry
+
+        new_kwargs_seen: list[dict[str, Any]] = []
+        original_new = Retry.new
+
+        def spy_new(self: Retry, **kw: Any) -> Retry:
+            new_kwargs_seen.append(kw)
+            return original_new(self, **kw)
+
+        monkeypatch.setattr(Retry, "new", spy_new)
+
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
+        result = CliRunner().invoke(cmd, ["--retry-strategy", "{}", "--task", "T"])
+        assert result.exit_code == 0, result.output
+        # The mocked SDK call never triggers urllib3's own retry path, so
+        # the only ``.new(**{})`` call here is the one in session.py — and
+        # it had to happen, otherwise the round-1 truthy-check regression
+        # would resurface.
+        assert {} in new_kwargs_seen
+
+    def test_overrides_propagate_to_configuration(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--retry-strategy total=7,backoff_factor=1.5`` reaches the SDK
+        as a ``retry_strategy`` instance with the overridden fields, while
+        list-typed defaults (``status_forcelist``) are preserved by the
+        ``.new()`` partial-override semantics."""
+        cmd = _build_command("TasksApi", "get_task")
+        captured: list[Any] = []
+
+        def patched(self_api: Any, *args: Any, **kwargs: Any) -> Any:
+            captured.append(self_api.api_client.configuration.retry_strategy)
+            return {"data": {}}
+
+        monkeypatch.setattr(asana.TasksApi, "get_task", patched)
+        result = CliRunner().invoke(
+            cmd,
+            ["--retry-strategy", "total=7,backoff_factor=1.5", "--task", "T"],
+        )
+        assert result.exit_code == 0, result.output
+        assert len(captured) == 1
+        rs = captured[0]
+        assert rs.total == 7
+        assert rs.backoff_factor == 1.5
+        # SDK default not touched by the partial override.
+        assert rs.status_forcelist == [429, 500, 502, 503, 504]
+
+
 class TestDebugRedactorLifecycle:
     """The http.client debug redactor must stay installed for the duration
     of every paginated request, including the lazy per-page HTTP calls that
