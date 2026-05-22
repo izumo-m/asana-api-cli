@@ -4,6 +4,8 @@ Catalog of every intentional gap between `asana-api-cli` and the
 `python-asana` SDK — unexposed SDK features, behavior changes, and
 CLI-only additions — framed by [Constitution #1 (parity is the top
 priority) and #2 (security overrides parity)](principles.md#constitution).
+Companion of [`cli-sdk-mapping.md`](cli-sdk-mapping.md), which catalogs
+the *parity* side (which built-in option maps to which SDK input).
 
 This document is **reference**, not required reading for code changes.
 The CLI surface snapshot test (`tests/test_cli_surface.py`) and per-feature

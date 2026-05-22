@@ -14,6 +14,7 @@
 
 - Project constitution & terminology → [`docs/principles.md`](docs/principles.md)
 - Editing `src/asana_api_cli/*.py` or any CLI surface change → [`docs/architecture.md`](docs/architecture.md)
+- Adding / renaming / changing the SDK mapping of a built-in (manually declared) CLI option → also update [`docs/cli-sdk-mapping.md`](docs/cli-sdk-mapping.md)
 - Release work (`chore: release X.Y.Z`) → [`docs/release.md`](docs/release.md)
 - Bumping the `asana` SDK version → [`docs/architecture.md`](docs/architecture.md) (CLI surface snapshot test)
 
