@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `--help` text of every CLI-only flag (`--multibyte-filenames`, `--output`, `--query`, `--csv-bom`) now ends with an `[asana-api extension]` marker so users can distinguish CLI additions from SDK-derived options at a glance. The convention is documented in [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 - Paginatable commands now expose SDK pagination inputs 1:1 as CLI flags: `--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`. Each maps to a single `opts` key, `Configuration` property, or method kwarg of `python-asana`.
 - Default output of paginatable commands changes shape: without any pagination flag, the command now walks every page automatically and returns a flat list of items. Pass `--no-return-page-iterator` or `--full-payload` to get a single `{data, next_page}` dict from one HTTP call instead.
 

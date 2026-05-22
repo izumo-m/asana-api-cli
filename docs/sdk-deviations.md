@@ -14,6 +14,23 @@ can tell intentional non-parity from an oversight.
 Code anchors below name functions/classes (not line numbers) so the
 references stay valid across edits.
 
+## Convention: `[asana-api extension]` marker
+
+Every CLI-only flag cataloged below (the rows whose "SDK behavior" column
+is "Not in SDK") ends its `--help` text with the `[asana-api extension]`
+marker so users can tell at a glance which options have no SDK
+counterpart. The catalog and the marker are kept in sync: adding a new
+CLI-only flag means adding both a row here and the marker to the help
+text; removing one without the other is a bug.
+
+Flags that *remap* an existing SDK input to a different CLI surface
+(e.g. `--timeout` remapping the SDK's `_request_timeout` per-call kwarg
+to a global flag) are not marked — the underlying feature exists in the
+SDK, only the surface differs. Behavior-only deviations such as the
+`--debug` token redaction (constitution #2) are likewise not marked,
+because the flag itself is SDK-derived; the deviation is enforced by a
+stronger principle.
+
 ## SDK features the CLI does not expose
 
 | SDK feature | CLI status | Reason | Code anchor |

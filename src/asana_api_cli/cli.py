@@ -680,7 +680,8 @@ class _ApiGroup(GroupWithGlobalOptions):
     help=(
         "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
         "attachment uploads whose filename contains non-ASCII characters; "
-        "off by default to match the underlying SDK behavior."
+        "off by default to match the underlying SDK behavior. "
+        "[asana-api extension]"
     ),
 )
 def main(
