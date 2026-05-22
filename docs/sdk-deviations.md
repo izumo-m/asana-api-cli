@@ -1,7 +1,8 @@
 # SDK deviations
 
-Catalog of where `asana-api-cli` deliberately diverges from the
-`python-asana` SDK, framed by [Constitution #1 (parity is the top
+Catalog of every intentional gap between `asana-api-cli` and the
+`python-asana` SDK — unexposed SDK features, behavior changes, and
+CLI-only additions — framed by [Constitution #1 (parity is the top
 priority) and #2 (security overrides parity)](principles.md#constitution).
 
 This document is **reference**, not required reading for code changes.
@@ -29,6 +30,9 @@ references stay valid across edits.
 | `_request_timeout` per-call kwarg | Per-call kwarg on each SDK method | Surfaced as the global `--timeout` flag; the session wraps `ApiClient.call_api` to inject the kwarg | A CLI invocation is a single API call from the user's perspective, so a global flag is more ergonomic than a per-method surface | `--timeout` option in `cli.py:main`; `AsanaSession._install_timeout` in `session.py` |
 | Multipart filename with non-ASCII characters | Emits `filename="..."` only; non-ASCII bytes round-trip is undefined | Emits the RFC 5987 `filename*=UTF-8''<percent-encoded>` parameter alongside `filename=` when `--multibyte-filenames` is set | SDK gap: the Asana API needs RFC 5987 to round-trip non-ASCII attachment names. Opt-in so default upload semantics do not change silently | `--multibyte-filenames` option in `cli.py:main`; `MultibyteFilenameSupport` in `session.py` |
 | Default pagination return shape | `Configuration.return_page_iterator = True` produces a `PageIterator` (iterator object) | The iterator is walked to completion (`list(result)`) inside the session context and printed as a flat list of items | (1) An unwalked iterator cannot be serialized to stdout — the CLI must materialize a complete payload. (2) Materializing inside the session context keeps `HttpClientAuthRedactor` active for every page request; lazy iteration after the session exits would leak `Authorization` headers on pages 2..N (constitution #2 tie-in) | `_make_command` in `cli.py` (`paginatable and not no_return_page_iterator and not full_payload` branch) |
+| `--output FORMAT` | (Not in SDK — SDK returns Python objects) | Renders the response into one of `json` / `table` / `csv` / `text` (default `json` — canonical, lossless) | Shell ergonomics: CLI output must be text. The four formats serve different consumer types (machines via JSON, humans via table, spreadsheets via CSV, scripts via text) | `--output` option and `_format_output` in `formatter.py` |
+| `--query EXPR` | (Not in SDK — SDK returns Python objects) | Pipes the response through jq with the given expression; each yield is rendered separately according to the chosen output format | Shell ergonomics: extracts fields / items inline without spawning a separate `jq` process. Mirrors `aws --query` | `--query` option and the `jqlib.all` call in `_format_output` in `formatter.py` |
+| `--csv-bom` | (Not in SDK — SDK returns Python objects) | Prepends a UTF-8 BOM to CSV output when set | Windows ergonomics: Excel on Windows needs the BOM to decode UTF-8 CSV correctly. Opt-in so Unix pipelines stay clean | `--csv-bom` option and `_print_csv` in `formatter.py` |
 | `--all-items` / `--page-size` / `--max-items` | (Not in SDK) | Accepted as v2-era deprecation aliases of the new flags. `--all-items` is a no-op (the new default already walks every page); `--page-size N` aliases `--limit N`; `--max-items N` aliases `--item-limit N`. Each emits a stderr warning, and the wrapper rejects passing both an alias and its replacement | v2 → v3 migration path; aliases scheduled for removal in v3.1+ | `_make_command` in `cli.py` (deprecation branches around `all_items` / `page_size` / `max_items`) |
 
 ## Decisions deferred (v3.0)

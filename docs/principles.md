@@ -2,7 +2,7 @@
 
 ## Constitution
 
-1. **Parity with the `python-asana` SDK is the top priority.** Both surface (group / command / option) and behavior (pagination semantics, authentication, error types, response shape) follow the SDK. CLI-specific additions are kept minimal — output formats, `--query`, Windows ergonomics. Intentional non-parity is cataloged in [`sdk-deviations.md`](sdk-deviations.md).
+1. **Parity with the `python-asana` SDK is the top priority.** Both surface (group / command / option) and behavior (pagination semantics, authentication, error types, response shape) follow the SDK. CLI-specific extensions or deviations are kept minimal and admitted only when (a) they close a concrete gap that an SDK-faithful CLI cannot fill (output formatting, shell ergonomics, SDK gaps, process-model mismatches), (b) SDK-faithful behavior remains reachable (by default, or via an opt-in flag), and (c) they are cataloged in [`sdk-deviations.md`](sdk-deviations.md) with their rationale.
 
 2. **Security overrides parity.** Credentials and other secrets must never appear in user-visible output, even when raw SDK behavior would expose them. The `--debug` HTTP log redaction (`HttpClientAuthRedactor` in `redactor.py`) is the canonical example: it deviates from the SDK's verbose HTTP logging to mask authorization headers.
 
