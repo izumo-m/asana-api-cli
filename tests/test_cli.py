@@ -590,8 +590,10 @@ class TestRootGroup:
         assert "$ASANA_ACCESS_TOKEN" in out
 
     def test_main_has_global_options(self) -> None:
+        from asana_api_cli.click_ext import _SDK_HAS_RETRY_STRATEGY
+
         flags = _option_flags(main)
-        for expected in (
+        expected_flags = [
             "--host",
             "--proxy",
             "--verify-ssl",
@@ -601,7 +603,6 @@ class TestRootGroup:
             "--key-file",
             "--assert-hostname",
             "--no-assert-hostname",
-            "--retry-strategy",
             "--request-timeout",
             "--connection-pool-maxsize",
             "--access-token",
@@ -615,7 +616,10 @@ class TestRootGroup:
             "--logger-file",
             "--debug",
             "--multibyte-filenames",
-        ):
+        ]
+        if _SDK_HAS_RETRY_STRATEGY:
+            expected_flags.append("--retry-strategy")
+        for expected in expected_flags:
             assert expected in flags, f"missing {expected}"
 
     def test_main_does_not_have_removed_options(self) -> None:

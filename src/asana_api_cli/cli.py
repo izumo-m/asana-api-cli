@@ -45,6 +45,7 @@ from asana_api_cli.click_ext import (
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
+    _SDK_HAS_RETRY_STRATEGY,
 )
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import (
@@ -803,6 +804,30 @@ _ROOT_EPILOG = (
 )
 
 
+def _retry_strategy_option(f: Any) -> Any:
+    """Apply the ``--retry-strategy`` decorator only when the installed
+    python-asana exposes ``Configuration.retry_strategy`` (added in 5.1).
+
+    On older SDKs the flag would crash at apply time, so we hide it
+    entirely — both from ``--help`` and from the parser, so users on
+    5.0.x get a clean ``no such option`` rather than a traceback.
+    """
+    if not _SDK_HAS_RETRY_STRATEGY:
+        return f
+    return click.option(
+        "--retry-strategy",
+        "retry_strategy_overrides",
+        default=None,
+        callback=click_callback(schema=RETRY_FIELD_SCHEMA),
+        help=(
+            "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', JSON "
+            "object, or @path. See urllib3 Retry docs. List-typed fields "
+            "(allowed_methods, status_forcelist, remove_headers_on_redirect) "
+            "require JSON. (Configuration.retry_strategy)"
+        ),
+    )(f)
+
+
 # Root uses LazyGroup so that the manually declared @click.option globals are
 # not duplicated by GroupWithGlobalOptions' auto-append behavior. Subgroups
 # (_ApiGroup) and leaf commands (CommandWithGlobalOptions) still auto-append
@@ -855,18 +880,7 @@ _ROOT_EPILOG = (
         "(Configuration.assert_hostname)"
     ),
 )
-@click.option(
-    "--retry-strategy",
-    "retry_strategy_overrides",
-    default=None,
-    callback=click_callback(schema=RETRY_FIELD_SCHEMA),
-    help=(
-        "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', JSON "
-        "object, or @path. See urllib3 Retry docs. List-typed fields "
-        "(allowed_methods, status_forcelist, remove_headers_on_redirect) "
-        "require JSON. (Configuration.retry_strategy)"
-    ),
-)
+@_retry_strategy_option
 @click.option(
     "--request-timeout",
     "request_timeout",
@@ -971,20 +985,24 @@ def main(
     cert_file: str | None,
     key_file: str | None,
     assert_hostname: bool | None,
-    retry_strategy_overrides: dict[str, Any] | None,
-    request_timeout: float | None,
-    connection_pool_maxsize: int | None,
-    access_token: str | None,
-    username: str | None,
-    password: str | None,
-    api_key: dict[str, str] | None,
-    api_key_prefix: dict[str, str] | None,
-    temp_folder_path: str | None,
-    safe_chars_for_path_param: str | None,
-    logger_format: str | None,
-    logger_file: str | None,
-    debug: bool,
-    multibyte_filenames: bool,
+    # ``retry_strategy_overrides`` and everything after it have ``= None``
+    # defaults so the ``--retry-strategy`` decorator can be skipped on
+    # python-asana <5.1 without click then trying to call this function
+    # without a value for that name.
+    retry_strategy_overrides: dict[str, Any] | None = None,
+    request_timeout: float | None = None,
+    connection_pool_maxsize: int | None = None,
+    access_token: str | None = None,
+    username: str | None = None,
+    password: str | None = None,
+    api_key: dict[str, str] | None = None,
+    api_key_prefix: dict[str, str] | None = None,
+    temp_folder_path: str | None = None,
+    safe_chars_for_path_param: str | None = None,
+    logger_format: str | None = None,
+    logger_file: str | None = None,
+    debug: bool = False,
+    multibyte_filenames: bool = False,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default

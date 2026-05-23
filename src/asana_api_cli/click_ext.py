@@ -26,11 +26,26 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
+import asana
 import click
 from click.core import ParameterSource
 
 from asana_api_cli.session import runtime
 from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
+
+
+# ``Configuration.retry_strategy`` was introduced in python-asana 5.1.
+# When wrapping an older SDK the property simply does not exist, so
+# exposing ``--retry-strategy`` would crash at apply time. Detect once at
+# import and gate every retry-strategy touchpoint (option declaration on
+# the root, mirror in ``_make_global_option_params``, the "Retry" group
+# under ``GLOBAL_OPTION_GROUPS``). The runtime applier in ``session.py``
+# already checks ``runtime.retry_strategy_overrides is not None`` so its
+# code path is naturally dead when the flag is hidden. We instantiate
+# ``Configuration()`` because ``retry_strategy`` is an instance attribute
+# set in ``__init__`` — checking ``hasattr`` on the class itself returns
+# False even on 5.2.4.
+_SDK_HAS_RETRY_STRATEGY: bool = hasattr(asana.Configuration(), "retry_strategy")
 
 
 GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
@@ -43,7 +58,7 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
         "TLS",
         ["verify_ssl", "ssl_ca_cert", "cert_file", "key_file", "assert_hostname"],
     ),
-    ("Retry", ["retry_strategy_overrides"]),
+    *([("Retry", ["retry_strategy_overrides"])] if _SDK_HAS_RETRY_STRATEGY else []),
     ("Logging / Debug", ["debug", "logger_format", "logger_file"]),
     ("Advanced", ["temp_folder_path", "safe_chars_for_path_param"]),
     ("CLI extension", ["multibyte_filenames"]),
@@ -122,17 +137,24 @@ def _make_global_option_params() -> list[click.Option]:
                 "default. (Configuration.assert_hostname)"
             ),
         ),
-        click.Option(
-            ["--retry-strategy", "retry_strategy_overrides"],
-            default=None,
-            callback=click_callback(schema=RETRY_FIELD_SCHEMA),
-            help=(
-                "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', "
-                "JSON object, or @path. See urllib3 Retry docs. List-typed "
-                "fields (allowed_methods, status_forcelist, "
-                "remove_headers_on_redirect) require JSON. "
-                "(Configuration.retry_strategy)"
-            ),
+        *(
+            [
+                click.Option(
+                    ["--retry-strategy", "retry_strategy_overrides"],
+                    default=None,
+                    callback=click_callback(schema=RETRY_FIELD_SCHEMA),
+                    help=(
+                        "Override urllib3 Retry fields. VALUE: "
+                        "'k1=v1,k2=v2,...', JSON object, or @path. See "
+                        "urllib3 Retry docs. List-typed fields "
+                        "(allowed_methods, status_forcelist, "
+                        "remove_headers_on_redirect) require JSON. "
+                        "(Configuration.retry_strategy)"
+                    ),
+                ),
+            ]
+            if _SDK_HAS_RETRY_STRATEGY
+            else []
         ),
         click.Option(
             ["--request-timeout", "request_timeout"],

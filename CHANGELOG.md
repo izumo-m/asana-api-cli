@@ -87,6 +87,21 @@ Combining a deprecated alias with its replacement (e.g.
   with an `[asana-api extension]` marker so users can distinguish CLI
   additions from SDK-derived options at a glance.
 
+### Compatibility
+
+- Lowered the `asana` SDK constraint from `>=5.2,<6` to `>=5.0.2,<6`.
+  The CLI surface is built from whatever `*Api` classes the installed
+  SDK exposes, so users on 5.0.x / 5.1.x get a working CLI with
+  fewer command groups (5.2 added 9 new ones: AccessRequests,
+  Budgets, Exports, ProjectPortfolioSettings, Rates, Reactions,
+  Roles, TimeTrackingCategories, TimesheetApprovalStatuses).
+  `--retry-strategy` — which relies on `Configuration.retry_strategy`
+  introduced in python-asana 5.1 — is hidden from `--help` (and
+  rejected as `No such option`) on 5.0.x; on 5.1+ it works as before.
+  5.0.0 is excluded because its `api_client.call_api` had a
+  `'list' object has no attribute 'items'` bug on no-opts endpoints
+  (`delete-*` etc.) that was fixed in 5.0.2.
+
 ### Fixed
 
 - On Windows, `--body -` (read JSON body from stdin) now decodes

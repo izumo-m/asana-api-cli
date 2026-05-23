@@ -21,7 +21,7 @@ dependencies = [
     "click>=8.0",
     "jq>=1.6",
     "tabulate>=0.9",
-    "asana>=5.2,<6",
+    "asana>=5.0.2,<6",
 ]
 
 [project.urls]

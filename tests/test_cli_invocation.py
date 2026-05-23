@@ -24,6 +24,7 @@ import click
 import pytest
 
 from asana_api_cli.cli import _enumerate_api_classes, _make_command, _operations_for
+from asana_api_cli.click_ext import _SDK_HAS_RETRY_STRATEGY
 from asana_api_cli.session import runtime
 
 from _cli_runner import full_output, make_runner
@@ -341,6 +342,10 @@ class TestGlobalOptionValidation:
         # but never with a parser error.
         assert "Invalid value" not in full_output(result)
 
+    @pytest.mark.skipif(
+        not _SDK_HAS_RETRY_STRATEGY,
+        reason="--retry-strategy is hidden on python-asana <5.1",
+    )
     def test_retry_strategy_rejects_unknown_field(self) -> None:
         """Unknown retry fields must be rejected before any SDK call."""
         from asana_api_cli.cli import main
@@ -349,6 +354,10 @@ class TestGlobalOptionValidation:
         assert result.exit_code != 0
         assert "Unknown field" in full_output(result)
 
+    @pytest.mark.skipif(
+        not _SDK_HAS_RETRY_STRATEGY,
+        reason="--retry-strategy is hidden on python-asana <5.1",
+    )
     def test_retry_strategy_list_field_in_shorthand_rejected(self) -> None:
         """List-typed fields require the JSON form."""
         from asana_api_cli.cli import main
@@ -451,6 +460,10 @@ class TestTriStateToggles:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    not _SDK_HAS_RETRY_STRATEGY,
+    reason="--retry-strategy is hidden on python-asana <5.1",
+)
 class TestRetryStrategyReachesSession:
     """End-to-end plumbing for ``--retry-strategy``: the parsed overrides
     must reach ``AsanaSession.__init__`` and be applied via

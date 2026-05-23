@@ -217,7 +217,9 @@ class TestShellCompletion:
 
 class TestGlobalOptionNamesInventory:
     def test_covers_runtime_fields(self) -> None:
-        for name in (
+        from asana_api_cli.click_ext import _SDK_HAS_RETRY_STRATEGY
+
+        expected_names = [
             "debug",
             "host",
             "proxy",
@@ -226,7 +228,6 @@ class TestGlobalOptionNamesInventory:
             "cert_file",
             "key_file",
             "assert_hostname",
-            "retry_strategy_overrides",
             "request_timeout",
             "connection_pool_maxsize",
             "access_token",
@@ -239,7 +240,10 @@ class TestGlobalOptionNamesInventory:
             "logger_format",
             "logger_file",
             "multibyte_filenames",
-        ):
+        ]
+        if _SDK_HAS_RETRY_STRATEGY:
+            expected_names.append("retry_strategy_overrides")
+        for name in expected_names:
             assert name in GLOBAL_OPTION_NAMES
 
     def test_every_global_belongs_to_exactly_one_group(self) -> None:
