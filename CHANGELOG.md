@@ -7,44 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Breaking changes (v2 → v3)
 
-- `--multibyte-filenames` global flag for attachment uploads. When set, the CLI emits the RFC 5987 `filename*=UTF-8''<percent-encoded>` parameter of `Content-Disposition` in addition to the standard `filename=`, so Asana correctly decodes non-ASCII filenames (Japanese, Cyrillic, Greek, etc.). Off by default to preserve strict SDK parity — the upstream `python-asana` SDK does not emit `filename*=`, which has been a known gap since 2022 ([Asana Forum thread](https://forum.asana.com/t/attachment-names-uploaded-with-asana-api-are-garbled-on-asanaweb/286200)).
-- Eleven new global options that expose previously-unreachable `asana.Configuration` properties, so every settable Configuration property now has a 1:1 CLI flag:
-  - `--cert-file PATH` / `--key-file PATH` (`Configuration.cert_file` / `Configuration.key_file`) for client-side mTLS.
-  - `--assert-hostname` / `--no-assert-hostname` tri-state toggle (`Configuration.assert_hostname`).
-  - `--connection-pool-maxsize N` (`Configuration.connection_pool_maxsize`).
-  - `--safe-chars-for-path-param S` (`Configuration.safe_chars_for_path_param`).
-  - `--logger-format FMT` / `--logger-file PATH` (`Configuration.logger_format` / `Configuration.logger_file`).
-  - `--username USER` / `--password PASS` (`Configuration.username` / `Configuration.password`) — **no-op as of python-asana 5.2.4**: the SDK only uses Bearer-token auth, so these properties stay inert; the `--help` text says so explicitly.
-  - `--api-key VALUE` / `--api-key-prefix VALUE` (`Configuration.api_key` / `Configuration.api_key_prefix`) — same no-op caveat. VALUE accepts shorthand `k=v,k=v`, a JSON object `{...}`, or `@path` to a JSON file.
-- `--retry-strategy VALUE` global flag replacing the old `--retries N`. Overrides any field of `Configuration.retry_strategy` (16 user-settable `urllib3.util.retry.Retry` fields); shorthand handles scalar fields and list-typed fields (`allowed_methods`, `status_forcelist`, `remove_headers_on_redirect`) require the JSON form. Unspecified fields keep their python-asana defaults.
+Several global flags renamed for 1:1 parity with `asana.Configuration`
+property names. No deprecation aliases:
 
-### Changed
+- `--temp-dir` → `--temp-folder-path`
+- `--ca-cert` → `--ssl-ca-cert`
+- `--timeout` → `--request-timeout`
+- `--retries N` → `--retry-strategy total=N`
 
-- `--version` now includes the installed `click` version alongside `python-asana` (e.g. `asana-api, version 2.1.1 (python-asana 5.2.4, click 8.3.3)`), making bug reports unambiguous when behavior depends on the click release.
-- The `--help` text of every CLI-only flag (`--multibyte-filenames`, `--output`, `--query`, `--csv-bom`) now ends with an `[asana-api extension]` marker so users can distinguish CLI additions from SDK-derived options at a glance. The convention is documented in [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
-- Paginatable commands now expose SDK pagination inputs 1:1 as CLI flags: `--limit`, `--offset`, `--page-limit`, `--item-limit`, `--return-page-iterator` / `--no-return-page-iterator`, `--full-payload`. Each maps to a single `opts` key, `Configuration` property, or method kwarg of `python-asana`.
-- Default output of paginatable commands changes shape: without any pagination flag, the command now walks every page automatically and returns a flat list of items. Pass `--no-return-page-iterator` or `--full-payload` to get a single `{data, next_page}` dict from one HTTP call instead.
-- **BREAKING**: Several global option flags were renamed so each one matches the underlying `asana.Configuration` property name 1:1 (no deprecation aliases are kept — this is a `develop-v3` major bump):
-  - `--temp-dir` → `--temp-folder-path` (`Configuration.temp_folder_path`)
-  - `--ca-cert` → `--ssl-ca-cert` (`Configuration.ssl_ca_cert`)
-  - `--timeout` → `--request-timeout` (per-call kwarg `_request_timeout`)
-  - `--retries N` → `--retry-strategy total=N` (subsumed by the new structured `--retry-strategy` flag that can override every `urllib3.Retry` field).
-  - `--no-verify-ssl` is now part of the toggle `--verify-ssl / --no-verify-ssl` (`Configuration.verify_ssl`). The old `--no-verify-ssl` form still works and behaves the same; passing `--verify-ssl` lets a script restore the SDK default on top of an existing `--no-verify-ssl` (e.g. from a wrapper).
-- Paginatable commands' `--no-return-page-iterator` flag is likewise now part of the toggle `--return-page-iterator / --no-return-page-iterator` (`Configuration.return_page_iterator`). Unspecified means the SDK default (iterator path) is used.
+Default behavior of paginatable commands (e.g. `tasks get-tasks`) changed:
+**now walks every page automatically** and returns a flat JSON list of
+items. Previously the default was a single page. To restore the
+single-page behavior, pass `--full-payload`.
 
 ### Deprecated
 
-- `--all-items` is deprecated and is now a no-op (walking every page is the new default behavior).
-- `--page-size N` is deprecated; use `--limit N` instead.
-- `--max-items N` is deprecated; use `--item-limit N` instead.
-- Each of the above emits a stderr warning when used. Combining a deprecated alias with the equivalent new flag (e.g. `--page-size` with `--limit`) is rejected with a usage error. The aliases will be removed in a future release.
+The following v2.x flags still work but emit a stderr warning and will
+be removed in a future release:
+
+- `--all-items` — now a no-op (walking every page is the default)
+- `--page-size N` → use `--limit N`
+- `--max-items N` → use `--item-limit N`
+
+Combining a deprecated alias with its replacement (e.g.
+`--page-size 50 --limit 100`) is rejected with a usage error.
+
+### Added
+
+- `--multibyte-filenames` global flag: emits RFC 5987
+  `filename*=UTF-8''…` on multipart uploads so Asana correctly decodes
+  non-ASCII attachment filenames (Japanese, Cyrillic, Greek, etc.).
+  Off by default to match the underlying SDK behavior
+  ([Asana Forum context](https://forum.asana.com/t/attachment-names-uploaded-with-asana-api-are-garbled-on-asanaweb/286200)).
+- `--retry-strategy VALUE` global flag (replaces `--retries N`):
+  overrides any field of `urllib3.util.retry.Retry`. Accepts shorthand
+  `total=5,backoff_factor=1.5`, a JSON object, or `@path/to/file.json`.
+  See [`docs/cli-sdk-mapping.md`](docs/cli-sdk-mapping.md).
+- Eleven new global flags for previously-unreachable `Configuration`
+  properties (full 1:1 SDK parity):
+  - mTLS: `--cert-file PATH`, `--key-file PATH`
+  - TLS: `--assert-hostname / --no-assert-hostname` (tri-state)
+  - Networking: `--connection-pool-maxsize N`,
+    `--safe-chars-for-path-param S`
+  - Logging: `--logger-format FMT`, `--logger-file PATH`
+  - No-op (parity only, inert in python-asana 5.2.4):
+    `--username`, `--password`, `--api-key`, `--api-key-prefix`
+- New pagination flags (1:1 with the SDK):
+  - `--limit N` — per-page size (1-100)
+  - `--page-limit N` — same as `--limit` via Configuration (parity flag)
+  - `--item-limit N` — total cap on items returned
+  - `--full-payload` / `--no-return-page-iterator` — get one
+    `{data, next_page}` dict from one HTTP call instead of walking pages
+- `--version` now shows the installed `click` version alongside
+  `python-asana`
+  (`asana-api, version 3.0.0 (python-asana 5.2.4, click 8.3.3)`).
+
+### Changed
+
+- `--help` overhauled for clarity: global options grouped by category;
+  command groups carry meaningful one-line descriptions; long SDK
+  descriptions no longer truncated; pagination has a consolidated
+  "Pagination:" epilog explaining the two modes (iterator vs single
+  payload); root help ends with a usage-examples block; subcommand
+  help shows global options in compact form (no longer repeats the
+  full ~70 lines). See `asana-api --help` for the new shape.
+- `--task GID` (and every `*_gid` positional) renders with a `GID`
+  metavar and inline example (`Task GID, e.g. 1234567890.`), making
+  it obvious that Asana wants the numeric ID rather than a name.
+- `--body JSON` on POST/PUT commands always shows the input-format
+  hint (`Accepts inline JSON, @path/to/file, or - (stdin). Wrap
+  payload in {"data": {...}}.`).
+- `--no-verify-ssl` is now part of a toggle
+  `--verify-ssl / --no-verify-ssl`. The old `--no-verify-ssl` form
+  still works unchanged.
+- The `--help` text of every CLI-only flag
+  (`--multibyte-filenames`, `--output`, `--query`, `--csv-bom`) ends
+  with an `[asana-api extension]` marker so users can distinguish CLI
+  additions from SDK-derived options at a glance.
 
 ### Fixed
 
-- On Windows, `--body -` (read JSON body from stdin) now decodes input as UTF-8 instead of the locale code page (e.g. cp932 on Japanese Windows). Previously, piping a UTF-8 JSON payload with non-ASCII characters could be silently misdecoded into garbled text or surface as an opaque JSON parse error.
-- `--output csv` and `--output table` no longer crash when `--query` yields a mixed list whose first element is a dict and later elements are not (e.g. `--query '[.data[0], .data | length]'`); the CLI now falls back to plain printing for such non-tabular yields.
+- On Windows, `--body -` (read JSON body from stdin) now decodes
+  input as UTF-8 instead of the locale code page (e.g. cp932 on
+  Japanese Windows).
+- `--output csv` and `--output table` no longer crash when `--query`
+  yields a mixed list whose first element is a dict and later
+  elements are not (e.g. `--query '[.data[0], .data | length]'`).
 
 ## [2.1.1] - 2026-05-19
 

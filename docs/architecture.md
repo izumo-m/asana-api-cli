@@ -58,7 +58,24 @@ Method-level introspection is **deferred per group**: top-level `asana-api --hel
    `docs/sdk-deviations.md`) needs to be updated to reflect what the
    new SDK actually wires up. Bump the python-asana version pin in the
    `--help` strings too.
-7. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`, and `CHANGELOG.md` together.
+7. *(Optional, soft improvement)* Review the group descriptions when
+   the SDK adds or removes resource groups:
+   - [`docs/api-groups.md`](api-groups.md) is the authoritative table
+     (CLI group → Asana reference link → short description).
+   - `_GROUP_DESCRIPTIONS` in `src/asana_api_cli/cli.py` mirrors that
+     table; the `test_group_descriptions_match_docs` test asserts the
+     two stay in sync.
+   - Groups that are new in this SDK render with a fallback English
+     name derived from the class name (e.g. `FooBar` → "Foo bar") so
+     the CLI keeps working without action. Add curated entries to both
+     the doc and the dict for richer wording.
+   - Removed groups can stay in both places — they're harmless dead
+     data and re-engage on downgrades.
+   - Source descriptions from
+     [developers.asana.com/llms.txt](https://developers.asana.com/llms.txt)
+     (an AI-friendly Markdown index of the reference) and/or the
+     individual `/reference/<group>.md` pages.
+8. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`, and `CHANGELOG.md` together.
 
 ## Output formats
 

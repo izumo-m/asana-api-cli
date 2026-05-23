@@ -194,9 +194,9 @@ SDK behavior from the shell before writing any Python.
 | (none) | — | SDK default: walks every page automatically and outputs a flat JSON list of items |
 | `--limit N` | `opts["limit"]` | Per-page size sent to the server (Asana API requires 1-100) |
 | `--offset <TOKEN>` | `opts["offset"]` | Pagination cursor (the `next_page.offset` from a previous response) |
-| `--page-limit N` | `Configuration.page_limit` | Per-page size used when `--limit` is not set (SDK default: 100). Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
+| `--page-limit N` | `Configuration.page_limit` | Same as `--limit` via Configuration (default: 100). Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
 | `--item-limit N` | kwarg `item_limit=N` | Stop after N items have been collected. Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
-| `--return-page-iterator` / `--no-return-page-iterator` | `Configuration.return_page_iterator` | Toggle for the SDK iterator path (SDK default: on). `--no-return-page-iterator` disables auto-pagination — the command runs one HTTP request and outputs the raw `{data, next_page}` dict |
+| `--return-page-iterator` / `--no-return-page-iterator` | `Configuration.return_page_iterator` | Toggle the SDK page iterator (default: enabled). `--no-return-page-iterator` disables auto-pagination — the command runs one HTTP request and outputs the raw `{data, next_page}` dict |
 | `--full-payload` | kwarg `full_payload=True` | Same effect as `--no-return-page-iterator` (per-call kwarg form) |
 
 ```bash
@@ -250,14 +250,14 @@ for the exact destination of each.
 | `--access-token TOKEN` | Asana personal access token (default: `$ASANA_ACCESS_TOKEN`) |
 | `--host URL` | Override API base URL (default: `https://app.asana.com/api/1.0`) |
 | `--proxy URL` | HTTP/HTTPS proxy URL |
-| `--verify-ssl / --no-verify-ssl` | Toggle TLS certificate verification (SDK default: on) |
+| `--verify-ssl / --no-verify-ssl` | Toggle TLS certificate verification (default: True) |
 | `--ssl-ca-cert PATH` | Path to a PEM bundle of trusted CA certificates |
 | `--cert-file PATH` | Client TLS certificate for mTLS |
 | `--key-file PATH` | Client TLS private key for mTLS |
-| `--assert-hostname / --no-assert-hostname` | Toggle urllib3 hostname assertion (SDK default: unset → urllib3 default) |
+| `--assert-hostname / --no-assert-hostname` | Toggle urllib3 hostname assertion (tri-state: unspecified → urllib3 default) |
 | `--retry-strategy VALUE` | Override `Configuration.retry_strategy` fields. `VALUE` accepts shorthand (`total=5,backoff_factor=1.5,raise_on_status=false`), a JSON object (`'{"total":5,"status_forcelist":[429,500]}'`), or `@path` to a JSON file. List-typed fields require the JSON form. See [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#structured-value-format-api-key-api-key-prefix-retry-strategy) for the field list |
 | `--request-timeout SECONDS` | Per-request timeout in seconds |
-| `--connection-pool-maxsize N` | Max urllib3 connections cached per host (SDK default: cpu_count × 5) |
+| `--connection-pool-maxsize N` | Max urllib3 connections cached per host (default: cpu_count × 5) |
 | `--temp-folder-path PATH` | Directory for temporary downloads |
 | `--safe-chars-for-path-param S` | Extra characters treated as safe when percent-encoding path parameters |
 | `--logger-format FMT` | Python logging format string for the SDK loggers |
