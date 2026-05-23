@@ -21,13 +21,14 @@ from __future__ import annotations
 import json
 
 import pytest
-from click.testing import CliRunner
 
 from asana_api_cli.cli import main
 
+from _cli_runner import make_runner
+
 
 def _run(*args: str) -> "tuple[int, str, str]":
-    result = CliRunner().invoke(main, list(args))
+    result = make_runner().invoke(main, list(args))
     return result.exit_code, result.stdout, result.stderr
 
 

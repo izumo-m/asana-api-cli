@@ -15,9 +15,10 @@ from __future__ import annotations
 import json
 
 import pytest
-from click.testing import CliRunner
 
 from asana_api_cli.cli import main
+
+from _cli_runner import full_output, make_runner
 
 
 @pytest.mark.vcr
@@ -25,9 +26,11 @@ def test_workspaces_get_workspace(workspace_gid: str) -> None:
     """Get a single workspace by GID — exercises ${WORKSPACE_GID} templating
     in the request path AND in the response body.
     """
-    result = CliRunner().invoke(main, ["workspaces", "get-workspace", "--workspace", workspace_gid])
-    assert result.exit_code == 0, result.output
-    ws = json.loads(result.output)
+    result = make_runner().invoke(
+        main, ["workspaces", "get-workspace", "--workspace", workspace_gid]
+    )
+    assert result.exit_code == 0, full_output(result)
+    ws = json.loads(full_output(result))
     assert ws["resource_type"] == "workspace"
     # Returned gid round-trips to whatever we asked for.
     assert ws["gid"] == workspace_gid
@@ -46,9 +49,9 @@ def test_workspaces_get_workspaces(workspace_gid: str) -> None:
     test workspace" assertion holds regardless of which account recorded
     the cassette.
     """
-    result = CliRunner().invoke(main, ["workspaces", "get-workspaces"])
-    assert result.exit_code == 0, result.output
-    workspaces = json.loads(result.output)
+    result = make_runner().invoke(main, ["workspaces", "get-workspaces"])
+    assert result.exit_code == 0, full_output(result)
+    workspaces = json.loads(full_output(result))
     assert isinstance(workspaces, list)
     for ws in workspaces:
         assert ws.get("resource_type") == "workspace"

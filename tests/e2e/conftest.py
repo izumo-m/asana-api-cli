@@ -39,10 +39,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
-from click.testing import CliRunner
 from vcr.serializers import yamlserializer
 
 from asana_api_cli.cli import main
+
+from _cli_runner import full_output, make_runner
 
 WORKSPACE_ENV = "ASANA_PYTEST_WORKSPACE"
 
@@ -236,7 +237,7 @@ PAGINATION_SMALL_PROJECT_NAME = "pagination-test-small"
 
 def _discover_project_gid(workspace_gid: str, name: str) -> str:
     """Look up a project's gid by name within the workspace."""
-    result = CliRunner().invoke(
+    result = make_runner().invoke(
         main,
         [
             "projects",
@@ -248,8 +249,8 @@ def _discover_project_gid(workspace_gid: str, name: str) -> str:
         ],
     )
     if result.exit_code != 0:
-        pytest.fail(f"failed to list projects: {result.output}")
-    projects = json.loads(result.output)
+        pytest.fail(f"failed to list projects: {full_output(result)}")
+    projects = json.loads(full_output(result))
     target = next((p for p in projects if p.get("name") == name), None)
     if target is None:
         pytest.skip(
@@ -309,7 +310,7 @@ def created_projects() -> Generator[list[str], None, None]:
     gids: list[str] = []
     yield gids
     for gid in gids:
-        CliRunner().invoke(main, ["projects", "delete-project", "--project", gid])
+        make_runner().invoke(main, ["projects", "delete-project", "--project", gid])
 
 
 @pytest.fixture
@@ -319,7 +320,7 @@ def created_tasks() -> Generator[list[str], None, None]:
     gids: list[str] = []
     yield gids
     for gid in gids:
-        CliRunner().invoke(main, ["tasks", "delete-task", "--task", gid])
+        make_runner().invoke(main, ["tasks", "delete-task", "--task", gid])
 
 
 @pytest.fixture
@@ -329,7 +330,7 @@ def created_attachments() -> Generator[list[str], None, None]:
     gids: list[str] = []
     yield gids
     for gid in gids:
-        CliRunner().invoke(main, ["attachments", "delete-attachment", "--attachment", gid])
+        make_runner().invoke(main, ["attachments", "delete-attachment", "--attachment", gid])
 
 
 @pytest.fixture
@@ -339,7 +340,7 @@ def attachment_parent_task(pagination_project_gid: str, created_tasks: list[str]
     Cleanup is handled by the ``created_tasks`` fixture's teardown.
     """
     name = "pytest-e2e-attachment-parent"
-    result = CliRunner().invoke(
+    result = make_runner().invoke(
         main,
         [
             "tasks",

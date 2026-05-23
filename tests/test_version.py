@@ -12,13 +12,14 @@ def test_version_string_format():
 
 
 def test_version_cli(tmp_path):
-    from click.testing import CliRunner
-
     from asana_api_cli.cli import main
 
-    runner = CliRunner()
+    from _cli_runner import full_output, make_runner
+
+    runner = make_runner()
     result = runner.invoke(main, ["--version"])
     assert result.exit_code == 0
-    assert "asana-api" in result.output
-    assert "python-asana" in result.output
-    assert "click" in result.output
+    out = full_output(result)
+    assert "asana-api" in out
+    assert "python-asana" in out
+    assert "click" in out

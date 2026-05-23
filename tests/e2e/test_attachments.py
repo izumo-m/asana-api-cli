@@ -29,15 +29,16 @@ import shutil
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
 
 from asana_api_cli.cli import main
+
+from _cli_runner import make_runner
 
 _DATA_DIR = Path(__file__).parent / "data"
 
 
 def _run(*args: str) -> "tuple[int, str, str]":
-    result = CliRunner().invoke(main, list(args))
+    result = make_runner().invoke(main, list(args))
     return result.exit_code, result.stdout, result.stderr
 
 

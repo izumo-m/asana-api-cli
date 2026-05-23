@@ -8,7 +8,6 @@ from typing import Any
 import click
 import pytest
 from asana.rest import ApiException
-from click.testing import CliRunner
 
 from asana_api_cli.formatter import (
     _format_output,
@@ -17,6 +16,8 @@ from asana_api_cli.formatter import (
     formatted,
 )
 from asana_api_cli.session import runtime
+
+from _cli_runner import full_output, make_runner
 
 
 # ---------------------------------------------------------------------------
@@ -472,49 +473,49 @@ class TestFormattedDecorator:
         return cmd
 
     def test_json_output(self) -> None:
-        runner = CliRunner()
+        runner = make_runner()
         result = runner.invoke(self._make_cli({"gid": "1"}))
         assert result.exit_code == 0
-        assert json.loads(result.output) == {"gid": "1"}
+        assert json.loads(full_output(result)) == {"gid": "1"}
 
     def test_table_output(self) -> None:
-        runner = CliRunner()
+        runner = make_runner()
         result = runner.invoke(self._make_cli({"gid": "1", "name": "T"}), ["--output", "table"])
         assert result.exit_code == 0
-        assert "gid" in result.output
-        assert "T" in result.output
+        assert "gid" in full_output(result)
+        assert "T" in full_output(result)
 
     def test_csv_output(self) -> None:
-        runner = CliRunner()
+        runner = make_runner()
         result = runner.invoke(self._make_cli([{"a": "x"}]), ["--output", "csv"])
         assert result.exit_code == 0
-        assert "a\n" in result.output
-        assert "x\n" in result.output
+        assert "a\n" in full_output(result)
+        assert "x\n" in full_output(result)
 
     def test_csv_bom_flag(self) -> None:
-        runner = CliRunner()
+        runner = make_runner()
         result = runner.invoke(self._make_cli([{"a": "x"}]), ["--output", "csv", "--csv-bom"])
         assert result.exit_code == 0
-        assert result.output.startswith("\ufeff")
+        assert full_output(result).startswith("\ufeff")
 
     def test_query_option(self) -> None:
-        runner = CliRunner()
+        runner = make_runner()
         result = runner.invoke(
             self._make_cli({"data": [1, 2, 3]}),
             ["--query", ".data | length"],
         )
         assert result.exit_code == 0
-        assert json.loads(result.output) == 3
+        assert json.loads(full_output(result)) == 3
 
     def test_generator_collapsed_to_list(self) -> None:
         def gen():  # type: ignore[no-untyped-def]
             yield {"gid": "1"}
             yield {"gid": "2"}
 
-        runner = CliRunner()
+        runner = make_runner()
         result = runner.invoke(self._make_cli(gen()))
         assert result.exit_code == 0
-        assert json.loads(result.output) == [{"gid": "1"}, {"gid": "2"}]
+        assert json.loads(full_output(result)) == [{"gid": "1"}, {"gid": "2"}]
 
     def test_api_exception_handled(self) -> None:
         @click.command()
@@ -523,7 +524,7 @@ class TestFormattedDecorator:
             """Raise API error."""
             raise ApiException(status=403, reason="Forbidden")
 
-        runner = CliRunner()
+        runner = make_runner()
         result = runner.invoke(cmd)
         assert result.exit_code != 0
-        assert "Forbidden" in result.output  # CliRunner merges stderr
+        assert "Forbidden" in full_output(result)  # CliRunner merges stderr

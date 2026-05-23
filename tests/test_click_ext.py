@@ -11,7 +11,6 @@ import re
 
 import click
 import pytest
-from click.testing import CliRunner
 
 from asana_api_cli.click_ext import (
     GLOBAL_OPTION_GROUPS,
@@ -22,6 +21,8 @@ from asana_api_cli.click_ext import (
     _COMPACT_SECTION_LABELS,
 )
 from asana_api_cli.session import runtime
+
+from _cli_runner import full_output, make_runner
 
 
 def _count_option_appearances(output: str, flag: str) -> int:
@@ -89,32 +90,34 @@ def _build_cli() -> click.Group:
 
 class TestGlobalOptionsAtAnyLevel:
     def test_debug_on_leaf_command(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["tasks", "act", "--debug"])
-        assert result.exit_code == 0, result.output
-        assert "debug=True" in result.output
+        result = make_runner().invoke(_build_cli(), ["tasks", "act", "--debug"])
+        assert result.exit_code == 0, full_output(result)
+        assert "debug=True" in full_output(result)
 
     def test_debug_on_subgroup(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["tasks", "--debug", "act"])
-        assert result.exit_code == 0, result.output
-        assert "debug=True" in result.output
+        result = make_runner().invoke(_build_cli(), ["tasks", "--debug", "act"])
+        assert result.exit_code == 0, full_output(result)
+        assert "debug=True" in full_output(result)
 
     def test_debug_on_root_still_works(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["--debug", "tasks", "act"])
-        assert result.exit_code == 0, result.output
-        assert "debug=True" in result.output
+        result = make_runner().invoke(_build_cli(), ["--debug", "tasks", "act"])
+        assert result.exit_code == 0, full_output(result)
+        assert "debug=True" in full_output(result)
 
     def test_host_on_leaf_command(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["tasks", "act", "--host", "https://example.com"])
-        assert result.exit_code == 0, result.output
-        assert "host=https://example.com" in result.output
+        result = make_runner().invoke(
+            _build_cli(), ["tasks", "act", "--host", "https://example.com"]
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert "host=https://example.com" in full_output(result)
 
     def test_access_token_on_leaf_command(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["tasks", "act", "--access-token", "secret-1"])
-        assert result.exit_code == 0, result.output
-        assert "token=secret-1" in result.output
+        result = make_runner().invoke(_build_cli(), ["tasks", "act", "--access-token", "secret-1"])
+        assert result.exit_code == 0, full_output(result)
+        assert "token=secret-1" in full_output(result)
 
     def test_leaf_overrides_root(self) -> None:
-        result = CliRunner().invoke(
+        result = make_runner().invoke(
             _build_cli(),
             [
                 "--host",
@@ -125,47 +128,47 @@ class TestGlobalOptionsAtAnyLevel:
                 "https://leaf.example",
             ],
         )
-        assert result.exit_code == 0, result.output
-        assert "host=https://leaf.example" in result.output
+        assert result.exit_code == 0, full_output(result)
+        assert "host=https://leaf.example" in full_output(result)
 
     def test_default_at_leaf_does_not_clobber_root(self) -> None:
-        result = CliRunner().invoke(
+        result = make_runner().invoke(
             _build_cli(), ["--host", "https://root.example", "tasks", "act"]
         )
-        assert result.exit_code == 0, result.output
-        assert "host=https://root.example" in result.output
+        assert result.exit_code == 0, full_output(result)
+        assert "host=https://root.example" in full_output(result)
 
 
 class TestHelpRendering:
     def test_global_options_appear_in_subcommand_help(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["tasks", "act", "--help"])
-        assert result.exit_code == 0, result.output
-        assert "Global Options" in result.output
-        assert "--debug" in result.output
-        assert "--access-token" in result.output
+        result = make_runner().invoke(_build_cli(), ["tasks", "act", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert "Global Options" in full_output(result)
+        assert "--debug" in full_output(result)
+        assert "--access-token" in full_output(result)
 
     def test_globals_appear_exactly_once_in_subcommand_help(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["tasks", "act", "--help"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(_build_cli(), ["tasks", "act", "--help"])
+        assert result.exit_code == 0, full_output(result)
         for flag in ("--debug", "--access-token", "--username"):
-            count = _count_option_appearances(result.output, flag)
-            assert count == 1, f"{flag} appears {count} times in:\n{result.output}"
+            count = _count_option_appearances(full_output(result), flag)
+            assert count == 1, f"{flag} appears {count} times in:\n{full_output(result)}"
 
     def test_root_help_does_not_have_global_options_section(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["--help"])
-        assert result.exit_code == 0, result.output
-        assert "Global Options" not in result.output
-        assert "--debug" in result.output
+        result = make_runner().invoke(_build_cli(), ["--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert "Global Options" not in full_output(result)
+        assert "--debug" in full_output(result)
 
     def test_root_help_shows_group_headings_as_top_level_sections(self) -> None:
-        result = CliRunner().invoke(_build_cli(), ["--help"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(_build_cli(), ["--help"])
+        assert result.exit_code == 0, full_output(result)
         # _build_cli() declares --access-token (Authentication), --host
         # (Connection), --debug (Logging / Debug). Only those 3 groups show
         # up; empty groups are skipped.
         for heading in ("Authentication:", "Connection:", "Logging / Debug:"):
-            assert heading in result.output, (
-                f"Missing top-level section heading {heading!r} in:\n{result.output}"
+            assert heading in full_output(result), (
+                f"Missing top-level section heading {heading!r} in:\n{full_output(result)}"
             )
 
     def test_subcommand_help_uses_compact_global_options_table(self) -> None:
@@ -173,21 +176,21 @@ class TestHelpRendering:
         # _make_global_option_params(). The compact form renders them as a
         # one-row-per-category table under a "Global Options:" umbrella with
         # a pointer back to `asana-api --help` for descriptions.
-        result = CliRunner().invoke(_build_cli(), ["tasks", "act", "--help"])
-        assert result.exit_code == 0, result.output
-        assert "Global Options:" in result.output
-        assert "See `asana-api --help` for descriptions." in result.output
+        result = make_runner().invoke(_build_cli(), ["tasks", "act", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert "Global Options:" in full_output(result)
+        assert "See `asana-api --help` for descriptions." in full_output(result)
         # Each non-empty group's label appears as the first column of one
         # row in the table (indented under "Global Options:").
         for heading, _ in GLOBAL_OPTION_GROUPS:
             short = _COMPACT_SECTION_LABELS.get(heading, heading)
-            assert re.search(rf"^ +{re.escape(short)}\s", result.output, re.MULTILINE), (
-                f"Missing compact label {short!r} in:\n{result.output}"
+            assert re.search(rf"^ +{re.escape(short)}\s", full_output(result), re.MULTILINE), (
+                f"Missing compact label {short!r} in:\n{full_output(result)}"
             )
         # The full per-option help text from root (e.g. for --retry-strategy)
         # must NOT be repeated on the subcommand — the compact form is
         # supposed to skip exactly that.
-        assert "Override urllib3 Retry fields" not in result.output
+        assert "Override urllib3 Retry fields" not in full_output(result)
 
     def test_no_op_section_marks_python_asana_version_on_root(self) -> None:
         # The long section heading appears on root help (full detail). On
@@ -197,9 +200,11 @@ class TestHelpRendering:
         # which declares all 21 globals (the test fixture only declares 3).
         from asana_api_cli.cli import main
 
-        result = CliRunner().invoke(main, ["--help"])
-        assert result.exit_code == 0, result.output
-        assert "No-op (SDK parity placeholders — inert in python-asana 5.2.4):" in result.output
+        result = make_runner().invoke(main, ["--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert "No-op (SDK parity placeholders — inert in python-asana 5.2.4):" in full_output(
+            result
+        )
 
 
 class TestShellCompletion:
