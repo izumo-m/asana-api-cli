@@ -68,7 +68,22 @@ rm tests/e2e/cassettes/<dir>/<test>.yaml
 uv run pytest --live --record tests/e2e/<file>::<test>
 ```
 
-After re-recording, review `git diff tests/e2e/cassettes/` and commit.
+### After re-recording: confirm nothing leaked
+
+Re-recording hits the real Asana API and writes the response straight
+into the cassette file. The masking layer covers the common cases,
+but a new field or shape can slip through silently.
+
+**After every `--record` invocation, run `git diff tests/e2e/cassettes/`
+and confirm none of the following from your account survived into the
+cassette:**
+
+- real email addresses
+- `asanausercontent.com` presigned-URL signatures (`?e=...&t=...`)
+- real gids (any 16-digit number that exists as a real workspace,
+  project, task, user, etc. in your Asana account)
+
+Do not commit until the diff is clean.
 
 ### Escape hatch: pytest-recording native flags
 
@@ -103,6 +118,31 @@ substituted back at replay time (see `tests/e2e/conftest.py`):
 A different developer can replay the same cassettes by setting their own
 `ASANA_PYTEST_WORKSPACE`; the cassette's request URL and response body
 adapt to their value at load time.
+
+### Auto-templated gids
+
+Identifiers that don't have a semantic name (user gid, team gid, transient
+task / project / section gids, attachment asset ids) are replaced with a
+**deterministic synthetic gid** derived from `sha256(real_gid)` truncated
+into the `[10^15, 10^16)` decimal range. The shape matches a current Asana
+gid (`[1-9][0-9]{15}`) so the cassette stays drop-in compatible — there is
+no `${...}` wrapping at replay time.
+
+Discovery sources at record time (see `_collect_gids` in `conftest.py`):
+
+- `"gid": "<digits>"` in any JSON body — covers every resource gid the
+  API returns, threshold-free.
+- `/<parent>/<id>` URL path segments where `<parent>` is harvested from
+  the installed asana SDK's path templates (`asana/api/*.py` constants
+  like `/tasks/{task_gid}`). Catches gids that appear only in URLs.
+- `asanausercontent.com/.../assets/.../<asset_id>/...` — the asset CDN
+  host is not in the SDK so it gets its own pattern.
+
+Same real gid always maps to the same synthetic, so identifiers stay
+traceable across cassettes by grep. The check `len(set(synthetics)) ==
+len(synthetics)` guards against hash collisions; at our scale (<2k gids
+per cassette) it is essentially impossible to hit, but a real hit forces
+a re-record against a fresh resource set.
 
 ## PII masking
 
@@ -141,15 +181,9 @@ SDK path to confirm parity behavior.
 - **List-endpoint cassettes are account-shape-dependent.** `get-workspaces`
   records whichever workspaces the recording account has access to;
   re-recording on a different account produces a different list (count
-  and other-workspace gids). Assertions tolerate this by checking the
-  test workspace's presence rather than the full list, but cassette
-  diffs across re-recordings can be noisy.
-- **Other-resource gids are stored literally.** Only `${WORKSPACE_GID}`,
-  `${PAGINATION_PROJECT_GID}` and `${PAGINATION_SMALL_PROJECT_GID}` are
-  templated. Other workspace / project / task gids that incidentally
-  appear in responses (e.g. the second workspace returned by
-  `get-workspaces`) stay as the recording account's literals. They are
-  not PII but make cross-account re-recording diffs noisier.
+  and gid set). Assertions tolerate this by checking the test workspace's
+  presence rather than the full list, but cassette diffs across
+  re-recordings can be noisy.
 - **Workspace lifecycle is read-only via the API.** Asana does not expose
   create / delete on workspaces, so the test environment relies on at
   least one workspace already existing (the user provides its gid via

@@ -16,7 +16,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
   response:
     body:
-      string: '{"data":[{"gid":"1214927854047052","name":"pagination-test"},{"gid":"1215012205678472","name":"pagination-test-small"}],"next_page":null}'
+      string: '{"data":[{"gid":"8503325469700806","name":"pagination-test"},{"gid":"2750130645330941","name":"pagination-test-small"}],"next_page":null}'
     headers:
       Connection:
       - keep-alive
@@ -25,17 +25,17 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Sat, 23 May 2026 18:03:46 GMT
+      - Sat, 23 May 2026 19:33:30 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=305,cdn-upstream-fbl;dur=917,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="rgvGo49xpPevwSon59SRYUzoJ0AHYjDLKGCIJk3lz3ttjyoG987zzw==",cdn-downstream-fbl;dur=938
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=297,cdn-upstream-fbl;dur=495,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="qLbVEkpHOseE04mCL-2UwMovDDKT0qr0TO-I37dkoG61pyBzzKB5jw==",cdn-downstream-fbl;dur=513
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 193f392c116e27a3f195dc4d0ef3ff2e.cloudfront.net (CloudFront)
+      - 1.1 918c5fa0268802c76cde9d59d951a06c.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - rgvGo49xpPevwSon59SRYUzoJ0AHYjDLKGCIJk3lz3ttjyoG987zzw==
+      - qLbVEkpHOseE04mCL-2UwMovDDKT0qr0TO-I37dkoG61pyBzzKB5jw==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -69,7 +69,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '458'
+      - '46'
       x-frame-options:
       - DENY
       - DENY
@@ -80,7 +80,7 @@ interactions:
       code: 200
       message: OK
 - request:
-    body: '{"data": {"name": "pytest-e2e-attachment-parent", "projects": ["1214927854047052"]}}'
+    body: '{"data": {"name": "pytest-e2e-attachment-parent", "projects": ["8503325469700806"]}}'
     headers:
       Accept:
       - application/json; charset=utf-8
@@ -96,7 +96,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/tasks
   response:
     body:
-      string: "{\"data\":{\"gid\":\"1215091632633395\",\"resource_type\":\"task\",\"created_at\":\"2026-05-23T18:03:47.302Z\",\"modified_at\":\"2026-05-23T18:03:47.623Z\",\"name\":\"pytest-e2e-attachment-parent\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/1214927854047052/task/1215091632633395\",\"projects\":[{\"gid\":\"1214927854047052\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"memberships\":[{\"section\":{\"gid\":\"1214927779918259\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"1214927854047052\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}],\"followers\":[{\"gid\":\"1214276200508365\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}}"
+      string: "{\"data\":{\"gid\":\"3664146423627942\",\"resource_type\":\"task\",\"created_at\":\"2026-05-23T19:33:31.715Z\",\"modified_at\":\"2026-05-23T19:33:31.959Z\",\"name\":\"pytest-e2e-attachment-parent\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/8503325469700806/task/3664146423627942\",\"projects\":[{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"3991398924663590\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}]}}"
     headers:
       Connection:
       - keep-alive
@@ -105,17 +105,17 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Sat, 23 May 2026 18:03:48 GMT
+      - Sat, 23 May 2026 19:33:32 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=2,cdn-upstream-connect;dur=304,cdn-upstream-fbl;dur=1484,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="M3CXqXTlz9tbXlo5Kf-VBahfqPRXiEGfmuZfBcQwDXfFmYE9fVtPkw==",cdn-downstream-fbl;dur=1500
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=2,cdn-upstream-connect;dur=286,cdn-upstream-fbl;dur=1339,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="U134BhnbgGV8L8io9liRPpn-H4KEtA20J8wVfG5Zk5MWlWSNeLpW6Q==",cdn-downstream-fbl;dur=1357
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 c9bacacdd678f5d95591fb7de8685414.cloudfront.net (CloudFront)
+      - 1.1 81fac1c7319deef9db939ade015e10d8.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - M3CXqXTlz9tbXlo5Kf-VBahfqPRXiEGfmuZfBcQwDXfFmYE9fVtPkw==
+      - U134BhnbgGV8L8io9liRPpn-H4KEtA20J8wVfG5Zk5MWlWSNeLpW6Q==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -136,7 +136,7 @@ interactions:
       - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
         'none';frame-src 'none';frame-ancestors 'none'
       location:
-      - /api/1.0/tasks/1215091632633395
+      - /api/1.0/tasks/3664146423627942
       pragma:
       - no-cache
       server:
@@ -148,7 +148,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '1024'
+      - '905'
       x-frame-options:
       - DENY
       x-xss-protection:
@@ -157,14 +157,14 @@ interactions:
       code: 201
       message: Created
 - request:
-    body: "--e085cca2a97d3b67e89ec8ccd0ff1c20\r\nContent-Disposition: form-data; name=\"parent\"\r\n\r\n1215091632633395\r\n--e085cca2a97d3b67e89ec8ccd0ff1c20\r\nContent-Disposition:
+    body: "--2cdbce4ca98f0e9c25410bea0f4ee9d6\r\nContent-Disposition: form-data; name=\"parent\"\r\n\r\n3664146423627942\r\n--2cdbce4ca98f0e9c25410bea0f4ee9d6\r\nContent-Disposition:
       form-data; name=\"file\"; filename=\"ascii.txt\"\r\nContent-Type: text/plain\r\n\r\nHello,
-      world!\n\r\n--e085cca2a97d3b67e89ec8ccd0ff1c20--\r\n"
+      world!\n\r\n--2cdbce4ca98f0e9c25410bea0f4ee9d6--\r\n"
     headers:
       Accept:
       - application/json; charset=utf-8
       Content-Type:
-      - multipart/form-data; boundary=e085cca2a97d3b67e89ec8ccd0ff1c20
+      - multipart/form-data; boundary=2cdbce4ca98f0e9c25410bea0f4ee9d6
       User-Agent:
       - Swagger-Codegen/5.2.4/python
       X-Asana-Client-Lib:
@@ -175,7 +175,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/attachments
   response:
     body:
-      string: '{"data":{"gid":"1215091564536516","resource_type":"attachment","name":"ascii.txt","resource_subtype":"asana"}}'
+      string: '{"data":{"gid":"6918904797120902","resource_type":"attachment","name":"ascii.txt","resource_subtype":"asana"}}'
     headers:
       Connection:
       - keep-alive
@@ -184,17 +184,17 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Sat, 23 May 2026 18:03:49 GMT
+      - Sat, 23 May 2026 19:33:33 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=295,cdn-upstream-fbl;dur=1111,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="b2__YUU75Qn3hc004xLTMrmqOfewQ1v2NFEnClVBnNR2SeS26env9g==",cdn-downstream-fbl;dur=1131
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=299,cdn-upstream-fbl;dur=1129,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="GhVX5q5XkNMuDRupW_9zhPYJ4oLSumHEg38gVwqp1kNiAdGx1bRi8Q==",cdn-downstream-fbl;dur=1151
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 90bb233b934e3e63efb14c8734c7c4cc.cloudfront.net (CloudFront)
+      - 1.1 193f392c116e27a3f195dc4d0ef3ff2e.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - b2__YUU75Qn3hc004xLTMrmqOfewQ1v2NFEnClVBnNR2SeS26env9g==
+      - GhVX5q5XkNMuDRupW_9zhPYJ4oLSumHEg38gVwqp1kNiAdGx1bRi8Q==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -225,7 +225,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '667'
+      - '677'
       x-frame-options:
       - DENY
       x-xss-protection:
@@ -247,10 +247,10 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: GET
-    uri: https://app.asana.com/api/1.0/attachments/1215091564536516
+    uri: https://app.asana.com/api/1.0/attachments/6918904797120902
   response:
     body:
-      string: '{"data":{"gid":"1215091564536516","created_at":"2026-05-23T18:03:48.941Z","download_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/1215091564536515/0dde7bbb99fc8ad8faca97ef01250f9b","host":"asana","name":"ascii.txt","parent":{"gid":"1215091632633395","name":"pytest-e2e-attachment-parent","resource_type":"task","resource_subtype":"default_task"},"permanent_url":"https://app.asana.com/app/asana/-/get_asset?asset_id=1215091564536516","resource_type":"attachment","resource_subtype":"asana","view_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/1215091564536515/0dde7bbb99fc8ad8faca97ef01250f9b"}}'
+      string: '{"data":{"gid":"6918904797120902","created_at":"2026-05-23T19:33:33.202Z","download_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/1610666740007344/febd4f90ca34db7af0ffea32cba85d34","host":"asana","name":"ascii.txt","parent":{"gid":"3664146423627942","name":"pytest-e2e-attachment-parent","resource_type":"task","resource_subtype":"default_task"},"permanent_url":"https://app.asana.com/app/asana/-/get_asset?asset_id=6918904797120902","resource_type":"attachment","resource_subtype":"asana","view_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/1610666740007344/febd4f90ca34db7af0ffea32cba85d34"}}'
     headers:
       Connection:
       - keep-alive
@@ -259,17 +259,17 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Sat, 23 May 2026 18:03:50 GMT
+      - Sat, 23 May 2026 19:33:34 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=286,cdn-upstream-fbl;dur=780,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="PZ_-WtH18-NTOeENxXGmFJ5zlByCkpj0im7_mzUgIwrLdAdiIJygDQ==",cdn-downstream-fbl;dur=797
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=287,cdn-upstream-fbl;dur=546,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="_ztqMSKYh-LlIQZEYsh1TIFO7HEzEhI5f7eFgiyDRN3J-tm35_iy4A==",cdn-downstream-fbl;dur=567
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 4de02f7e0312e6ee4d03ffa713b6f14e.cloudfront.net (CloudFront)
+      - 1.1 d27c289c0f61faf180ffaa0edb16f2a2.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - PZ_-WtH18-NTOeENxXGmFJ5zlByCkpj0im7_mzUgIwrLdAdiIJygDQ==
+      - _ztqMSKYh-LlIQZEYsh1TIFO7HEzEhI5f7eFgiyDRN3J-tm35_iy4A==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -303,7 +303,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '347'
+      - '113'
       x-frame-options:
       - DENY
       - DENY
@@ -327,7 +327,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: DELETE
-    uri: https://app.asana.com/api/1.0/attachments/1215091564536516
+    uri: https://app.asana.com/api/1.0/attachments/6918904797120902
   response:
     body:
       string: '{"data":{}}'
@@ -339,17 +339,17 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Sat, 23 May 2026 18:03:51 GMT
+      - Sat, 23 May 2026 19:33:34 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=299,cdn-upstream-fbl;dur=829,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="hEcEFC8CirJKtqACCh4dTZTKzCWoX0pI5QUnYA7kUiVJ2mCh0nn58w==",cdn-downstream-fbl;dur=845
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=2,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=570,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="KdIRHR3FWfhwzLI0VCtwz_IkE1p67ecqckgzqZobWxd56Mt6tNXasg==",cdn-downstream-fbl;dur=590
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 193f392c116e27a3f195dc4d0ef3ff2e.cloudfront.net (CloudFront)
+      - 1.1 93d71664269ea5653c2099d21548660a.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - hEcEFC8CirJKtqACCh4dTZTKzCWoX0pI5QUnYA7kUiVJ2mCh0nn58w==
+      - KdIRHR3FWfhwzLI0VCtwz_IkE1p67ecqckgzqZobWxd56Mt6tNXasg==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -380,7 +380,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '376'
+      - '419'
       x-frame-options:
       - DENY
       x-xss-protection:
@@ -402,7 +402,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: DELETE
-    uri: https://app.asana.com/api/1.0/tasks/1215091632633395
+    uri: https://app.asana.com/api/1.0/tasks/3664146423627942
   response:
     body:
       string: '{"data":{}}'
@@ -414,17 +414,17 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Sat, 23 May 2026 18:03:52 GMT
+      - Sat, 23 May 2026 19:33:35 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=288,cdn-upstream-fbl;dur=1087,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="tZ9xJnGQPksKq2U6RG3-ShVzjKYPjbUayOYmCHWnMa-Ohdm_fNsoTg==",cdn-downstream-fbl;dur=1106
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=727,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="1gHr3UEk3EKtofzcH8UIkd9SGE_NWZPTY30Kxm_BORWmVyKYXJL1Gg==",cdn-downstream-fbl;dur=746
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 7c8e8fe40f73c1f5c6ffc31ff8a21db6.cloudfront.net (CloudFront)
+      - 1.1 96bb855a471c299ad9b47a8edfb8199c.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - tZ9xJnGQPksKq2U6RG3-ShVzjKYPjbUayOYmCHWnMa-Ohdm_fNsoTg==
+      - 1gHr3UEk3EKtofzcH8UIkd9SGE_NWZPTY30Kxm_BORWmVyKYXJL1Gg==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -455,7 +455,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '653'
+      - '580'
       x-frame-options:
       - DENY
       x-xss-protection:

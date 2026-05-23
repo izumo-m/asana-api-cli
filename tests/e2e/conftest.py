@@ -31,6 +31,8 @@ See ``tests/e2e/README.md`` for the full workflow.
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import json
 import os
 import re
@@ -159,6 +161,127 @@ def _before_record_response(response):  # type: ignore[no-untyped-def]
     return response
 
 
+# ---------- GID auto-templating ---------------------------------------------
+
+
+def _gid_parent_segments() -> frozenset[str]:
+    """Path segments preceding any ``{*_gid}`` / ``{custom_id}`` placeholder
+    in the installed asana SDK's endpoint definitions.
+
+    Scans ``asana/api/*.py`` for ``'/<path>/{placeholder}'``-style string
+    literals (swagger-codegen output). Computed once at import time; re-derived
+    implicitly on each SDK bump.
+    """
+    import asana
+
+    api_dir = Path(asana.__file__).parent / "api"
+    template_re = re.compile(r"'(/[^']+)'\s*,\s*'(?:GET|POST|PUT|DELETE|HEAD|PATCH)'")
+    parent_re = re.compile(r"/([^/{]+)/\{[^}]+\}")
+    parents: set[str] = set()
+    for f in api_dir.glob("*.py"):
+        text = f.read_text(encoding="utf-8")
+        for m in template_re.finditer(text):
+            for pm in parent_re.finditer(m.group(1)):
+                parents.add(pm.group(1))
+    return frozenset(parents)
+
+
+_GID_PARENTS = _gid_parent_segments()
+
+# Match a path segment immediately after a known parent (captures the gid
+# or custom_id position). Built from the SDK so it tracks the API surface.
+_GID_PATH_RE = re.compile(
+    r"/(?:" + "|".join(re.escape(p) for p in sorted(_GID_PARENTS)) + r')/([^/?"\\\s]+)'
+)
+
+# ``"gid": "<value>"`` in any JSON-shaped string. Threshold-free so gids of
+# any digit length are captured.
+_JSON_GID_RE = re.compile(r'"gid"\s*:\s*"([^"]+)"')
+
+# Asset-id position in an asanausercontent.com URL path. Asana's CDN host
+# is not in the SDK so it needs its own pattern. The asset id is a storage
+# identifier distinct from the attachment gid.
+_ASSET_URL_RE = re.compile(r'asanausercontent\.com/[^/]+/assets/[^/]+/([^/?"\\\s]+)')
+
+
+def _collect_gids(cassette_dict: Any) -> list[str]:
+    """Discover Asana identifiers used anywhere in the cassette.
+
+    Three sources, all unioned: JSON ``"gid"`` fields, URL path segments
+    after SDK-known parents, and asanausercontent.com asset-id positions.
+    Returns first-occurrence order (deterministic for a given cassette).
+    """
+    seen: dict[str, None] = {}
+
+    def _collect_str(text: str) -> None:
+        for pattern in (_JSON_GID_RE, _GID_PATH_RE, _ASSET_URL_RE):
+            for m in pattern.finditer(text):
+                value = m.group(1)
+                # Skip ``${VAR}`` placeholders the explicit-binding pass left
+                # behind; only digit-form ids participate in auto-templating.
+                if value.isdigit():
+                    seen.setdefault(value, None)
+
+    def _visit(obj: Any) -> None:
+        if isinstance(obj, str):
+            _collect_str(obj)
+        elif isinstance(obj, bytes):
+            with contextlib.suppress(UnicodeDecodeError):
+                _collect_str(obj.decode("utf-8"))
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                _visit(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                _visit(item)
+
+    _visit(cassette_dict)
+    return list(seen.keys())
+
+
+def _synthetic_gid(real_gid: str) -> str:
+    """16-digit decimal placeholder derived from ``sha256(real_gid)``.
+
+    Format ``[1-9][0-9]{15}`` matches a current Asana gid's shape so the
+    cassette stays drop-in compatible (no ``${...}`` wrapping). Same real
+    gid → same synthetic, so identifiers stay traceable by grep across
+    cassettes.
+    """
+    digest = hashlib.sha256(real_gid.encode("ascii")).digest()
+    n = int.from_bytes(digest[:8], "big")
+    return str(10**15 + (n % (9 * 10**15)))
+
+
+def _auto_template_gids(cassette_dict: Any) -> Any:
+    """Replace each discovered identifier with a deterministic synthetic gid.
+
+    Runs AFTER the explicit binding pass so ``${WORKSPACE_GID}`` /
+    ``${PAGINATION_PROJECT_GID}`` / ... take priority. The rest — user gid,
+    team gid, transient task / project gids, asset ids, etc. — become
+    16-digit decimals that look like real gids but reveal nothing about
+    the recording account.
+    """
+    gids = _collect_gids(cassette_dict)
+    if not gids:
+        return cassette_dict
+
+    mapping = {gid: _synthetic_gid(gid) for gid in gids}
+    if len(set(mapping.values())) != len(mapping):
+        # Two real gids hashed to the same synthetic — replay would become
+        # ambiguous. ~1 in 9*10^15 per pair, so essentially impossible at
+        # our scale; surface loudly if it ever does happen so the cassette
+        # can be re-recorded against a fresh resource set.
+        raise RuntimeError(
+            f"synthetic gid collision across {len(gids)} gids; "
+            f"re-record the cassette or extend the hash domain"
+        )
+
+    # Longest-first so a gid that's a prefix of another can't half-match.
+    alternation = "|".join(re.escape(g) for g in sorted(gids, key=len, reverse=True))
+    pattern = re.compile(r"\b(?:" + alternation + r")\b")
+    return _walk(cassette_dict, lambda s: pattern.sub(lambda m: mapping[m.group(0)], s))
+
+
 # ---------- Templated YAML serializer ---------------------------------------
 
 
@@ -207,6 +330,7 @@ _orig_yaml_deserialize = yamlserializer.deserialize
 def _templated_yaml_serialize(cassette_dict):  # type: ignore[no-untyped-def]
     bindings = _bindings()
     templated = _walk(cassette_dict, lambda s: _template_string(s, bindings))
+    templated = _auto_template_gids(templated)
     return _orig_yaml_serialize(templated)
 
 
@@ -391,3 +515,23 @@ def _ensure_token(request: pytest.FixtureRequest):
             os.environ.pop("ASANA_ACCESS_TOKEN", None)
     else:
         yield
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Delete the cassette file before re-recording.
+
+    vcrpy's ``record_mode="all"`` re-records every interaction but APPENDS
+    to the existing cassette rather than overwriting. Auto-templated
+    synthetic gids from a prior recording would then be re-collected by
+    ``_auto_template_gids`` as if they were real, double-hashing them on
+    the next save. Wiping the file in ``pytest_runtest_setup`` — which
+    runs before pytest-recording's ``vcr`` fixture loads it — gives VCR
+    an empty cassette to start from.
+    """
+    if not item.config.getoption("--record", default=False):
+        return
+    if item.get_closest_marker("vcr") is None:
+        return
+    module_path = Path(str(item.fspath))
+    cassette_path = module_path.parent / "cassettes" / module_path.stem / f"{item.name}.yaml"
+    cassette_path.unlink(missing_ok=True)
