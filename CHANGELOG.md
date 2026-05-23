@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-05-23
+
 ### Breaking changes (v2 → v3)
 
 Several global flags renamed for 1:1 parity with `asana.Configuration`
@@ -248,7 +250,8 @@ Combining a deprecated alias with its replacement (e.g.
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...v3.0.0
 [2.1.1]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.5.0...v2.0.0
