@@ -6,6 +6,7 @@ authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+keywords = ["asana", "cli", "python-asana"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
