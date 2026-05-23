@@ -113,6 +113,10 @@ are dispatched by `resource_type`:
 - `user.email` / `user.name` / `user.photo` → bound values / `null`
 - `workspace.name` / `workspace.email_domains` → bound value / `["example.invalid"]`
 - `team.name` → bound value
+- `attachment.download_url` / `attachment.view_url` → query string stripped
+  (Asana issues presigned `?e=<expiry>&t=<HMAC>` URLs against
+  `asanausercontent.com`; the token grants read access to the asset
+  until expiry and must not be committed)
 
 Test assertions should compare on structure or against the bound values,
 not on real account data.

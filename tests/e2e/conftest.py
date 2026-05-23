@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.parse
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any, Callable
@@ -96,6 +97,20 @@ def _bindings() -> dict[str, str]:
 # ---------- PII masking (resource_type aware) -------------------------------
 
 
+def _strip_signed_query(url: str) -> str:
+    """Drop the query string from an ``asanausercontent.com`` URL.
+
+    Asana's ``download_url`` / ``view_url`` are presigned: the
+    ``?e=<expiry>&v=...&t=<HMAC>`` query grants read access to the asset
+    until the expiry. Never commit it to the repo — the response body is
+    enough to verify the URL's shape, and tests do not follow the URL.
+    """
+    parts = urllib.parse.urlsplit(url)
+    if parts.netloc.endswith("asanausercontent.com"):
+        return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+    return url
+
+
 def _mask_object(obj: Any, bindings: dict[str, str]) -> None:
     if isinstance(obj, dict):
         rtype = obj.get("resource_type")
@@ -114,6 +129,11 @@ def _mask_object(obj: Any, bindings: dict[str, str]) -> None:
         elif rtype == "team":
             if "name" in obj:
                 obj["name"] = bindings.get("TEAM_NAME", obj["name"])
+        elif rtype == "attachment":
+            for url_field in ("download_url", "view_url"):
+                value = obj.get(url_field)
+                if isinstance(value, str):
+                    obj[url_field] = _strip_signed_query(value)
         for v in obj.values():
             _mask_object(v, bindings)
     elif isinstance(obj, list):
