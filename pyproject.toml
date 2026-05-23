@@ -6,6 +6,16 @@ authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Office/Business :: Groupware",
+    "Topic :: Utilities",
+]
 dependencies = [
     "click>=8.0",
     "jq>=1.6",
