@@ -1,0 +1,162 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
+  response:
+    body:
+      string: '{"data":[{"gid":"1214927854047052","name":"pagination-test"}],"next_page":null}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '79'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 11:54:57 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=339,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="KSeZbL6APLNuz5Fr3DsfmyxXxOis63hNJIWo9TcjjsVimkhq3-HgaQ==",cdn-downstream-fbl;dur=363
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 3081b2b6964f02c0e56dc0b5d6d1a43a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - KSeZbL6APLNuz5Fr3DsfmyxXxOis63hNJIWo9TcjjsVimkhq3-HgaQ==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '187'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/tasks?limit=50&project=1214927854047052
+  response:
+    body:
+      string: '{"data":[{"gid":"1214928260937768","name":"ptest-1500","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250899321","name":"ptest-1499","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203353131","name":"ptest-1498","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146546503","name":"ptest-1497","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928293217365","name":"ptest-1496","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164748339","name":"ptest-1495","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928293216178","name":"ptest-1494","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165135277","name":"ptest-1493","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260908550","name":"ptest-1492","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260535559","name":"ptest-1491","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165165749","name":"ptest-1490","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179695424","name":"ptest-1489","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203290273","name":"ptest-1488","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928147126121","name":"ptest-1487","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260906042","name":"ptest-1486","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165135266","name":"ptest-1485","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250592797","name":"ptest-1484","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928293031554","name":"ptest-1483","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250285438","name":"ptest-1482","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260862981","name":"ptest-1481","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164809415","name":"ptest-1480","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250229794","name":"ptest-1479","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260678184","name":"ptest-1478","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250759920","name":"ptest-1477","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165121815","name":"ptest-1476","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260844591","name":"ptest-1475","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164775965","name":"ptest-1474","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250274435","name":"ptest-1473","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250731259","name":"ptest-1472","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164792847","name":"ptest-1471","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250132386","name":"ptest-1470","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260792092","name":"ptest-1469","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250751717","name":"ptest-1468","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250274425","name":"ptest-1467","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146988236","name":"ptest-1466","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164826941","name":"ptest-1465","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250525010","name":"ptest-1464","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165059397","name":"ptest-1463","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179938357","name":"ptest-1462","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250685595","name":"ptest-1461","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260792200","name":"ptest-1460","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260678173","name":"ptest-1459","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165029954","name":"ptest-1458","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164976200","name":"ptest-1457","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179697554","name":"ptest-1456","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250685585","name":"ptest-1455","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260430838","name":"ptest-1454","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146890283","name":"ptest-1453","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260738108","name":"ptest-1452","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164697398","name":"ptest-1451","resource_type":"task","resource_subtype":"default_task"}],"next_page":{"offset":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlWUTFNQjkzTUxcIiwxMjE0OTI4MjUwNzA0MTU5XSIsImlhdCI6MTc3OTM2NDQ5NywiZXhwIjoxNzc5MzY1Mzk3fQ.mWN3Wa78rlQeX1dOwIOKENGgaMrnDney1tTGJdMv_Pk","path":"/tasks?project=1214927854047052&limit=50&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlWUTFNQjkzTUxcIiwxMjE0OTI4MjUwNzA0MTU5XSIsImlhdCI6MTc3OTM2NDQ5NywiZXhwIjoxNzc5MzY1Mzk3fQ.mWN3Wa78rlQeX1dOwIOKENGgaMrnDney1tTGJdMv_Pk","uri":"https://app.asana.com/api/1.0/tasks?project=1214927854047052&limit=50&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlWUTFNQjkzTUxcIiwxMjE0OTI4MjUwNzA0MTU5XSIsImlhdCI6MTc3OTM2NDQ5NywiZXhwIjoxNzc5MzY1Mzk3fQ.mWN3Wa78rlQeX1dOwIOKENGgaMrnDney1tTGJdMv_Pk"}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '6061'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 11:54:57 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=267,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="62cEh1Scp5bw9YSE6bYi9AbdEac9CXkoSpANbKvysG8Sv4vBSy_Xiw==",cdn-downstream-fbl;dur=291
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 a0ab8fad44e7d16e458ba0843ec3ded6.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 62cEh1Scp5bw9YSE6bYi9AbdEac9CXkoSpANbKvysG8Sv4vBSy_Xiw==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '119'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

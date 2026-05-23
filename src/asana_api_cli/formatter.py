@@ -24,13 +24,13 @@ def formatted(f: Any) -> Any:
         "output_format",
         type=click.Choice(["json", "table", "csv", "text"], case_sensitive=False),
         default="json",
-        help="Output format (default: json)",
+        help="Output format (default: json) [asana-api extension]",
     )
     @click.option(
         "--query",
         "jq_query",
         default=None,
-        help="jq expression to filter output",
+        help="jq expression to filter output [asana-api extension]",
     )
     @click.option(
         "--csv-bom",
@@ -39,7 +39,7 @@ def formatted(f: Any) -> Any:
         default=False,
         help=(
             "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
-            "non-ASCII characters correctly"
+            "non-ASCII characters correctly [asana-api extension]"
         ),
     )
     @functools.wraps(f)
@@ -164,9 +164,13 @@ def _to_rows(data: Any) -> list[dict[str, Any]] | None:
     if isinstance(data, list):
         if not data:
             return []
-        if isinstance(data[0], dict):
+        # A jq yield can produce a mixed list (e.g. `[.data[0], .data | length]`)
+        # which has no clean column layout. Require homogeneous shape.
+        if all(isinstance(item, dict) for item in data):
             return data
-        return [{"value": v} for v in data]
+        if not any(isinstance(item, dict) for item in data):
+            return [{"value": v} for v in data]
+        return None
     if isinstance(data, dict):
         return [data]
     return None

@@ -22,10 +22,12 @@ from unittest.mock import MagicMock
 import asana
 import click
 import pytest
-from click.testing import CliRunner
 
 from asana_api_cli.cli import _enumerate_api_classes, _make_command, _operations_for
+from asana_api_cli.click_ext import _SDK_HAS_RETRY_STRATEGY
 from asana_api_cli.session import runtime
+
+from _cli_runner import full_output, make_runner
 
 
 # ---------------------------------------------------------------------------
@@ -51,10 +53,22 @@ def _isolated_runtime(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             "proxy",
             "verify_ssl",
             "ssl_ca_cert",
-            "retries",
-            "timeout",
+            "cert_file",
+            "key_file",
+            "assert_hostname",
+            "retry_strategy_overrides",
+            "request_timeout",
+            "connection_pool_maxsize",
             "access_token",
-            "temp_dir",
+            "username",
+            "password",
+            "api_key",
+            "api_key_prefix",
+            "temp_folder_path",
+            "safe_chars_for_path_param",
+            "logger_format",
+            "logger_file",
+            "multibyte_filenames",
         )
     }
     try:
@@ -109,19 +123,34 @@ def _patch(
 
 
 # ---------------------------------------------------------------------------
-# Pagination: --max-items forwards to the SDK's ``item_limit`` kwarg
+# v3 primary pagination flags (1:1 with SDK inputs)
 # ---------------------------------------------------------------------------
 
 
-class TestMaxItemsKwarg:
-    """``--max-items N`` is forwarded as ``item_limit=N`` to the SDK method.
+def _capture_configuration(
+    monkeypatch: pytest.MonkeyPatch, return_value: Any
+) -> list[tuple[bool, int]]:
+    """Patch ``TasksApi.get_tasks`` to snapshot
+    ``(return_page_iterator, page_limit)`` at call time."""
+    captured: list[tuple[bool, int]] = []
+
+    def patched(self_api: Any, opts: Any, **kwargs: Any) -> Any:
+        cfg = self_api.api_client.configuration
+        captured.append((cfg.return_page_iterator, cfg.page_limit))
+        return return_value
+
+    monkeypatch.setattr(asana.TasksApi, "get_tasks", patched)
+    return captured
+
+
+class TestItemLimitKwarg:
+    """``--item-limit N`` is forwarded as the SDK's ``item_limit`` kwarg.
 
     The SDK's ``PageIterator`` then caps each per-request ``limit`` to
-    ``min(page_limit, item_limit - count)`` and stops at exactly N items,
-    so the CLI does not need to walk pages itself.
+    ``min(page_limit, item_limit - count)`` and stops at exactly N items.
     """
 
-    def test_max_items_passes_item_limit_kwarg(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_item_limit_passes_kwarg(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
         mock = _patch(
             monkeypatch,
@@ -129,153 +158,171 @@ class TestMaxItemsKwarg:
             "get_tasks",
             return_value=iter([{"gid": str(i)} for i in range(250)]),
         )
-        result = CliRunner().invoke(cmd, ["--max-items", "250"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--item-limit", "250"])
+        assert result.exit_code == 0, full_output(result)
         assert mock.call_count == 1
         assert mock.call_args_list[0].kwargs == {"item_limit": 250}
         # CLI does not push ``limit`` into opts; that's the SDK's job.
         assert "limit" not in mock.call_args_list[0].args[0]
-        assert len(json.loads(result.output)) == 250
+        assert len(json.loads(full_output(result))) == 250
 
-    def test_max_items_zero_passes_item_limit_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """``--max-items 0`` still constructs a session and calls the SDK; the
-        SDK's PageIterator short-circuits and makes no HTTP request."""
+    def test_item_limit_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--item-limit 0`` still constructs a session and calls the SDK;
+        the SDK's PageIterator short-circuits and yields nothing."""
         cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            return_value=iter([]),
-        )
-        result = CliRunner().invoke(cmd, ["--max-items", "0"])
-        assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=iter([]))
+        result = make_runner().invoke(cmd, ["--item-limit", "0"])
+        assert result.exit_code == 0, full_output(result)
         assert mock.call_args_list[0].kwargs == {"item_limit": 0}
-        assert json.loads(result.output) == []
-
-    def test_max_items_5_passes_item_limit_5(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            return_value=iter([{"gid": str(i)} for i in range(5)]),
-        )
-        result = CliRunner().invoke(cmd, ["--max-items", "5"])
-        assert result.exit_code == 0, result.output
-        assert mock.call_args_list[0].kwargs == {"item_limit": 5}
+        assert json.loads(full_output(result)) == []
 
 
-# ---------------------------------------------------------------------------
-# Pagination: --page-size feeds Configuration.page_limit
-# ---------------------------------------------------------------------------
+class TestPageLimitFlag:
+    """``--page-limit N`` sets ``Configuration.page_limit = N``.
 
-
-class TestPageSizeKwarg:
-    """``--page-size N`` sets ``Configuration.page_limit = N`` for the SDK.
-
-    The SDK reads ``page_limit`` to populate ``query_params['limit']`` when
-    the caller did not. We assert by snapshotting the configuration at the
-    moment the SDK method is invoked.
+    Used by the SDK to populate ``query_params['limit']`` when the caller
+    did not set ``opts["limit"]``.
     """
 
-    def _capture_page_limit_on_call(
-        self, monkeypatch: pytest.MonkeyPatch, return_value: Any
-    ) -> list[int]:
-        captured: list[int] = []
-
-        def patched_get_tasks(self_api: Any, opts: Any, **kwargs: Any) -> Any:
-            captured.append(self_api.api_client.configuration.page_limit)
-            return return_value
-
-        monkeypatch.setattr(asana.TasksApi, "get_tasks", patched_get_tasks)
-        return captured
-
-    def test_page_size_sets_page_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_page_limit_sets_configuration(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
-        captured = self._capture_page_limit_on_call(monkeypatch, return_value=iter([{"gid": "1"}]))
-        result = CliRunner().invoke(cmd, ["--page-size", "50", "--max-items", "10"])
-        assert result.exit_code == 0, result.output
-        assert captured == [50]
+        captured = _capture_configuration(monkeypatch, return_value=iter([]))
+        result = make_runner().invoke(cmd, ["--page-limit", "50"])
+        assert result.exit_code == 0, full_output(result)
+        assert captured == [(True, 50)]
 
-    def test_no_page_size_keeps_sdk_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Default ``page_limit`` is 100 (the SDK default) when ``--page-size``
-        is not passed."""
+    def test_no_page_limit_keeps_sdk_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Without ``--page-limit``, ``Configuration.page_limit`` stays at
+        the SDK default (100)."""
         cmd = _build_command("TasksApi", "get_tasks")
-        captured = self._capture_page_limit_on_call(monkeypatch, return_value=_page([]))
-        result = CliRunner().invoke(cmd, [])
-        assert result.exit_code == 0, result.output
-        assert captured == [100]
+        captured = _capture_configuration(monkeypatch, return_value=iter([]))
+        result = make_runner().invoke(cmd, [])
+        assert result.exit_code == 0, full_output(result)
+        assert captured == [(True, 100)]
+
+
+class TestV3PrimaryFlags:
+    """v3 flags that map 1:1 to SDK ``Configuration`` properties, ``opts``
+    keys, and method kwargs."""
+
+    def test_limit_reaches_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--limit N`` lands in ``opts["limit"]`` (sent as ``?limit=N``)."""
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([{"gid": "1"}]))
+        result = make_runner().invoke(cmd, ["--limit", "50", "--no-return-page-iterator"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[0]["limit"] == 50
+
+    def test_offset_passthrough(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--offset TOKEN`` reaches ``opts["offset"]`` on a single request."""
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
+        result = make_runner().invoke(cmd, ["--offset", "abc123"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[0]["offset"] == "abc123"
+
+    def test_no_return_page_iterator_flips_configuration(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """``--no-return-page-iterator`` sets
+        ``Configuration.return_page_iterator = False`` for that call."""
+        cmd = _build_command("TasksApi", "get_tasks")
+        captured = _capture_configuration(monkeypatch, return_value=_page([]))
+        result = make_runner().invoke(cmd, ["--no-return-page-iterator"])
+        assert result.exit_code == 0, full_output(result)
+        assert captured == [(False, 100)]
+
+    def test_full_payload_passes_kwarg(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--full-payload`` adds ``full_payload=True`` to the SDK call."""
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
+        result = make_runner().invoke(cmd, ["--full-payload"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].kwargs == {"full_payload": True}
+
+    def test_default_keeps_iterator_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Without any pagination flag, ``Configuration.return_page_iterator``
+        stays at the SDK default (True) and no ``limit`` is pushed into opts."""
+        cmd = _build_command("TasksApi", "get_tasks")
+        captured = _capture_configuration(monkeypatch, return_value=iter([]))
+        result = make_runner().invoke(cmd, [])
+        assert result.exit_code == 0, full_output(result)
+        assert captured == [(True, 100)]
+
+    def test_paginate_alias_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--paginate`` was removed in 2.1.0; the option is no longer accepted."""
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
+        result = make_runner().invoke(cmd, ["--paginate"])
+        assert result.exit_code != 0
+        assert "No such option: --paginate" in full_output(result)
+        assert mock.call_count == 0
 
 
 # ---------------------------------------------------------------------------
-# Pagination: default, --all-items, --offset, and the removed --paginate alias
+# v2 → v3 deprecation aliases
 # ---------------------------------------------------------------------------
 
 
-class TestPaginationModes:
-    """The four pagination modes: default, ``--max-items``, ``--all-items``, ``--offset``."""
+class TestDeprecationAliases:
+    """``--all-items``, ``--page-size``, ``--max-items`` are retained as
+    deprecation aliases. Each emits a stderr warning and forwards to its v3
+    equivalent (or no-ops when the behavior is now the default).
+    """
 
-    def test_default_single_page_no_limit_in_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Without any pagination flag we don't push ``limit`` into opts."""
+    def test_all_items_warns_and_is_noop(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            return_value=_page([{"gid": "1"}, {"gid": "2"}]),
-        )
-        result = CliRunner().invoke(cmd, [])
-        assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
-        assert "limit" not in mock.call_args_list[0].args[0]
-
-    def test_all_items_does_not_push_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """``--all-items`` delegates pagination to the SDK; we don't set ``limit``."""
-        cmd = _build_command("TasksApi", "get_tasks")
-        # Emulate the SDK's PageIterator with a plain iterator -- the
-        # formatter wrapper collapses any non-list iterable to a list.
         mock = _patch(
             monkeypatch,
             "TasksApi",
             "get_tasks",
             return_value=iter([{"gid": "1"}, {"gid": "2"}]),
         )
-        result = CliRunner().invoke(cmd, ["--all-items"])
-        assert result.exit_code == 0, result.output
-        assert mock.call_count == 1
+        result = make_runner().invoke(cmd, ["--all-items"])
+        assert result.exit_code == 0, result.stdout + result.stderr
+        assert "--all-items is deprecated" in result.stderr
+        # No-op alias: SDK call should look identical to passing no flag.
+        assert mock.call_args_list[0].kwargs == {}
         assert "limit" not in mock.call_args_list[0].args[0]
-        assert json.loads(result.output) == [{"gid": "1"}, {"gid": "2"}]
+        assert json.loads(result.stdout) == [{"gid": "1"}, {"gid": "2"}]
 
-    def test_paginate_alias_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """``--paginate`` was removed in 2.1.0; the option is no longer accepted."""
+    def test_page_size_warns_and_forwards_to_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=iter([]))
+        result = make_runner().invoke(cmd, ["--page-size", "50"])
+        assert result.exit_code == 0, result.stdout + result.stderr
+        assert "--page-size is deprecated" in result.stderr
+        # Forwarded to ``opts["limit"]`` (the v3 --limit destination).
+        assert mock.call_args_list[0].args[0]["limit"] == 50
+
+    def test_max_items_warns_and_forwards_to_item_limit(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=iter([]))
+        result = make_runner().invoke(cmd, ["--max-items", "100"])
+        assert result.exit_code == 0, result.stdout + result.stderr
+        assert "--max-items is deprecated" in result.stderr
+        # Forwarded to the ``item_limit`` kwarg (the v3 --item-limit destination).
+        assert mock.call_args_list[0].kwargs == {"item_limit": 100}
+
+    def test_page_size_with_limit_is_usage_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
         mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
-        result = CliRunner().invoke(cmd, ["--paginate"])
+        result = make_runner().invoke(cmd, ["--page-size", "50", "--limit", "100"])
         assert result.exit_code != 0
-        assert "No such option: --paginate" in result.output
+        assert "alias of --limit" in full_output(result)
         assert mock.call_count == 0
 
-    def test_max_items_with_all_items_is_an_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_max_items_with_item_limit_is_usage_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
         mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
-        result = CliRunner().invoke(cmd, ["--max-items", "10", "--all-items"])
+        result = make_runner().invoke(cmd, ["--max-items", "100", "--item-limit", "200"])
         assert result.exit_code != 0
-        assert "cannot be combined" in result.output
+        assert "alias of --item-limit" in full_output(result)
         assert mock.call_count == 0
-
-    def test_offset_passthrough(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """``--offset TOKEN`` reaches ``opts["offset"]`` on a single request."""
-        cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_tasks",
-            return_value=_page([{"gid": "1"}]),
-        )
-        result = CliRunner().invoke(cmd, ["--offset", "abc123"])
-        assert result.exit_code == 0, result.output
-        assert mock.call_args_list[0].args[0]["offset"] == "abc123"
 
 
 # ---------------------------------------------------------------------------
@@ -286,25 +333,200 @@ class TestPaginationModes:
 class TestGlobalOptionValidation:
     """Type/range validation on global options that affect runtime state."""
 
-    def test_retries_rejects_negative(self) -> None:
-        """``--retries`` must be a non-negative integer; negative values
-        previously silently disabled retries via urllib3.Retry."""
+    def test_retry_strategy_total_zero_accepted(self) -> None:
+        """``--retry-strategy total=0`` parses fine (disables retries explicitly)."""
         from asana_api_cli.cli import main
 
-        result = CliRunner().invoke(main, ["--retries", "-1"])
-        assert result.exit_code != 0
-        assert "Invalid value" in result.output or "is not in the range" in result.output
-
-    def test_retries_zero_accepted(self) -> None:
-        """``--retries 0`` is valid (disables retries explicitly)."""
-        from asana_api_cli.cli import main
-
-        # Click parses 0 fine; we don't run a subcommand so we expect a
-        # missing-command error rather than a validation error.
-        result = CliRunner().invoke(main, ["--retries", "0"])
+        result = make_runner().invoke(main, ["--retry-strategy", "total=0"])
         # Either succeeds (showing help) or fails with "Missing command",
-        # but not with an IntRange validation error.
-        assert "Invalid value" not in result.output
+        # but never with a parser error.
+        assert "Invalid value" not in full_output(result)
+
+    @pytest.mark.skipif(
+        not _SDK_HAS_RETRY_STRATEGY,
+        reason="--retry-strategy is hidden on python-asana <5.1",
+    )
+    def test_retry_strategy_rejects_unknown_field(self) -> None:
+        """Unknown retry fields must be rejected before any SDK call."""
+        from asana_api_cli.cli import main
+
+        result = make_runner().invoke(main, ["--retry-strategy", "bogus=1"])
+        assert result.exit_code != 0
+        assert "Unknown field" in full_output(result)
+
+    @pytest.mark.skipif(
+        not _SDK_HAS_RETRY_STRATEGY,
+        reason="--retry-strategy is hidden on python-asana <5.1",
+    )
+    def test_retry_strategy_list_field_in_shorthand_rejected(self) -> None:
+        """List-typed fields require the JSON form."""
+        from asana_api_cli.cli import main
+
+        result = make_runner().invoke(main, ["--retry-strategy", "status_forcelist=429"])
+        assert result.exit_code != 0
+        assert "list type" in full_output(result)
+
+    def test_connection_pool_maxsize_rejects_zero(self) -> None:
+        from asana_api_cli.cli import main
+
+        result = make_runner().invoke(main, ["--connection-pool-maxsize", "0"])
+        assert result.exit_code != 0
+        assert "Invalid value" in full_output(result) or "is not in the range" in full_output(
+            result
+        )
+
+
+# ---------------------------------------------------------------------------
+# Tri-state toggle plumbing (--verify-ssl/--no-verify-ssl,
+# --assert-hostname/--no-assert-hostname)
+# ---------------------------------------------------------------------------
+
+
+class TestTriStateToggles:
+    """Toggles with ``default=None`` must distinguish three states:
+    explicit True (user passed the positive form), explicit False (user
+    passed the negative form), and unset (user passed neither).
+
+    ``main()`` guards the unset case so the runtime singleton is not
+    clobbered with ``None`` over a value an earlier code path may have
+    set. ``AsanaSession`` mirrors the guard so it only writes
+    ``config.<prop>`` when the runtime carries an explicit value.
+
+    These tests invoke ``main`` with a subcommand path ending in
+    ``--help``: Click runs the root group callback (which writes to
+    ``runtime``) before descending into the subcommand, and the leaf
+    ``--help`` then short-circuits without touching the SDK — exactly
+    what we want for an option-plumbing test.
+    """
+
+    def test_verify_ssl_explicit_true(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.verify_ssl = None
+        result = make_runner().invoke(main, ["--verify-ssl", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.verify_ssl is True
+
+    def test_no_verify_ssl_explicit_false(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.verify_ssl = None
+        result = make_runner().invoke(main, ["--no-verify-ssl", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.verify_ssl is False
+
+    def test_verify_ssl_unset_does_not_clobber_existing_runtime_value(self) -> None:
+        """Regression for the round-1 review fix: when ``main()`` runs
+        without either side of the toggle, it must NOT overwrite a value
+        already in ``runtime.verify_ssl`` (set by a higher-priority source).
+        Pre-set to False, invoke main with no toggle on the command line;
+        the guard must leave it intact."""
+        from asana_api_cli.cli import main
+
+        runtime.verify_ssl = False
+        result = make_runner().invoke(main, ["tasks", "get-task", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.verify_ssl is False
+
+    def test_assert_hostname_explicit_true(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.assert_hostname = None
+        result = make_runner().invoke(main, ["--assert-hostname", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.assert_hostname is True
+
+    def test_no_assert_hostname_explicit_false(self) -> None:
+        from asana_api_cli.cli import main
+
+        runtime.assert_hostname = None
+        result = make_runner().invoke(main, ["--no-assert-hostname", "tasks", "get-task", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.assert_hostname is False
+
+    def test_assert_hostname_unset_does_not_clobber_existing_runtime_value(self) -> None:
+        """Same regression shape as ``verify_ssl`` — round-2 review added
+        the ``is not None`` guard to ``main()`` for symmetry."""
+        from asana_api_cli.cli import main
+
+        runtime.assert_hostname = True
+        result = make_runner().invoke(main, ["tasks", "get-task", "--help"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.assert_hostname is True
+
+
+# ---------------------------------------------------------------------------
+# --retry-strategy reaches session.py and exercises Retry.new()
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not _SDK_HAS_RETRY_STRATEGY,
+    reason="--retry-strategy is hidden on python-asana <5.1",
+)
+class TestRetryStrategyReachesSession:
+    """End-to-end plumbing for ``--retry-strategy``: the parsed overrides
+    must reach ``AsanaSession.__init__`` and be applied via
+    ``Configuration.retry_strategy.new(**overrides)``.
+
+    Tests invoke a leaf command built by ``_build_command`` so the
+    global-option pickup goes through ``CommandWithGlobalOptions.invoke``
+    (which is what powers the leaf-level reach of every global option)
+    rather than through ``main``. The retry override semantics are
+    identical in both paths.
+    """
+
+    def test_empty_object_still_invokes_new(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Regression for the round-1 fix changing ``if runtime...:`` to
+        ``if runtime... is not None:``. Passing ``--retry-strategy '{}'``
+        is an intentional "user did pass the flag" signal — the session
+        must call ``.new()`` (even though the resulting Retry is
+        observationally identical to the SDK default)."""
+        from urllib3.util.retry import Retry
+
+        new_kwargs_seen: list[dict[str, Any]] = []
+        original_new = Retry.new
+
+        def spy_new(self: Retry, **kw: Any) -> Retry:
+            new_kwargs_seen.append(kw)
+            return original_new(self, **kw)
+
+        monkeypatch.setattr(Retry, "new", spy_new)
+
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
+        result = make_runner().invoke(cmd, ["--retry-strategy", "{}", "--task", "T"])
+        assert result.exit_code == 0, full_output(result)
+        # The mocked SDK call never triggers urllib3's own retry path, so
+        # the only ``.new(**{})`` call here is the one in session.py — and
+        # it had to happen, otherwise the round-1 truthy-check regression
+        # would resurface.
+        assert {} in new_kwargs_seen
+
+    def test_overrides_propagate_to_configuration(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--retry-strategy total=7,backoff_factor=1.5`` reaches the SDK
+        as a ``retry_strategy`` instance with the overridden fields, while
+        list-typed defaults (``status_forcelist``) are preserved by the
+        ``.new()`` partial-override semantics."""
+        cmd = _build_command("TasksApi", "get_task")
+        captured: list[Any] = []
+
+        def patched(self_api: Any, *args: Any, **kwargs: Any) -> Any:
+            captured.append(self_api.api_client.configuration.retry_strategy)
+            return {"data": {}}
+
+        monkeypatch.setattr(asana.TasksApi, "get_task", patched)
+        result = make_runner().invoke(
+            cmd,
+            ["--retry-strategy", "total=7,backoff_factor=1.5", "--task", "T"],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert len(captured) == 1
+        rs = captured[0]
+        assert rs.total == 7
+        assert rs.backoff_factor == 1.5
+        # SDK default not touched by the partial override.
+        assert rs.status_forcelist == [429, 500, 502, 503, 504]
 
 
 class TestDebugRedactorLifecycle:
@@ -327,7 +549,7 @@ class TestDebugRedactorLifecycle:
         def _generator() -> Iterator[dict[str, Any]]:
             for i in range(3):
                 current = http.client.__dict__.get("print")
-                redactor_states.append(getattr(current, "_asana_cli_redactor", False))
+                redactor_states.append(getattr(current, "_http_client_auth_redactor", False))
                 yield {"gid": str(i)}
 
         cmd = _build_command("TasksApi", "get_tasks")
@@ -337,8 +559,8 @@ class TestDebugRedactorLifecycle:
         saved_print = http.client.__dict__.get("print")
         saved_debuglevel = http.client.HTTPConnection.debuglevel
         try:
-            result = CliRunner().invoke(cmd, ["--all-items"])
-            assert result.exit_code == 0, result.output
+            result = make_runner().invoke(cmd, ["--all-items"])
+            assert result.exit_code == 0, full_output(result)
             assert len(redactor_states) == 3
             assert all(redactor_states), (
                 "redactor must be installed during every PageIterator yield; "
@@ -369,8 +591,8 @@ class TestArgumentForwarding:
             "get_task",
             return_value={"data": {"gid": "TASK"}},
         )
-        result = CliRunner().invoke(cmd, ["--task", "TASK_GID"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--task", "TASK_GID"])
+        assert result.exit_code == 0, full_output(result)
         assert mock.call_args_list[0].args[0] == "TASK_GID"
 
     def test_body_is_parsed_and_passed_first(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -382,16 +604,16 @@ class TestArgumentForwarding:
             return_value={"data": {"gid": "NEW"}},
         )
         body_json = '{"data": {"name": "x"}}'
-        result = CliRunner().invoke(cmd, ["--body", body_json])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--body", body_json])
+        assert result.exit_code == 0, full_output(result)
         # ``body`` (parsed JSON) is the first positional, opts is the second.
         assert mock.call_args_list[0].args[0] == {"data": {"name": "x"}}
 
     def test_arbitrary_opt_param_reaches_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         mock = _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
-        result = CliRunner().invoke(cmd, ["--task", "T", "--opt-fields", "name,gid"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--task", "T", "--opt-fields", "name,gid"])
+        assert result.exit_code == 0, full_output(result)
         opts = mock.call_args_list[0].args[1]
         assert opts["opt_fields"] == "name,gid"
 
@@ -399,8 +621,8 @@ class TestArgumentForwarding:
         """An optional opt the user did not supply must NOT be sent as ``None``."""
         cmd = _build_command("TasksApi", "get_task")
         mock = _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
-        result = CliRunner().invoke(cmd, ["--task", "T"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--task", "T"])
+        assert result.exit_code == 0, full_output(result)
         opts = mock.call_args_list[0].args[1]
         assert "opt_fields" not in opts
 
@@ -410,8 +632,8 @@ class TestArgumentForwarding:
         """``delete_task`` has no ``opts`` parameter; the CLI must not pass one."""
         cmd = _build_command("TasksApi", "delete_task")
         mock = _patch(monkeypatch, "TasksApi", "delete_task", return_value={"data": {}})
-        result = CliRunner().invoke(cmd, ["--task", "T"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--task", "T"])
+        assert result.exit_code == 0, full_output(result)
         assert mock.call_args_list[0].args == ("T",)
 
 
@@ -429,8 +651,8 @@ class TestWorkspaceResolution:
         """``get-tasks`` exposes ``workspace`` as an optional opts param."""
         cmd = _build_command("TasksApi", "get_tasks")
         mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
-        result = CliRunner().invoke(cmd, ["--workspace", "WS123"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--workspace", "WS123"])
+        assert result.exit_code == 0, full_output(result)
         assert mock.call_args_list[0].args[0]["workspace"] == "WS123"
 
     def test_env_var_not_used_when_workspace_is_optional(
@@ -440,8 +662,8 @@ class TestWorkspaceResolution:
         monkeypatch.setenv("ASANA_DEFAULT_WORKSPACE", "ENV_WS")
         cmd = _build_command("TasksApi", "get_tasks")
         mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
-        result = CliRunner().invoke(cmd, [])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, [])
+        assert result.exit_code == 0, full_output(result)
         assert "workspace" not in mock.call_args_list[0].args[0]
 
     def test_env_var_fills_required_positional_workspace(
@@ -456,8 +678,8 @@ class TestWorkspaceResolution:
             "get_projects_for_workspace",
             return_value=_page([]),
         )
-        result = CliRunner().invoke(cmd, [])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, [])
+        assert result.exit_code == 0, full_output(result)
         # workspace_gid is positional, so it shows up as the first call arg.
         assert mock.call_args_list[0].args[0] == "ENV_WS"
 
@@ -470,8 +692,8 @@ class TestWorkspaceResolution:
             "get_projects_for_workspace",
             return_value=_page([]),
         )
-        result = CliRunner().invoke(cmd, ["--workspace", "EXPLICIT_WS"])
-        assert result.exit_code == 0, result.output
+        result = make_runner().invoke(cmd, ["--workspace", "EXPLICIT_WS"])
+        assert result.exit_code == 0, full_output(result)
         assert mock.call_args_list[0].args[0] == "EXPLICIT_WS"
 
     def test_required_workspace_missing_exits_without_calling_sdk(
@@ -484,6 +706,6 @@ class TestWorkspaceResolution:
             "get_projects_for_workspace",
             return_value=_page([]),
         )
-        result = CliRunner().invoke(cmd, [])
+        result = make_runner().invoke(cmd, [])
         assert result.exit_code != 0
         assert mock.call_count == 0

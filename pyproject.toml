@@ -1,16 +1,27 @@
 [project]
 name = "asana-api-cli"
-version = "2.1.1"
+version = "3.0.0"
 description = "Command-line wrapper around the official Asana Python SDK"
-authors = [{name = "Masanao Izumo", email = "asana@masanao.site"}]
+authors = [{name = "Masanao Izumo"}]
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+keywords = ["asana", "cli", "python-asana"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Office/Business :: Groupware",
+    "Topic :: Utilities",
+]
 dependencies = [
     "click>=8.0",
     "jq>=1.6",
     "tabulate>=0.9",
-    "asana>=5.2,<6",
+    "asana>=5.0.2,<6",
 ]
 
 [project.urls]
@@ -30,6 +41,8 @@ dev = [
     "build>=1,<2",
     "twine>=6,<7",
     "vermin>=1.6,<2",
+    "vcrpy>=6",
+    "pytest-recording>=0.13",
 ]
 
 [build-system]
@@ -80,5 +93,6 @@ no_parse_comments = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 addopts = ""
 disable_test_id_escaping_and_forfeit_all_rights_to_community_support = true

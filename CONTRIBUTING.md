@@ -18,6 +18,10 @@ uv sync
 uv run pytest
 ```
 
+End-to-end tests under `tests/e2e/` run the CLI against the real Asana API
+and are skipped by default. See [`tests/e2e/README.md`](tests/e2e/README.md)
+for the live / replay workflow and the one-time workspace provisioning step.
+
 ## Code style
 
 - Format and lint with `ruff`:
@@ -25,6 +29,12 @@ uv run pytest
   ```bash
   uv run ruff format .
   uv run ruff check .
+  ```
+
+- Type-check with `basedpyright`:
+
+  ```bash
+  uv run basedpyright
   ```
 
 - Messages printed to the console (errors, help text, etc.) must be written

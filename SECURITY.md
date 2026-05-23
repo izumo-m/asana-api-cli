@@ -43,3 +43,15 @@ environment variable. Treat this token as a secret:
   suspect it has been exposed.
 - When sharing command output, scrub any GIDs or data you do not want to
   disclose; `asana-api-cli` prints raw API responses by default.
+
+## Debug output
+
+`asana-api --debug` enables HTTP request/response logging to stderr to help
+diagnose issues. The CLI installs an `HttpClientAuthRedactor` that masks
+the `Authorization` header before printing, so debug logs are safe to copy
+into bug reports.
+
+Note that this masking is provided by the CLI, not by the SDK. If you
+enable the SDK's HTTP debug logging directly from Python (without going
+through `asana-api`), the `Authorization` header — which contains your
+personal access token — appears in the output in clear text.

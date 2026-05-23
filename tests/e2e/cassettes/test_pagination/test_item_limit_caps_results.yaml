@@ -1,0 +1,322 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
+  response:
+    body:
+      string: '{"data":[{"gid":"1214927854047052","name":"pagination-test"}],"next_page":null}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '79'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 11:54:55 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=1,cdn-upstream-fbl;dur=246,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="VqwKhbu28kFvmhzeRqqY8clqFPmyYHET5v0QiWAdWMT23HizyXVorQ==",cdn-downstream-fbl;dur=272
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 2f3139232809729dc24811902779108a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - VqwKhbu28kFvmhzeRqqY8clqFPmyYHET5v0QiWAdWMT23HizyXVorQ==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '95'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/tasks?project=1214927854047052&limit=100
+  response:
+    body:
+      string: '{"data":[{"gid":"1214928260937768","name":"ptest-1500","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250899321","name":"ptest-1499","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203353131","name":"ptest-1498","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146546503","name":"ptest-1497","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928293217365","name":"ptest-1496","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164748339","name":"ptest-1495","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928293216178","name":"ptest-1494","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165135277","name":"ptest-1493","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260908550","name":"ptest-1492","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260535559","name":"ptest-1491","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165165749","name":"ptest-1490","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179695424","name":"ptest-1489","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203290273","name":"ptest-1488","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928147126121","name":"ptest-1487","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260906042","name":"ptest-1486","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165135266","name":"ptest-1485","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250592797","name":"ptest-1484","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928293031554","name":"ptest-1483","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250285438","name":"ptest-1482","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260862981","name":"ptest-1481","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164809415","name":"ptest-1480","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250229794","name":"ptest-1479","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260678184","name":"ptest-1478","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250759920","name":"ptest-1477","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165121815","name":"ptest-1476","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260844591","name":"ptest-1475","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164775965","name":"ptest-1474","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250274435","name":"ptest-1473","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250731259","name":"ptest-1472","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164792847","name":"ptest-1471","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250132386","name":"ptest-1470","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260792092","name":"ptest-1469","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250751717","name":"ptest-1468","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250274425","name":"ptest-1467","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146988236","name":"ptest-1466","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164826941","name":"ptest-1465","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250525010","name":"ptest-1464","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165059397","name":"ptest-1463","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179938357","name":"ptest-1462","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250685595","name":"ptest-1461","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260792200","name":"ptest-1460","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260678173","name":"ptest-1459","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928165029954","name":"ptest-1458","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164976200","name":"ptest-1457","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179697554","name":"ptest-1456","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250685585","name":"ptest-1455","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260430838","name":"ptest-1454","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146890283","name":"ptest-1453","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260738108","name":"ptest-1452","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164697398","name":"ptest-1451","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250704157","name":"ptest-1450","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146578724","name":"ptest-1449","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260715747","name":"ptest-1448","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179253915","name":"ptest-1447","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146716642","name":"ptest-1446","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203428178","name":"ptest-1445","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164871073","name":"ptest-1444","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146681277","name":"ptest-1443","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928293024254","name":"ptest-1442","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250688085","name":"ptest-1441","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203354589","name":"ptest-1440","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203070785","name":"ptest-1439","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260535544","name":"ptest-1438","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203412153","name":"ptest-1437","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250759908","name":"ptest-1436","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260678163","name":"ptest-1435","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260430827","name":"ptest-1434","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260693982","name":"ptest-1433","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203290142","name":"ptest-1432","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260626218","name":"ptest-1431","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146939675","name":"ptest-1430","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146901610","name":"ptest-1429","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146688031","name":"ptest-1428","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203380377","name":"ptest-1427","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260442634","name":"ptest-1426","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260678153","name":"ptest-1425","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250731317","name":"ptest-1424","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260670356","name":"ptest-1423","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260661934","name":"ptest-1422","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203163685","name":"ptest-1421","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260422427","name":"ptest-1420","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260659750","name":"ptest-1419","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250108944","name":"ptest-1418","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928180068908","name":"ptest-1417","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203215334","name":"ptest-1416","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164871062","name":"ptest-1415","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146872607","name":"ptest-1414","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164928383","name":"ptest-1413","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250229782","name":"ptest-1412","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214934146743611","name":"ptest-1411","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146290604","name":"ptest-1410","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928163889887","name":"ptest-1409","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250452868","name":"ptest-1408","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146309001","name":"ptest-1407","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260614454","name":"ptest-1406","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164818215","name":"ptest-1405","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164560053","name":"ptest-1404","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146681262","name":"ptest-1403","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260430817","name":"ptest-1402","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203290131","name":"ptest-1401","resource_type":"task","resource_subtype":"default_task"}],"next_page":{"offset":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlYNEZOQzlLTllcIiwxMjE0OTI4MTY0NTE5NzY5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.Wzl9GB3xQ63gd-UBIEPK4iMgloQ1b5pqj1nhKT6mL-8","path":"/tasks?project=1214927854047052&limit=100&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlYNEZOQzlLTllcIiwxMjE0OTI4MTY0NTE5NzY5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.Wzl9GB3xQ63gd-UBIEPK4iMgloQ1b5pqj1nhKT6mL-8","uri":"https://app.asana.com/api/1.0/tasks?project=1214927854047052&limit=100&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlYNEZOQzlLTllcIiwxMjE0OTI4MTY0NTE5NzY5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.Wzl9GB3xQ63gd-UBIEPK4iMgloQ1b5pqj1nhKT6mL-8"}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '11263'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 11:54:55 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=281,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="hjLXF_FIb1vA6Pj6l3qfBk1lluSRr7m3GUC1-F11qfX1Ps3YUW6h5g==",cdn-downstream-fbl;dur=300
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 ee788c63da10bd5eab6954ad5eda1484.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - hjLXF_FIb1vA6Pj6l3qfBk1lluSRr7m3GUC1-F11qfX1Ps3YUW6h5g==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '125'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/tasks?project=1214927854047052&limit=100&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlYNEZOQzlLTllcIiwxMjE0OTI4MTY0NTE5NzY5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.Wzl9GB3xQ63gd-UBIEPK4iMgloQ1b5pqj1nhKT6mL-8
+  response:
+    body:
+      string: '{"data":[{"gid":"1214928164519767","name":"ptest-1400","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260503785","name":"ptest-1399","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146516497","name":"ptest-1398","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203161268","name":"ptest-1397","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146681196","name":"ptest-1396","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146663631","name":"ptest-1395","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260412839","name":"ptest-1394","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203276023","name":"ptest-1393","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179697531","name":"ptest-1392","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260431872","name":"ptest-1391","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164826928","name":"ptest-1390","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146758110","name":"ptest-1389","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146758249","name":"ptest-1388","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250608545","name":"ptest-1387","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203248528","name":"ptest-1386","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203204439","name":"ptest-1385","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250608535","name":"ptest-1384","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250435979","name":"ptest-1383","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260430804","name":"ptest-1382","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164738235","name":"ptest-1381","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260397101","name":"ptest-1380","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164789484","name":"ptest-1379","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203215298","name":"ptest-1378","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203188384","name":"ptest-1377","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928180059054","name":"ptest-1376","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260422414","name":"ptest-1375","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250310355","name":"ptest-1374","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928180068891","name":"ptest-1373","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164826918","name":"ptest-1372","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260430794","name":"ptest-1371","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164818201","name":"ptest-1370","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146367942","name":"ptest-1369","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928260422248","name":"ptest-1368","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146689082","name":"ptest-1367","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203204427","name":"ptest-1366","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164662945","name":"ptest-1365","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141500266","name":"ptest-1364","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146336759","name":"ptest-1363","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146687896","name":"ptest-1362","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146367932","name":"ptest-1361","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203053524","name":"ptest-1360","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146290585","name":"ptest-1359","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179632056","name":"ptest-1358","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203023341","name":"ptest-1357","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146538083","name":"ptest-1356","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146538073","name":"ptest-1355","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203054685","name":"ptest-1354","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250432334","name":"ptest-1353","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928180059044","name":"ptest-1352","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164560040","name":"ptest-1351","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203127082","name":"ptest-1350","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250265872","name":"ptest-1349","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179939640","name":"ptest-1348","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179803557","name":"ptest-1347","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179508916","name":"ptest-1346","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250229765","name":"ptest-1345","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146617427","name":"ptest-1344","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164714964","name":"ptest-1343","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164530394","name":"ptest-1342","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146495160","name":"ptest-1341","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164714703","name":"ptest-1340","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250285510","name":"ptest-1339","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146336747","name":"ptest-1338","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141584669","name":"ptest-1337","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146337361","name":"ptest-1336","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202821777","name":"ptest-1335","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202814244","name":"ptest-1334","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179968807","name":"ptest-1333","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202831646","name":"ptest-1332","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164533864","name":"ptest-1331","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928180013284","name":"ptest-1330","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250372842","name":"ptest-1329","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203090464","name":"ptest-1328","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179923309","name":"ptest-1327","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164533830","name":"ptest-1326","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164598479","name":"ptest-1325","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164520890","name":"ptest-1324","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146337351","name":"ptest-1323","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164559799","name":"ptest-1322","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203090454","name":"ptest-1321","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179938514","name":"ptest-1320","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179928633","name":"ptest-1319","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250285421","name":"ptest-1318","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250109145","name":"ptest-1317","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179922081","name":"ptest-1316","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203070759","name":"ptest-1315","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146389746","name":"ptest-1314","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250288920","name":"ptest-1313","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164328570","name":"ptest-1312","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250286669","name":"ptest-1311","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164560005","name":"ptest-1310","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203054671","name":"ptest-1309","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141584657","name":"ptest-1308","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202831553","name":"ptest-1307","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146538060","name":"ptest-1306","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928013491411","name":"ptest-1305","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179873602","name":"ptest-1304","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250285605","name":"ptest-1303","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179498082","name":"ptest-1302","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203025996","name":"ptest-1301","resource_type":"task","resource_subtype":"default_task"}],"next_page":{"offset":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlaV1IyU0sxNlNcIiwxMjE0OTI4MTY0NDg0NTk5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.foCI8at-nFB82tw4i3FWxEbONLC_ZGk03Z9sFJ8HB2g","path":"/tasks?project=1214927854047052&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlaV1IyU0sxNlNcIiwxMjE0OTI4MTY0NDg0NTk5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.foCI8at-nFB82tw4i3FWxEbONLC_ZGk03Z9sFJ8HB2g&limit=100","uri":"https://app.asana.com/api/1.0/tasks?project=1214927854047052&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlaV1IyU0sxNlNcIiwxMjE0OTI4MTY0NDg0NTk5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.foCI8at-nFB82tw4i3FWxEbONLC_ZGk03Z9sFJ8HB2g&limit=100"}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '11263'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 11:54:55 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=310,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="oUHEB9-YjhY3NQC1RzDpERML3fNBtYMCgEyVLcYom36o6qh5WNBkrQ==",cdn-downstream-fbl;dur=326
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 ee788c63da10bd5eab6954ad5eda1484.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - oUHEB9-YjhY3NQC1RzDpERML3fNBtYMCgEyVLcYom36o6qh5WNBkrQ==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '156'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.11.2&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: GET
+    uri: https://app.asana.com/api/1.0/tasks?project=1214927854047052&limit=50&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVlaV1IyU0sxNlNcIiwxMjE0OTI4MTY0NDg0NTk5XSIsImlhdCI6MTc3OTM2NDQ5NSwiZXhwIjoxNzc5MzY1Mzk1fQ.foCI8at-nFB82tw4i3FWxEbONLC_ZGk03Z9sFJ8HB2g
+  response:
+    body:
+      string: '{"data":[{"gid":"1214928164484597","name":"ptest-1300","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928203023427","name":"ptest-1299","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164248607","name":"ptest-1298","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179708640","name":"ptest-1297","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146338765","name":"ptest-1296","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164328678","name":"ptest-1295","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164248597","name":"ptest-1294","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179563190","name":"ptest-1293","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250282819","name":"ptest-1292","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250274479","name":"ptest-1291","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179803490","name":"ptest-1290","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250265739","name":"ptest-1289","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202814232","name":"ptest-1288","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146337339","name":"ptest-1287","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202814222","name":"ptest-1286","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928145979923","name":"ptest-1285","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141395350","name":"ptest-1284","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164185510","name":"ptest-1283","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928145816648","name":"ptest-1282","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179698754","name":"ptest-1281","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250241090","name":"ptest-1280","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164379777","name":"ptest-1279","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146067883","name":"ptest-1278","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928145901049","name":"ptest-1277","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164310402","name":"ptest-1276","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179708625","name":"ptest-1275","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179465342","name":"ptest-1274","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164428061","name":"ptest-1273","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179574113","name":"ptest-1272","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179838180","name":"ptest-1271","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164418604","name":"ptest-1270","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928178974566","name":"ptest-1269","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146309047","name":"ptest-1268","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202778914","name":"ptest-1267","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141579287","name":"ptest-1266","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164311643","name":"ptest-1265","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928163889867","name":"ptest-1264","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928146337016","name":"ptest-1263","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141532771","name":"ptest-1262","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202686045","name":"ptest-1261","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202367072","name":"ptest-1260","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141416777","name":"ptest-1259","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202814324","name":"ptest-1258","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928250119636","name":"ptest-1257","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179677619","name":"ptest-1256","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164427961","name":"ptest-1255","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928164330185","name":"ptest-1254","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928202814352","name":"ptest-1253","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928179301410","name":"ptest-1252","resource_type":"task","resource_subtype":"default_task"},{"gid":"1214928141416767","name":"ptest-1251","resource_type":"task","resource_subtype":"default_task"}],"next_page":{"offset":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVoxQUZTME5PT1RcIiwxMjE0OTI4MDEzMTE5ODgyXSIsImlhdCI6MTc3OTM2NDQ5NiwiZXhwIjoxNzc5MzY1Mzk2fQ.3CBfiPXJ3CKC_UymRJDDQ8QNaUz9l2pAhrwhlNRGAD8","path":"/tasks?project=1214927854047052&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVoxQUZTME5PT1RcIiwxMjE0OTI4MDEzMTE5ODgyXSIsImlhdCI6MTc3OTM2NDQ5NiwiZXhwIjoxNzc5MzY1Mzk2fQ.3CBfiPXJ3CKC_UymRJDDQ8QNaUz9l2pAhrwhlNRGAD8&limit=50","uri":"https://app.asana.com/api/1.0/tasks?project=1214927854047052&offset=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJib3JkZXJfcmFuayI6IltcIlZcIiwxMjE0OTI3Nzc5OTE4MjU5LFwiOVoxQUZTME5PT1RcIiwxMjE0OTI4MDEzMTE5ODgyXSIsImlhdCI6MTc3OTM2NDQ5NiwiZXhwIjoxNzc5MzY1Mzk2fQ.3CBfiPXJ3CKC_UymRJDDQ8QNaUz9l2pAhrwhlNRGAD8&limit=50"}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '6061'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 21 May 2026 11:54:56 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=292,cdn-upstream-fbl;dur=531,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="lV0Y4kT1Xhq8YJ6tC3RS5NaOUS6P6tVKPo_7lwZZn42NVJP_wZ_R5g==",cdn-downstream-fbl;dur=558
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 ee788c63da10bd5eab6954ad5eda1484.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - lV0Y4kT1Xhq8YJ6tC3RS5NaOUS6P6tVKPo_7lwZZn42NVJP_wZ_R5g==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '90'
+      x-frame-options:
+      - DENY
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

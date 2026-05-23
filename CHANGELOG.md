@@ -7,6 +7,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-05-23
+
+### Breaking changes (v2 → v3)
+
+Several global flags renamed for 1:1 parity with `asana.Configuration`
+property names. No deprecation aliases:
+
+- `--temp-dir` → `--temp-folder-path`
+- `--ca-cert` → `--ssl-ca-cert`
+- `--timeout` → `--request-timeout`
+- `--retries N` → `--retry-strategy total=N`
+
+Default behavior of paginatable commands (e.g. `tasks get-tasks`) changed:
+**now walks every page automatically** and returns a flat JSON list of
+items. Previously the default was a single page. To restore the
+single-page behavior, pass `--full-payload`.
+
+### Deprecated
+
+The following v2.x flags still work but emit a stderr warning and will
+be removed in a future release:
+
+- `--all-items` — now a no-op (walking every page is the default)
+- `--page-size N` → use `--limit N`
+- `--max-items N` → use `--item-limit N`
+
+Combining a deprecated alias with its replacement (e.g.
+`--page-size 50 --limit 100`) is rejected with a usage error.
+
+### Added
+
+- `--multibyte-filenames` global flag: emits RFC 5987
+  `filename*=UTF-8''…` on multipart uploads so Asana correctly decodes
+  non-ASCII attachment filenames (Japanese, Cyrillic, Greek, etc.).
+  Off by default to match the underlying SDK behavior
+  ([Asana Forum context](https://forum.asana.com/t/attachment-names-uploaded-with-asana-api-are-garbled-on-asanaweb/286200)).
+- `--retry-strategy VALUE` global flag (replaces `--retries N`):
+  overrides any field of `urllib3.util.retry.Retry`. Accepts shorthand
+  `total=5,backoff_factor=1.5`, a JSON object, or `@path/to/file.json`.
+  See [`docs/cli-sdk-mapping.md`](docs/cli-sdk-mapping.md).
+- Eleven new global flags for previously-unreachable `Configuration`
+  properties (full 1:1 SDK parity):
+  - mTLS: `--cert-file PATH`, `--key-file PATH`
+  - TLS: `--assert-hostname / --no-assert-hostname` (tri-state)
+  - Networking: `--connection-pool-maxsize N`,
+    `--safe-chars-for-path-param S`
+  - Logging: `--logger-format FMT`, `--logger-file PATH`
+  - No-op (parity only, inert in python-asana 5.2.4):
+    `--username`, `--password`, `--api-key`, `--api-key-prefix`
+- New pagination flags (1:1 with the SDK):
+  - `--limit N` — per-page size (1-100)
+  - `--page-limit N` — same as `--limit` via Configuration (parity flag)
+  - `--item-limit N` — total cap on items returned
+  - `--full-payload` / `--no-return-page-iterator` — get one
+    `{data, next_page}` dict from one HTTP call instead of walking pages
+- `--version` now shows the installed `click` version alongside
+  `python-asana`
+  (`asana-api, version 3.0.0 (python-asana 5.2.4, click 8.3.3)`).
+
+### Changed
+
+- `--help` overhauled for clarity: global options grouped by category;
+  command groups carry meaningful one-line descriptions; long SDK
+  descriptions no longer truncated; pagination has a consolidated
+  "Pagination:" epilog explaining the two modes (iterator vs single
+  payload); root help ends with a usage-examples block; subcommand
+  help shows global options in compact form (no longer repeats the
+  full ~70 lines). See `asana-api --help` for the new shape.
+- `--task GID` (and every `*_gid` positional) renders with a `GID`
+  metavar and inline example (`Task GID, e.g. 1234567890.`), making
+  it obvious that Asana wants the numeric ID rather than a name.
+- `--body JSON` on POST/PUT commands always shows the input-format
+  hint (`Accepts inline JSON, @path/to/file, or - (stdin). Wrap
+  payload in {"data": {...}}.`).
+- `--no-verify-ssl` is now part of a toggle
+  `--verify-ssl / --no-verify-ssl`. The old `--no-verify-ssl` form
+  still works unchanged.
+- The `--help` text of every CLI-only flag
+  (`--multibyte-filenames`, `--output`, `--query`, `--csv-bom`) ends
+  with an `[asana-api extension]` marker so users can distinguish CLI
+  additions from SDK-derived options at a glance.
+
+### Compatibility
+
+- Lowered the `asana` SDK constraint from `>=5.2,<6` to `>=5.0.2,<6`.
+  The CLI surface is built from whatever `*Api` classes the installed
+  SDK exposes, so users on 5.0.x / 5.1.x get a working CLI with
+  fewer command groups (5.2 added 9 new ones: AccessRequests,
+  Budgets, Exports, ProjectPortfolioSettings, Rates, Reactions,
+  Roles, TimeTrackingCategories, TimesheetApprovalStatuses).
+  `--retry-strategy` — which relies on `Configuration.retry_strategy`
+  introduced in python-asana 5.1 — is hidden from `--help` (and
+  rejected as `No such option`) on 5.0.x; on 5.1+ it works as before.
+  5.0.0 is excluded because its `api_client.call_api` had a
+  `'list' object has no attribute 'items'` bug on no-opts endpoints
+  (`delete-*` etc.) that was fixed in 5.0.2.
+
+### Fixed
+
+- On Windows, `--body -` (read JSON body from stdin) now decodes
+  input as UTF-8 instead of the locale code page (e.g. cp932 on
+  Japanese Windows).
+- `--output csv` and `--output table` no longer crash when `--query`
+  yields a mixed list whose first element is a dict and later
+  elements are not (e.g. `--query '[.data[0], .data | length]'`).
+
 ## [2.1.1] - 2026-05-19
 
 ### Added
@@ -125,7 +231,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **BREAKING:** Removed the `--default-workspace` option. Set the
+- **BREAKING**: Removed the `--default-workspace` option. Set the
   `ASANA_DEFAULT_WORKSPACE` environment variable instead.
 
 ### Fixed
@@ -144,7 +250,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...v3.0.0
 [2.1.1]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v1.5.0...v2.0.0

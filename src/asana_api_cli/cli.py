@@ -18,9 +18,13 @@ Translation rules:
   ``$ASANA_DEFAULT_WORKSPACE`` only when the parameter is required.
 * Methods that accept a ``body`` positional get a required ``--body`` option
   routed through ``resolve_body`` (supports ``@file`` / ``-`` / JSON string).
-* Paginatable methods (those with a ``limit`` doc-param) hide the raw
-  ``--limit`` option in favor of ``--page-size``, and gain ``--all-items``
-  and ``--max-items``.
+* Paginatable methods (those with a ``limit`` doc-param) expose ``--limit``,
+  ``--offset``, ``--page-limit``, ``--item-limit``,
+  ``--return-page-iterator/--no-return-page-iterator``, and ``--full-payload``.
+  Each maps 1:1 to a python-asana SDK input (opts key, ``Configuration``
+  property, or method kwarg) so the CLI works as a thin probe for SDK
+  behavior. v2.x flags ``--all-items``, ``--page-size``, and ``--max-items``
+  are retained as deprecation aliases that warn and forward.
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
@@ -41,6 +45,7 @@ from asana_api_cli.click_ext import (
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
+    _SDK_HAS_RETRY_STRATEGY,
 )
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import (
@@ -49,6 +54,7 @@ from asana_api_cli.session import (
     resolve_workspace,
     runtime,
 )
+from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
 from asana_api_cli.version import version_string
 
 
@@ -73,6 +79,147 @@ def _api_class_to_group(cls_name: str) -> str:
     return _snake(cls_name[:-3])
 
 
+def _humanize_class_name(name: str) -> str:
+    """PascalCase API class name → natural English, used as group-help fallback.
+
+    ``AccessRequests`` → ``"Access requests"``,
+    ``AuditLogAPI`` → ``"Audit log API"``,
+    ``Typeahead`` → ``"Typeahead"``. Acronyms (all-caps runs of length 2+)
+    are preserved; other non-leading words are lowercased.
+    """
+    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", name)
+    spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
+    parts = spaced.split(" ")
+    out = [parts[0]]
+    for p in parts[1:]:
+        if len(p) > 1 and p.isupper():
+            out.append(p)
+        else:
+            out.append(p.lower())
+    return " ".join(out)
+
+
+# Curated short help for each ``*Api`` class. Looked up by the class name
+# with the trailing ``Api`` stripped. Wording is sourced from
+# ``docs/api-groups.md``, which is the authoritative human-reviewable
+# table; ``test_group_descriptions_match_docs`` asserts the two stay in
+# sync. Each entry is intentionally kept ≤ 45 chars so click's
+# ``make_default_short_help`` (max_length=45) renders it verbatim — no
+# "…" truncation that would otherwise drop the key noun.
+#
+# Entries are intentionally kept across SDK versions: if a future SDK
+# removes a group, its description is harmless dead data (and re-engages
+# on a downgrade). When the SDK adds a group not in this dict,
+# ``_group_short_help`` falls back to ``_humanize_class_name`` so the
+# CLI keeps working — adding a curated entry is a soft improvement, not
+# a release blocker.
+_GROUP_DESCRIPTIONS: dict[str, str] = {
+    "AccessRequests": "Manage private-object access requests",
+    "Allocations": "Manage user allocations across projects",
+    "Attachments": "Upload, list, and remove file attachments",
+    "AuditLogAPI": "Read domain audit log events",
+    "BatchAPI": "Execute multiple API requests in parallel",
+    "Budgets": "Manage project and portfolio budgets",
+    "CustomFieldSettings": "List custom fields attached to objects",
+    "CustomFields": "Manage workspace custom fields",
+    "CustomTypes": "Read workspace custom object types",
+    "Events": "Poll resource change events (sync token)",
+    "Exports": "Initiate bulk exports of project resources",
+    "GoalRelationships": "Manage links between goals",
+    "Goals": "Manage organizational goals and metrics",
+    "Jobs": "Check status of async background jobs",
+    "Memberships": "Manage memberships across object types",
+    "OrganizationExports": "Trigger and download org-wide exports",
+    "PortfolioMemberships": "Read who has access to portfolios",
+    "Portfolios": "Manage portfolios (project collections)",
+    "ProjectBriefs": "Manage project brief documents",
+    "ProjectMemberships": "Read who has access to projects",
+    "ProjectPortfolioSettings": "Settings for projects within portfolios",
+    "ProjectStatuses": "Per-project status updates (deprecated)",
+    "ProjectTemplates": "Manage and instantiate project templates",
+    "Projects": "Manage projects (CRUD + members, etc.)",
+    "Rates": "Manage per-user billing rates on projects",
+    "Reactions": "Read emoji reactions on stories",
+    "Roles": "Manage RBAC roles within a workspace",
+    "Rules": "Trigger Asana rule via incoming webhook",
+    "Sections": "Manage project sections (board/list)",
+    "StatusUpdates": "Manage status updates on any object",
+    "Stories": "Manage stories (comments + activity)",
+    "Tags": "Manage tags applied to tasks",
+    "TaskTemplates": "Manage and instantiate task templates",
+    "Tasks": "Manage tasks (CRUD + lifecycle ops)",
+    "TeamMemberships": "Read who belongs to teams",
+    "Teams": "Manage teams within organizations",
+    "TimePeriods": "Read time periods (for goals, reporting)",
+    "TimeTrackingCategories": "Manage time-tracking categories",
+    "TimeTrackingEntries": "Manage time-tracking entries on tasks",
+    "TimesheetApprovalStatuses": "Manage weekly timesheet approval states",
+    "Typeahead": "Auto-complete search for workspace objects",
+    "UserTaskLists": "Read a user's My Tasks list",
+    "Users": "Manage user records (`me` = authenticated)",
+    "Webhooks": "Manage webhook subscriptions (real-time)",
+    "WorkspaceMemberships": "Read workspace members (admin/guest flags)",
+    "Workspaces": "Update workspace and manage its users",
+}
+
+
+def _group_short_help(class_name: str) -> str:
+    """Return the short help for a command group, curated or auto-generated."""
+    return _GROUP_DESCRIPTIONS.get(class_name, _humanize_class_name(class_name))
+
+
+# Hand-written help text for endpoint-local options whose SDK ``:param:``
+# docstring is empty. The triple ``(class_name, method_name, param_name)``
+# is the key because bare param names (``file``, ``parent``, ``name``)
+# would collide across endpoints. Sourced from Asana's developer
+# reference. Lookup is conditional — only used when the SDK provides no
+# description — so an SDK that later fills in a description silently wins
+# over the override (which is fine, the SDK text is authoritative).
+_OPT_HELP_OVERRIDES: dict[tuple[str, str, str], str] = {
+    ("Attachments", "create_attachment_for_object", "connect_to_app"): (
+        "Connect this attachment to the current app (for app component widgets)."
+    ),
+    ("Attachments", "create_attachment_for_object", "file"): (
+        "Local file path to upload (required when resource-subtype=asana)."
+    ),
+    ("Attachments", "create_attachment_for_object", "name"): (
+        "Display name for the attachment (required when resource-subtype=external)."
+    ),
+    ("Attachments", "create_attachment_for_object", "parent"): (
+        "GID of the parent task, project, or project_brief."
+    ),
+    ("Attachments", "create_attachment_for_object", "resource_subtype"): (
+        "Attachment type: 'asana' (file upload) or 'external' (URL link); default 'asana'."
+    ),
+    ("Attachments", "create_attachment_for_object", "url"): (
+        "URL of the external resource (required when resource-subtype=external)."
+    ),
+}
+
+
+# Shown at the bottom of ``--help`` on every paginatable command. Centralises
+# the two-mode mental model and the SDK kwarg / Configuration mapping so each
+# pagination flag's own help text can stay one short sentence about *what* the
+# flag does (no cross-references). The leading ``\b`` lines disable click's
+# rewrap on the aligned columns so the alignment survives in the rendered
+# output.
+_PAGINATION_EPILOG = (
+    "\b\n"
+    "Pagination:\n"
+    "  Per-page size (--limit) and total cap (--item-limit) are different.\n"
+    "\n"
+    "  Iterator mode (default): walks every page and prints a flat list.\n"
+    '    --limit         per-page size sent to the server (opts["limit"]; 1-100)\n'
+    "    --page-limit    same effect as --limit, via Configuration (parity)\n"
+    "    --item-limit    stop after this many items total (kwarg item_limit)\n"
+    '    --offset        resume from a server-issued page token (opts["offset"])\n'
+    "\n"
+    "  Single payload: --full-payload (≡ --no-return-page-iterator) makes one\n"
+    "  HTTP call return one {data, next_page} dict (kwarg full_payload=True).\n"
+    "  In this mode --item-limit is silently ignored."
+)
+
+
 def _method_to_command(method_name: str) -> str:
     """get_tasks → 'get-tasks'."""
     return method_name.replace("_", "-")
@@ -90,11 +237,16 @@ def _is_workspace_param(name: str) -> bool:
 
 
 def _escape_help(text: str) -> str:
-    """Strip HTML tags, normalize whitespace, truncate to 200 chars."""
+    """Strip HTML tags and collapse whitespace; preserve full length.
+
+    Length is left to click's ``wrap_text`` (which wraps to multiple lines
+    rather than truncating). A previous version cut the text at 200 chars
+    and appended ``"..."``, which routinely dropped critical caveats from
+    the end of SDK descriptions (e.g. ``--assignee``'s "*you must also
+    specify the `workspace`*" was hidden behind ``...``).
+    """
     t = re.sub(r"<[^>]+>", "", text)
     t = re.sub(r"\s+", " ", t).strip()
-    if len(t) > 200:
-        t = t[:197] + "..."
     return t
 
 
@@ -159,6 +311,9 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
             p.required = True
             p.description = p.description.replace("(required)", "").strip()
 
+    # `_PARAM_RE` already drops the SDK's `:param async_req bool` line (no
+    # colon after the type, so the regex never matches). Kept as a guard in
+    # case the SDK docstring format changes to the colon form.
     params.pop("async_req", None)
     return params
 
@@ -298,22 +453,26 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     non_ws_positionals = [n for n in path_positionals if not _is_workspace_param(n)]
     non_ws_opts = [p for p in opts_params if not _is_workspace_param(p.name)]
 
-    # Hide the raw SDK ``limit`` for paginatable ops; expose --page-size instead.
-    if paginatable:
-        non_ws_opts = [p for p in non_ws_opts if p.name != "limit"]
-
     options: list[click.Option] = []
 
-    # Path positionals → required --options (with ``_gid`` stripped).
+    # Path positionals → required --options (with ``_gid`` stripped). For
+    # ``*_gid`` params the SDK description is uninformative ("Globally unique
+    # identifier for the X" or worse, "The task to operate on."), so we
+    # synthesize a help line that says it's a GID, gives an example, and
+    # uses ``metavar=GID`` so the option signature itself reads naturally
+    # (``--task GID`` instead of ``--task TEXT``).
     for name in non_ws_positionals:
         opt_name = _option_name(name)
         flag = f"--{opt_name.replace('_', '-')}"
-        dp = op.params.get(name)
-        help_text = _escape_help(dp.description) if dp else ""
-        if name != opt_name:
-            suffix = f"(SDK kwarg: {name})"
-            help_text = f"{help_text} {suffix}".strip() if help_text else suffix
-        options.append(click.Option([flag], required=True, help=help_text))
+        opt_kwargs: dict[str, Any] = {"required": True}
+        if name.endswith("_gid"):
+            thing = opt_name.replace("_", " ")
+            opt_kwargs["metavar"] = "GID"
+            opt_kwargs["help"] = f"{thing.capitalize()} GID, e.g. 1234567890. (SDK kwarg: {name})"
+        else:
+            dp = op.params.get(name)
+            opt_kwargs["help"] = _escape_help(dp.description) if dp else ""
+        options.append(click.Option([flag], **opt_kwargs))
 
     # Unified --workspace option. The env-var fallback only applies when the
     # endpoint requires a workspace; for optional-workspace endpoints (e.g.
@@ -333,18 +492,40 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             )
         )
 
-    # body → required --body option.
+    # body → required --body option. The SDK docstring usually has a short
+    # "The X to create." line which is not enough — users also need to know
+    # the input *format* (inline JSON / @path / stdin) and Asana's
+    # ``{"data": {...}}`` envelope. Always append the format hint so help
+    # is self-contained even when the SDK description is generic.
     if has_body:
-        body_help = "Request body (JSON string, @file, or - for stdin)"
+        body_format = (
+            'Accepts inline JSON, @path/to/file, or - (stdin). Wrap payload in {"data": {...}}.'
+        )
         bp = op.params.get("body")
-        if bp and bp.description:
-            body_help = _escape_help(bp.description)
-        options.append(click.Option(["--body"], required=True, help=body_help))
+        sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
+        body_help = f"{sdk_desc} {body_format}".strip()
+        options.append(click.Option(["--body"], required=True, metavar="JSON", help=body_help))
 
-    # Remaining opts params (excluding workspace and limit-when-paginatable).
+    # Remaining opts params (excluding workspace). The SDK-derived help is
+    # used as-is, with two exceptions:
+    #   - When the SDK provides no ``:param:`` docstring (a handful of
+    #     endpoints, notably ``attachments create-attachment-for-object``),
+    #     fall back to ``_OPT_HELP_OVERRIDES`` so the user isn't staring
+    #     at a bare ``--file TEXT``.
+    #   - ``--limit`` reads as if it caps the total but is per-HTTP-request;
+    #     append the pointer on the option line itself (not only in the
+    #     epilog) so a casual Options-table scan still catches the pitfall.
     for p in non_ws_opts:
         flag = f"--{p.name.replace('_', '-')}"
-        kw: dict[str, Any] = {"help": _escape_help(p.description)}
+        help_text = _escape_help(p.description)
+        if not help_text:
+            help_text = _OPT_HELP_OVERRIDES.get(
+                (api_cls.__name__[:-3], op.method_name, p.name),
+                "",
+            )
+        if p.name == "limit" and paginatable:
+            help_text = f"{help_text} Use --item-limit to cap the total."
+        kw: dict[str, Any] = {"help": help_text}
         click_type = _click_type(p.py_type)
         if click_type is not None:
             kw["type"] = click_type
@@ -354,42 +535,135 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             kw["default"] = None
         options.append(click.Option([flag], **kw))
 
-    # Pagination options.
+    # Pagination options. Each flag's help is a single self-contained
+    # sentence describing *what* it does; the *when / how* (mode
+    # interactions, mutually-exclusive equivalences, SDK kwarg/Configuration
+    # mapping) is consolidated in the pagination epilog at the bottom of
+    # ``--help`` so the flag descriptions don't have to cross-reference
+    # each other.
     if paginatable:
+        options.append(
+            click.Option(
+                ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
+                default=None,
+                help="Toggle the SDK page iterator (default: enabled).",
+            )
+        )
+        options.append(
+            click.Option(
+                ["--page-limit", "page_limit"],
+                type=int,
+                default=None,
+                # Functionally equivalent to --limit for a single CLI call;
+                # --limit goes through opts and --page-limit goes through
+                # Configuration, but the SDK consults Configuration only
+                # when opts has no limit, so they boil down to the same
+                # per-page size. --page-limit exists for SDK parity (every
+                # Configuration property gets a flag) — prefer --limit.
+                help="Same as --limit via Configuration (default: 100).",
+            )
+        )
+        options.append(
+            click.Option(
+                ["--item-limit", "item_limit"],
+                type=int,
+                default=None,
+                help="Stop after this many items total. Iterator mode only.",
+            )
+        )
+        options.append(
+            click.Option(
+                ["--full-payload", "full_payload"],
+                is_flag=True,
+                default=False,
+                help="Return one {data, next_page} dict from a single HTTP call.",
+            )
+        )
+        # Deprecated v2.x aliases. Each emits a stderr warning at runtime
+        # and forwards to the corresponding v3 flag (or no-ops when the
+        # behavior is now the default). Their help text is intentionally
+        # short — the "Deprecated (v3.0; will be removed)" section heading
+        # (rendered by ``_GlobalOptionsMixin.format_options``) carries the
+        # deprecation status, so each entry only has to say what the v3
+        # replacement is. The option ``name`` (``all_items``, ``page_size``,
+        # ``max_items``) is what ``_DEPRECATED_OPTION_NAMES`` matches on.
         options.append(
             click.Option(
                 ["--all-items", "all_items"],
                 is_flag=True,
                 default=False,
-                help="Fetch all items (no cap)",
+                help="No-op; walking every page is now the default.",
             )
         )
         options.append(
             click.Option(
                 ["--page-size", "page_size"],
-                type=click.IntRange(min=1, max=100),
+                type=int,
                 default=None,
-                help="Items per page (Asana API requires 1-100, default 100)",
+                help="Alias for --limit.",
             )
         )
         options.append(
             click.Option(
                 ["--max-items", "max_items"],
-                type=click.IntRange(min=0),
+                type=int,
                 default=None,
-                help="Stop after fetching this many items in total",
+                help="Alias for --item-limit.",
             )
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Pop pagination flags first so kwargs only carries SDK params afterwards.
+        # Pop all pagination control flags before later code touches kwargs,
+        # so the opts loop and positional extractor see only docstring-derived
+        # parameters. The else branch keeps these names bound for
+        # non-paginatable commands so the listify check below need not
+        # re-guard them.
         if paginatable:
+            return_page_iterator: bool | None = kwargs.pop("return_page_iterator")
+            page_limit = kwargs.pop("page_limit")
+            item_limit = kwargs.pop("item_limit")
+            full_payload = kwargs.pop("full_payload")
             all_items = kwargs.pop("all_items")
             page_size = kwargs.pop("page_size")
             max_items = kwargs.pop("max_items")
         else:
+            return_page_iterator = None
+            full_payload = False
+            page_limit = item_limit = page_size = max_items = None
             all_items = False
-            page_size = max_items = None
+        # Unspecified ⇒ SDK default (True). Tracked as a separate name so
+        # the original tri-state survives for any future logic that needs it.
+        effective_iter = True if return_page_iterator is None else return_page_iterator
+
+        # Deprecated v2.x aliases: warn and resolve to the v3 flag.
+        if all_items:
+            click.echo(
+                "warning: --all-items is deprecated; walking every page is "
+                "now the default (will be removed in a future release)",
+                err=True,
+            )
+        if page_size is not None:
+            click.echo(
+                "warning: --page-size is deprecated; use --limit instead "
+                "(will be removed in a future release)",
+                err=True,
+            )
+            if kwargs.get("limit") is not None:
+                raise click.UsageError(
+                    "--page-size is the deprecated alias of --limit; specify only one"
+                )
+            kwargs["limit"] = page_size
+        if max_items is not None:
+            click.echo(
+                "warning: --max-items is deprecated; use --item-limit "
+                "instead (will be removed in a future release)",
+                err=True,
+            )
+            if item_limit is not None:
+                raise click.UsageError(
+                    "--max-items is the deprecated alias of --item-limit; specify only one"
+                )
+            item_limit = max_items
 
         if has_body:
             body_value = kwargs.pop("body")  # click marks --body as required
@@ -403,13 +677,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         else:
             resolved_workspace = None
 
-        if all_items and max_items is not None:
-            raise click.UsageError("--max-items cannot be combined with --all-items")
-
-        want_iter = paginatable and (all_items or max_items is not None)
-
         if paginatable:
-            session_ctx = AsanaSession.from_env(use_page_iterator=want_iter, page_size=page_size)
+            session_ctx = AsanaSession.from_env(
+                return_page_iterator=effective_iter,
+                page_limit=page_limit,
+            )
         else:
             session_ctx = AsanaSession.from_env()
 
@@ -437,13 +709,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                     call_args.append(kwargs.pop(_option_name(name)))
 
             method = getattr(api, op.method_name)
-            # ``--max-items N`` maps to the SDK's native ``item_limit`` kwarg
-            # on paginated methods: PageIterator caps the per-call ``limit``
-            # to ``min(page_limit, item_limit - count)`` and stops at exactly
-            # N items.
             method_kwargs: dict[str, Any] = {}
-            if paginatable and max_items is not None:
-                method_kwargs["item_limit"] = max_items
+            if item_limit is not None:
+                method_kwargs["item_limit"] = item_limit
+            if full_payload:
+                method_kwargs["full_payload"] = True
             result = (
                 method(*call_args, opts, **method_kwargs) if op.has_opts else method(*call_args)
             )
@@ -454,7 +724,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             # headers on every page past the first. Consume it here so every
             # page request lands while the session (and its redactor) is
             # still live.
-            if want_iter:
+            if paginatable and effective_iter and not full_payload:
                 result = list(result)
             return result
 
@@ -472,6 +742,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         params=options,
         callback=callback,
         help=summary,
+        epilog=_PAGINATION_EPILOG if paginatable else None,
     )
 
 
@@ -514,11 +785,54 @@ class _ApiGroup(GroupWithGlobalOptions):
 # ---------------------------------------------------------------------------
 
 
+# Shown at the bottom of ``asana-api --help``. Five short, copy-pasteable
+# command lines (auth env-var assumed) cover the four most common entry
+# points — read, single-fetch, create, debug — plus a pointer to per-group
+# ``--help`` for everything else. The trailing reminder names the auth env
+# var so the examples make sense without a preceding ``--access-token``.
+# Leading ``\b`` keeps click's wrap_text from reflowing the aligned form.
+_ROOT_EPILOG = (
+    "\b\n"
+    "Examples:\n"
+    "  asana-api tasks get-tasks --workspace WS --assignee me\n"
+    "  asana-api tasks get-task --task 1234567890 --opt-fields name,assignee.name\n"
+    "  asana-api tasks create-task --body @new-task.json   # workspace goes inside body\n"
+    "  asana-api --debug tasks get-tasks --workspace WS   # show HTTP requests\n"
+    "  asana-api <group> --help   # e.g. asana-api tasks --help\n"
+    "\n"
+    "  Set $ASANA_ACCESS_TOKEN once, or pass --access-token TOKEN."
+)
+
+
+def _retry_strategy_option(f: Any) -> Any:
+    """Apply the ``--retry-strategy`` decorator only when the installed
+    python-asana exposes ``Configuration.retry_strategy`` (added in 5.1).
+
+    On older SDKs the flag would crash at apply time, so we hide it
+    entirely — both from ``--help`` and from the parser, so users on
+    5.0.x get a clean ``no such option`` rather than a traceback.
+    """
+    if not _SDK_HAS_RETRY_STRATEGY:
+        return f
+    return click.option(
+        "--retry-strategy",
+        "retry_strategy_overrides",
+        default=None,
+        callback=click_callback(schema=RETRY_FIELD_SCHEMA),
+        help=(
+            "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', JSON "
+            "object, or @path. See urllib3 Retry docs. List-typed fields "
+            "(allowed_methods, status_forcelist, remove_headers_on_redirect) "
+            "require JSON. (Configuration.retry_strategy)"
+        ),
+    )(f)
+
+
 # Root uses LazyGroup so that the manually declared @click.option globals are
 # not duplicated by GroupWithGlobalOptions' auto-append behavior. Subgroups
 # (_ApiGroup) and leaf commands (CommandWithGlobalOptions) still auto-append
 # so global options work at any level of the tree.
-@click.group(name="asana-api", cls=LazyGroup)
+@click.group(name="asana-api", cls=LazyGroup, epilog=_ROOT_EPILOG)
 @click.version_option(version_string(), prog_name="asana-api")
 @click.option(
     "--host",
@@ -527,25 +841,63 @@ class _ApiGroup(GroupWithGlobalOptions):
 )
 @click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")
 @click.option(
-    "--no-verify-ssl",
-    is_flag=True,
-    default=False,
-    help="Disable TLS certificate verification (insecure)",
+    "--verify-ssl/--no-verify-ssl",
+    "verify_ssl",
+    default=None,
+    help=(
+        "Verify TLS certificates (default: True). Pass --no-verify-ssl "
+        "to disable (insecure). (Configuration.verify_ssl)"
+    ),
 )
 @click.option(
-    "--ca-cert",
-    "ca_cert",
+    "--ssl-ca-cert",
+    "ssl_ca_cert",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Path to a PEM bundle of trusted CA certificates",
+    help="Path to a PEM bundle of trusted CA certs. (Configuration.ssl_ca_cert)",
 )
 @click.option(
-    "--retries",
-    type=click.IntRange(min=0),
+    "--cert-file",
+    "cert_file",
     default=None,
-    help="Number of retries on 429/5xx responses (default: 5)",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Client TLS certificate for mTLS. (Configuration.cert_file)",
 )
-@click.option("--timeout", type=float, default=None, help="Per-request timeout in seconds")
+@click.option(
+    "--key-file",
+    "key_file",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Client TLS private key for mTLS. (Configuration.key_file)",
+)
+@click.option(
+    "--assert-hostname/--no-assert-hostname",
+    "assert_hostname",
+    default=None,
+    help=(
+        "Verify the server certificate's hostname matches the request URL "
+        "host. Tri-state: unspecified → urllib3 default. "
+        "(Configuration.assert_hostname)"
+    ),
+)
+@_retry_strategy_option
+@click.option(
+    "--request-timeout",
+    "request_timeout",
+    type=float,
+    default=None,
+    help="Per-request timeout in seconds. (SDK kwarg: _request_timeout)",
+)
+@click.option(
+    "--connection-pool-maxsize",
+    "connection_pool_maxsize",
+    type=click.IntRange(min=1),
+    default=None,
+    help=(
+        "Max urllib3 connections cached per host (default: cpu_count "
+        "* 5). (Configuration.connection_pool_maxsize)"
+    ),
+)
 @click.option(
     "--access-token",
     "access_token",
@@ -553,11 +905,59 @@ class _ApiGroup(GroupWithGlobalOptions):
     help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)",
 )
 @click.option(
-    "--temp-dir",
-    "temp_dir",
+    "--username",
+    "username",
+    default=None,
+    help="Use --access-token. (Configuration.username)",
+)
+@click.option(
+    "--password",
+    "password",
+    default=None,
+    help="Use --access-token. (Configuration.password)",
+)
+@click.option(
+    "--api-key",
+    "api_key",
+    default=None,
+    callback=click_callback(),
+    help="Use --access-token. (Configuration.api_key)",
+)
+@click.option(
+    "--api-key-prefix",
+    "api_key_prefix",
+    default=None,
+    callback=click_callback(),
+    help="Use --access-token. (Configuration.api_key_prefix)",
+)
+@click.option(
+    "--temp-folder-path",
+    "temp_folder_path",
     default=None,
     type=click.Path(file_okay=False),
-    help="Directory for temporary downloads",
+    help="Directory for temporary downloads. (Configuration.temp_folder_path)",
+)
+@click.option(
+    "--safe-chars-for-path-param",
+    "safe_chars_for_path_param",
+    default=None,
+    help=(
+        "Extra chars treated as safe when percent-encoding path "
+        "parameters. (Configuration.safe_chars_for_path_param)"
+    ),
+)
+@click.option(
+    "--logger-format",
+    "logger_format",
+    default=None,
+    help="Python logging format string. (Configuration.logger_format)",
+)
+@click.option(
+    "--logger-file",
+    "logger_file",
+    default=None,
+    type=click.Path(dir_okay=False),
+    help="Path SDK loggers write to. (Configuration.logger_file)",
 )
 @click.option(
     "--debug",
@@ -565,38 +965,86 @@ class _ApiGroup(GroupWithGlobalOptions):
     default=False,
     help="Print HTTP request/response to stderr for troubleshooting",
 )
+@click.option(
+    "--multibyte-filenames",
+    "multibyte_filenames",
+    is_flag=True,
+    default=False,
+    help=(
+        "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
+        "attachment uploads whose filename contains non-ASCII characters; "
+        "off by default to match the underlying SDK behavior. "
+        "[asana-api extension]"
+    ),
+)
 def main(
     host: str | None,
     proxy: str | None,
-    no_verify_ssl: bool,
-    ca_cert: str | None,
-    retries: int | None,
-    timeout: float | None,
-    access_token: str | None,
-    temp_dir: str | None,
-    debug: bool,
+    verify_ssl: bool | None,
+    ssl_ca_cert: str | None,
+    cert_file: str | None,
+    key_file: str | None,
+    assert_hostname: bool | None,
+    # ``retry_strategy_overrides`` and everything after it have ``= None``
+    # defaults so the ``--retry-strategy`` decorator can be skipped on
+    # python-asana <5.1 without click then trying to call this function
+    # without a value for that name.
+    retry_strategy_overrides: dict[str, Any] | None = None,
+    request_timeout: float | None = None,
+    connection_pool_maxsize: int | None = None,
+    access_token: str | None = None,
+    username: str | None = None,
+    password: str | None = None,
+    api_key: dict[str, str] | None = None,
+    api_key_prefix: dict[str, str] | None = None,
+    temp_folder_path: str | None = None,
+    safe_chars_for_path_param: str | None = None,
+    logger_format: str | None = None,
+    logger_file: str | None = None,
+    debug: bool = False,
+    multibyte_filenames: bool = False,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
-    # JSON output is required to be UTF-8 by RFC 8259, but on Windows the
-    # default stdout encoding is the locale code page (cp932 on Japanese
-    # Windows), which raises UnicodeEncodeError when writing non-ASCII data.
-    # Reconfigure to UTF-8 so the same output works on every platform.
-    # The hasattr guard keeps CliRunner's in-memory streams (used by tests)
-    # from blowing up, since StringIO has no reconfigure().
-    for stream in (sys.stdout, sys.stderr):
+    # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
+    # stream encodings are the locale code page (e.g. cp932 on Japanese
+    # Windows): stdout/stderr raise UnicodeEncodeError when writing non-ASCII
+    # data, and stdin silently misdecodes a UTF-8 ``--body -`` payload.
+    # Reconfigure all three to UTF-8 so the same input/output works on every
+    # platform. The hasattr guard keeps CliRunner's in-memory streams (used
+    # by tests) from blowing up, since StringIO has no reconfigure().
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
 
     runtime.host = host
     runtime.proxy = proxy
-    runtime.verify_ssl = not no_verify_ssl
-    runtime.ssl_ca_cert = ca_cert
-    runtime.retries = retries
-    runtime.timeout = timeout
+    # Both verify_ssl and assert_hostname are tri-state toggles (positive /
+    # negative / unset). Guard so the unset case does not clobber a value
+    # set by an earlier code path; symmetry with how the leaf-level
+    # propagation in ``click_ext._consume_global_options`` skips the
+    # default ``None``.
+    if verify_ssl is not None:
+        runtime.verify_ssl = verify_ssl
+    runtime.ssl_ca_cert = ssl_ca_cert
+    runtime.cert_file = cert_file
+    runtime.key_file = key_file
+    if assert_hostname is not None:
+        runtime.assert_hostname = assert_hostname
+    runtime.retry_strategy_overrides = retry_strategy_overrides
+    runtime.request_timeout = request_timeout
+    runtime.connection_pool_maxsize = connection_pool_maxsize
     if access_token:
         runtime.access_token = access_token
-    runtime.temp_dir = temp_dir
+    runtime.username = username
+    runtime.password = password
+    runtime.api_key = api_key
+    runtime.api_key_prefix = api_key_prefix
+    runtime.temp_folder_path = temp_folder_path
+    runtime.safe_chars_for_path_param = safe_chars_for_path_param
+    runtime.logger_format = logger_format
+    runtime.logger_file = logger_file
     runtime.debug = debug
+    runtime.multibyte_filenames = multibyte_filenames
 
 
 def _register_groups(root: click.Group) -> None:
@@ -605,7 +1053,7 @@ def _register_groups(root: click.Group) -> None:
             _ApiGroup(
                 api_cls=cls,
                 name=_api_class_to_group(cls.__name__).replace("_", "-"),
-                help=f"{cls.__name__[:-3]} commands",
+                help=_group_short_help(cls.__name__[:-3]),
             )
         )
 

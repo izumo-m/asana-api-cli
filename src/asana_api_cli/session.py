@@ -7,13 +7,11 @@ applying the global configuration passed in from the CLI.
 
 from __future__ import annotations
 
-import builtins
 import functools
-import http.client
 import json
 import os
-import re
 import sys
+import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,182 +19,68 @@ from typing import Any
 
 import asana
 import click
-from urllib3.util.retry import Retry
+from urllib3.fields import RequestField
+
+from asana_api_cli.redactor import HttpClientAuthRedactor
 
 ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
 DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
 
-# Match ``Authorization: <scheme> <token>`` inside an HTTP request-headers
-# chunk. We never apply this regex to user-controlled data (request body or
-# response body), so the value side just needs to terminate cleanly at the
-# next header boundary: any run of non-whitespace, non-backslash characters
-# stops at real CR/LF (raw form) and at the leading ``\\`` of literal
-# ``\\r\\n`` (``repr`` form). Character set is intentionally not pinned to
-# the shape of today's Asana access tokens — Asana's developer docs
-# explicitly state that token formats are opaque and may change.
-_AUTH_HEADER_RE = re.compile(
-    r"(Authorization:\s*(?:Bearer|Basic))\s+([^\s\\]+)",
-    re.IGNORECASE,
-)
 
-# HTTP request methods that may appear at the start of the headers chunk in
-# ``send: b'<METHOD> ... HTTP/1.1\\r\\n...'``. Used to distinguish that chunk
-# from the body chunk(s) that ``http.client`` prints from a separate
-# ``send()`` call.
-_HTTP_METHODS: tuple[str, ...] = (
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "HEAD",
-    "OPTIONS",
-    "TRACE",
-    "CONNECT",
-)
+class MultibyteFilenameSupport:
+    """Context manager that augments ``urllib3.fields.RequestField`` to
+    emit the RFC 5987 ``filename*=UTF-8''<percent-encoded>`` parameter of
+    ``Content-Disposition`` whenever a multipart field has a non-ASCII
+    filename.
 
-# Mask reveals the last ``_MASK_SUFFIX_LEN`` characters of the token, but
-# only when the token is at least ``_MASK_MIN_LEN`` long. The threshold
-# caps the leak ratio at 6/16 = 37.5% for unexpectedly short tokens.
-_MASK_MIN_LEN = 16
-_MASK_SUFFIX_LEN = 6
+    Asana's attachment endpoint requires the ``filename*=`` form to
+    decode non-ASCII filenames correctly; without it the server treats
+    the ``filename="..."`` value as a literal and stores it as mojibake
+    or percent-encoded text. The official ``python-asana`` SDK (via
+    urllib3's default multipart formatter) does not emit ``filename*=`` —
+    this is a long-standing upstream gap (Asana forum discussion since
+    2022-12, unresolved as of 2026-05).
 
+    Off by default to preserve strict SDK parity. The CLI enables it
+    when ``--multibyte-filenames`` is set; library callers can use it
+    standalone::
 
-def _looks_like_request_headers(repr_bytes: str) -> bool:
-    """Return True if *repr_bytes* is the ``repr()`` of an HTTP request-headers
-    chunk, i.e. starts with ``b'<METHOD> `` (or ``b"<METHOD> ``).
-
-    ``http.client.HTTPConnection.send()`` is called once per chunk it
-    flushes. For typical requests that means one call for the headers
-    block and zero or more calls for the body chunks. Only the headers
-    chunk starts with a method line — body chunks start with whatever the
-    body is (JSON ``{...}``, multipart boundary, raw text, etc.) and may
-    legitimately contain the substring ``Authorization: Bearer ...`` as
-    part of user content (e.g. an Asana task description). Limiting
-    redaction to the headers chunk guarantees the body is never touched.
-    """
-    if not (repr_bytes.startswith("b'") or repr_bytes.startswith('b"')):
-        return False
-    after_quote = repr_bytes[2:]
-    return any(after_quote.startswith(m + " ") for m in _HTTP_METHODS)
-
-
-def _default_mask_token(token: str) -> str:
-    """Return a masked form of *token* suitable for debug output.
-
-    Reveals the last few characters so the user can tell two tokens
-    apart (e.g. work vs personal account) without exposing the bulk of
-    the secret. For unexpectedly short tokens, falls back to a complete
-    redaction.
-
-    Format-agnostic: Asana's developer documentation declares that token
-    formats are opaque and may change without notice, so this function
-    must not depend on the current PAT/OAuth shape.
-    """
-    if len(token) < _MASK_MIN_LEN:
-        return "<REDACTED>"
-    return f"...{token[-_MASK_SUFFIX_LEN:]}"
-
-
-class HttpClientPrintRedactor:
-    """Context manager that redacts ``Authorization`` headers in
-    ``http.client``'s wire-level debug output.
-
-    When ``http.client.HTTPConnection.debuglevel`` is 1 (which the asana
-    SDK sets via ``Configuration.debug = True``), ``http.client`` issues
-    a bare ``print("send:", repr(data))`` on every chunk it flushes to
-    the socket. The first such chunk is the request headers, which
-    carries the Authorization header verbatim.
-
-    Python resolves the bare ``print`` inside ``http.client`` via the
-    module's globals before falling back to builtins, so binding a
-    callable to ``http.client.print`` intercepts every debug print the
-    module makes — without touching ``sys.stdout``.
-
-    Redaction is applied **only** to ``("send:", "b'<METHOD> ...'")``
-    chunks. Body chunks (which may legitimately contain user-supplied
-    text matching ``Authorization: ...``) pass through verbatim.
-
-    Layered patches: if some other library has already patched
-    ``http.client.print``, ``install`` chains through it instead of
-    clobbering it. ``uninstall`` is conservative — it restores the
-    previous ``http.client.print`` only if our wrapper is still the
-    top-of-stack value. If something else has wrapped us in the
-    meantime, ``uninstall`` is a no-op so that outer chain stays intact.
-
-    Usable as a context manager (recommended) or via explicit
-    ``install()`` / ``uninstall()``::
-
-        with HttpClientPrintRedactor():
-            ...  # asana SDK calls or any HTTP traffic with debuglevel=1
-
-        r = HttpClientPrintRedactor()
-        r.install()
-        try:
+        with MultibyteFilenameSupport():
+            # urllib3-based uploads in this block emit filename*=
             ...
-        finally:
-            r.uninstall()
     """
 
-    def __init__(self, mask_fn: Callable[[str], str] | None = None) -> None:
-        self._mask_fn: Callable[[str], str] = mask_fn or _default_mask_token
-        self._wrapper: Callable[..., None] | None = None
+    def __init__(self) -> None:
+        self._original: Callable[..., None] | None = None
 
     def install(self) -> None:
-        """Patch ``http.client.print`` to redact Authorization values.
-
-        Idempotent across instances of this class: if the current
-        ``http.client.print`` is already a wrapper produced by this
-        class, ``install`` is a no-op (the existing chain stays in
-        place and this instance does not take ownership). Otherwise
-        wraps whatever is there — preserving any unrelated patch from
-        another library.
-        """
-        current = http.client.__dict__.get("print")
-        if getattr(current, "_asana_cli_redactor", False):
+        if self._original is not None:
             return
-        inner: Callable[..., Any] = current if callable(current) else builtins.print
-        mask_fn = self._mask_fn
+        self._original = RequestField.make_multipart
+        original = self._original
 
-        def _redact_match(m: re.Match[str]) -> str:
-            return f"{m.group(1)} {mask_fn(m.group(2))}"
+        def _patched(
+            field: RequestField,
+            content_disposition: str | None = None,
+            content_type: str | None = None,
+            content_location: str | None = None,
+        ) -> None:
+            original(field, content_disposition, content_type, content_location)
+            filename = field._filename  # pyright: ignore[reportPrivateUsage]
+            if filename and any(ord(c) > 127 for c in filename):
+                encoded = urllib.parse.quote(filename, safe="")
+                existing = field.headers.get("Content-Disposition") or ""
+                field.headers["Content-Disposition"] = existing + f"; filename*=utf-8''{encoded}"
 
-        def _redact_print(*args: Any, **kwargs: Any) -> None:
-            if len(args) >= 2 and args[0] == "send:" and _looks_like_request_headers(str(args[1])):
-                args = (args[0],) + tuple(
-                    _AUTH_HEADER_RE.sub(_redact_match, str(a)) for a in args[1:]
-                )
-            inner(*args, **kwargs)
-
-        _redact_print._asana_cli_redactor = True  # type: ignore[attr-defined]
-        _redact_print._asana_cli_inner = inner  # type: ignore[attr-defined]
-        http.client.print = _redact_print  # pyright: ignore[reportAttributeAccessIssue]
-        self._wrapper = _redact_print
+        RequestField.make_multipart = _patched  # pyright: ignore[reportAttributeAccessIssue]
 
     def uninstall(self) -> None:
-        """Restore the previous ``http.client.print``.
-
-        Only acts if our wrapper is still the top-of-stack value. If
-        another patch was installed on top of us, leaves the chain
-        alone — uninstalling in that case would either drop the outer
-        patch (data loss for that library) or leave its
-        ``_asana_cli_inner`` reference dangling.
-
-        Safe to call multiple times: subsequent calls are no-ops.
-        """
-        wrapper = self._wrapper
-        if wrapper is None:
+        if self._original is None:
             return
-        current = http.client.__dict__.get("print")
-        if current is wrapper:
-            inner = getattr(wrapper, "_asana_cli_inner", builtins.print)
-            if inner is builtins.print:
-                http.client.__dict__.pop("print", None)
-            else:
-                http.client.print = inner  # pyright: ignore[reportAttributeAccessIssue]
-        self._wrapper = None
+        RequestField.make_multipart = self._original  # pyright: ignore[reportAttributeAccessIssue]
+        self._original = None
 
-    def __enter__(self) -> HttpClientPrintRedactor:
+    def __enter__(self) -> MultibyteFilenameSupport:
         self.install()
         return self
 
@@ -216,7 +100,14 @@ def resolve_body(value: str) -> JsonValue:
     - otherwise — parse the string itself as JSON
     """
     if value == "-":
-        raw = sys.stdin.read()
+        try:
+            raw = sys.stdin.read()
+        except UnicodeDecodeError as exc:
+            # stdin is reconfigured to UTF-8 at startup (see cli.py main),
+            # so non-UTF-8 input from a pipe surfaces here instead of being
+            # silently misdecoded with the locale code page.
+            click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
+            sys.exit(1)
     elif value.startswith("@"):
         path = Path(value[1:])
         try:
@@ -248,17 +139,32 @@ class _Runtime:
     """Configuration shared globally during a CLI invocation.
 
     Updated by the ``main`` callback and the global-option mixins in ``click_ext``.
+    Each non-flag scalar defaults to ``None`` so ``AsanaSession`` can tell
+    "user did not pass the flag" from "user explicitly chose this value" and
+    leave the SDK default in place for the former.
     """
 
     debug: bool = False
     host: str | None = None
     proxy: str | None = None
-    verify_ssl: bool = True
+    verify_ssl: bool | None = None
     ssl_ca_cert: str | None = None
-    retries: int | None = None
-    timeout: float | None = None
+    request_timeout: float | None = None
     access_token: str | None = None
-    temp_dir: str | None = None
+    temp_folder_path: str | None = None
+    multibyte_filenames: bool = False
+    username: str | None = None
+    password: str | None = None
+    logger_format: str | None = None
+    logger_file: str | None = None
+    cert_file: str | None = None
+    key_file: str | None = None
+    assert_hostname: bool | None = None
+    connection_pool_maxsize: int | None = None
+    safe_chars_for_path_param: str | None = None
+    api_key: dict[str, str] | None = None
+    api_key_prefix: dict[str, str] | None = None
+    retry_strategy_overrides: dict[str, Any] | None = None
 
 
 runtime = _Runtime()
@@ -276,38 +182,69 @@ class AsanaSession:
     """
 
     def __init__(
-        self, token: str, *, use_page_iterator: bool = False, page_size: int | None = None
+        self, token: str, *, return_page_iterator: bool = True, page_limit: int | None = None
     ) -> None:
         config = asana.Configuration()
         config.access_token = token
-        # When *use_page_iterator* is True (--all-items), the SDK returns a
-        # PageIterator that walks every page.
-        config.return_page_iterator = use_page_iterator
-        # When --page-size is set, override the SDK default per-page size (100).
-        if page_size is not None:
-            config.page_limit = page_size
+        # *return_page_iterator* and *page_limit* mirror the SDK's
+        # ``asana.Configuration`` properties of the same names: with
+        # ``return_page_iterator=True`` (the SDK default) paginatable
+        # methods return an iterator that walks every page; with False
+        # they return a single ``{data, next_page}`` dict per HTTP call.
+        # ``page_limit`` (SDK default 100) is the per-page size used on the
+        # iterator path when ``opts["limit"]`` is not set.
+        config.return_page_iterator = return_page_iterator
+        if page_limit is not None:
+            config.page_limit = page_limit
 
         # Apply runtime values to Configuration
         if runtime.host:
             config.host = runtime.host
         if runtime.proxy:
             config.proxy = runtime.proxy  # pyright: ignore[reportAttributeAccessIssue]
-        if not runtime.verify_ssl:
-            config.verify_ssl = False
+        if runtime.verify_ssl is not None:
+            # Honor both sides of the toggle: --no-verify-ssl writes False,
+            # --verify-ssl writes True (pinning the SDK default even if the
+            # SDK later changes its own default).
+            config.verify_ssl = runtime.verify_ssl
         if runtime.ssl_ca_cert:
             config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.temp_dir:
-            config.temp_folder_path = runtime.temp_dir  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.retries is not None:
-            # Build a Retry with the user-specified total and python-asana's
-            # default backoff/status_forcelist.
-            config.retry_strategy = Retry(
-                total=runtime.retries,
-                backoff_factor=2,
-                status_forcelist=[429, 500, 502, 503, 504],
+        if runtime.temp_folder_path:
+            config.temp_folder_path = runtime.temp_folder_path  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.username is not None:
+            config.username = runtime.username  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.password is not None:
+            config.password = runtime.password  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.logger_format is not None:
+            config.logger_format = runtime.logger_format  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.logger_file is not None:
+            config.logger_file = runtime.logger_file  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.cert_file is not None:
+            config.cert_file = runtime.cert_file  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.key_file is not None:
+            config.key_file = runtime.key_file  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.assert_hostname is not None:
+            config.assert_hostname = runtime.assert_hostname  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.connection_pool_maxsize is not None:
+            config.connection_pool_maxsize = runtime.connection_pool_maxsize  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.safe_chars_for_path_param is not None:
+            config.safe_chars_for_path_param = runtime.safe_chars_for_path_param  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.api_key is not None:
+            config.api_key = runtime.api_key  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.api_key_prefix is not None:
+            config.api_key_prefix = runtime.api_key_prefix  # pyright: ignore[reportAttributeAccessIssue]
+        if runtime.retry_strategy_overrides is not None:
+            # Start from the SDK's default Retry instance so unspecified
+            # fields keep their python-asana defaults (e.g. total=5,
+            # backoff_factor=2, status_forcelist=[429,500,502,503,504]).
+            # An empty dict (e.g. `--retry-strategy '{}'`) yields a copy
+            # with no field overridden — semantically a no-op, but still
+            # honored as "user did pass the flag".
+            config.retry_strategy = config.retry_strategy.new(  # pyright: ignore[reportAttributeAccessIssue]
+                **runtime.retry_strategy_overrides
             )
 
-        self._redactor: HttpClientPrintRedactor | None = None
+        self._redactor: HttpClientAuthRedactor | None = None
         if runtime.debug:
             # The SDK debug setter enables http.client.HTTPConnection.debuglevel
             # and bumps the urllib3/asana loggers to DEBUG. The only path that
@@ -316,23 +253,32 @@ class AsanaSession:
             # Install the redactor AFTER the SDK setup so we wrap whatever
             # http.client.print is at that point.
             config.debug = True
-            self._redactor = HttpClientPrintRedactor()
+            self._redactor = HttpClientAuthRedactor()
             self._redactor.install()
+
+        self._multibyte_filenames: MultibyteFilenameSupport | None = None
+        if runtime.multibyte_filenames:
+            self._multibyte_filenames = MultibyteFilenameSupport()
+            self._multibyte_filenames.install()
 
         try:
             self._config = config
             self._client = asana.ApiClient(config)
-            # Configuration has no --timeout knob, so wrap call_api to inject it.
-            if runtime.timeout is not None:
-                self._install_timeout(runtime.timeout)
+            # Configuration has no per-request-timeout knob, so wrap
+            # call_api to inject it on every invocation.
+            if runtime.request_timeout is not None:
+                self._install_timeout(runtime.request_timeout)
         except Exception:
-            # If construction fails after the redactor was installed, the
+            # If construction fails after the patches were installed, the
             # caller never gets a session to call close() on, so undo the
-            # global http.client.print patch here rather than leaving it
-            # leaked for the rest of the process.
+            # global patches here rather than leaving them leaked for the
+            # rest of the process.
             if self._redactor is not None:
                 self._redactor.uninstall()
                 self._redactor = None
+            if self._multibyte_filenames is not None:
+                self._multibyte_filenames.uninstall()
+                self._multibyte_filenames = None
             raise
 
     def _install_timeout(self, timeout: float) -> None:
@@ -351,7 +297,8 @@ class AsanaSession:
         return self._client
 
     def close(self) -> None:
-        """Uninstall the debug redactor (if any).
+        """Uninstall any global patches installed for this session
+        (debug redactor, multibyte-filename multipart patch).
 
         Safe to call multiple times. Prefer using the session as a
         context manager (``with AsanaSession(...) as session: ...``)
@@ -360,6 +307,9 @@ class AsanaSession:
         if self._redactor is not None:
             self._redactor.uninstall()
             self._redactor = None
+        if self._multibyte_filenames is not None:
+            self._multibyte_filenames.uninstall()
+            self._multibyte_filenames = None
 
     def __enter__(self) -> AsanaSession:
         return self
@@ -369,7 +319,7 @@ class AsanaSession:
 
     @classmethod
     def from_env(
-        cls, *, use_page_iterator: bool = False, page_size: int | None = None
+        cls, *, return_page_iterator: bool = True, page_limit: int | None = None
     ) -> AsanaSession:
         """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
         token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
@@ -379,7 +329,7 @@ class AsanaSession:
                 err=True,
             )
             sys.exit(1)
-        return cls(token=token, use_page_iterator=use_page_iterator, page_size=page_size)
+        return cls(token=token, return_page_iterator=return_page_iterator, page_limit=page_limit)
 
 
 def resolve_workspace(
