@@ -15,10 +15,9 @@ from __future__ import annotations
 import json
 
 import pytest
+from _cli_runner import full_output, make_runner
 
 from asana_api_cli.cli import main
-
-from _cli_runner import full_output, make_runner
 
 
 @pytest.mark.vcr

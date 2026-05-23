@@ -7,6 +7,7 @@ from typing import Any
 
 import click
 import pytest
+from _cli_runner import full_output, make_runner
 from asana.rest import ApiException
 
 from asana_api_cli.formatter import (
@@ -16,9 +17,6 @@ from asana_api_cli.formatter import (
     formatted,
 )
 from asana_api_cli.session import runtime
-
-from _cli_runner import full_output, make_runner
-
 
 # ---------------------------------------------------------------------------
 # _to_rows

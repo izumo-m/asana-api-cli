@@ -22,13 +22,11 @@ from unittest.mock import MagicMock
 import asana
 import click
 import pytest
+from _cli_runner import full_output, make_runner
 
 from asana_api_cli.cli import _enumerate_api_classes, _make_command, _operations_for
 from asana_api_cli.click_ext import _SDK_HAS_RETRY_STRATEGY
 from asana_api_cli.session import runtime
-
-from _cli_runner import full_output, make_runner
-
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers

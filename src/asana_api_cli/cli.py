@@ -42,10 +42,10 @@ import asana
 import click
 
 from asana_api_cli.click_ext import (
+    _SDK_HAS_RETRY_STRATEGY,
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
-    _SDK_HAS_RETRY_STRATEGY,
 )
 from asana_api_cli.formatter import formatted
 from asana_api_cli.session import (
@@ -56,7 +56,6 @@ from asana_api_cli.session import (
 )
 from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
 from asana_api_cli.version import version_string
-
 
 # ---------------------------------------------------------------------------
 # Name conversion

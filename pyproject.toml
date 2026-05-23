@@ -61,7 +61,7 @@ docstring-code-format = true
 quote-style = "double"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "N", "B", "ISC", "G", "SIM", "Q"]
+select = ["E", "F", "I", "W", "N", "B", "ISC", "G", "SIM", "Q"]
 ignore = ["SIM102"]
 unfixable = ["F401"]          # do not auto-fix unused imports
 

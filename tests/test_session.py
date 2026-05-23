@@ -12,7 +12,6 @@ from typing import Any
 
 import asana
 import pytest
-
 from urllib3.fields import RequestField
 
 from asana_api_cli.session import (

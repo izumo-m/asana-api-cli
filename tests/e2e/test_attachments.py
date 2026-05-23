@@ -29,10 +29,9 @@ import shutil
 from pathlib import Path
 
 import pytest
+from _cli_runner import make_runner
 
 from asana_api_cli.cli import main
-
-from _cli_runner import make_runner
 
 _DATA_DIR = Path(__file__).parent / "data"
 

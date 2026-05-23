@@ -33,7 +33,6 @@ from click.core import ParameterSource
 from asana_api_cli.session import runtime
 from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
 
-
 # ``Configuration.retry_strategy`` was introduced in python-asana 5.1.
 # When wrapping an older SDK the property simply does not exist, so
 # exposing ``--retry-strategy`` would crash at apply time. Detect once at

@@ -39,11 +39,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from _cli_runner import full_output, make_runner
 from vcr.serializers import yamlserializer
 
 from asana_api_cli.cli import main
-
-from _cli_runner import full_output, make_runner
 
 WORKSPACE_ENV = "ASANA_PYTEST_WORKSPACE"
 

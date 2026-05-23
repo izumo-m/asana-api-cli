@@ -11,18 +11,17 @@ import re
 
 import click
 import pytest
+from _cli_runner import full_output, make_runner
 
 from asana_api_cli.click_ext import (
+    _COMPACT_SECTION_LABELS,
     GLOBAL_OPTION_GROUPS,
     GLOBAL_OPTION_NAMES,
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
-    _COMPACT_SECTION_LABELS,
 )
 from asana_api_cli.session import runtime
-
-from _cli_runner import full_output, make_runner
 
 
 def _count_option_appearances(output: str, flag: str) -> int:

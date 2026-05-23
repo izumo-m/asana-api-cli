@@ -33,7 +33,6 @@ from typing import Any
 
 import click
 
-
 _BOOL_TRUE = {"true"}
 _BOOL_FALSE = {"false"}
 

@@ -13,7 +13,6 @@ import click
 import pytest
 
 from asana_api_cli.cli import (
-    _Operation,
     _GROUP_DESCRIPTIONS,
     _api_class_to_group,
     _enumerate_api_classes,
@@ -23,13 +22,13 @@ from asana_api_cli.cli import (
     _humanize_class_name,
     _make_command,
     _method_to_command,
+    _Operation,
     _operations_for,
     _parse_params,
     _parse_summary,
     _snake,
     main,
 )
-
 
 # ---------------------------------------------------------------------------
 # Name conversion

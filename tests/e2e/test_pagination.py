@@ -25,10 +25,9 @@ from __future__ import annotations
 import json
 
 import pytest
+from _cli_runner import make_runner
 
 from asana_api_cli.cli import main
-
-from _cli_runner import make_runner
 
 # Must match ``PROJECT_SPECS[0].task_count`` in ``tools/e2e_init.py``.
 TOTAL_TASKS = 1500
