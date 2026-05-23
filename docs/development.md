@@ -16,21 +16,9 @@ pipx install .
 
 ## Project layout
 
-The CLI command tree is built **at runtime** by introspecting the installed
-`python-asana` SDK. There is no codegen step. When the SDK is upgraded, the
-CLI surface follows automatically; the snapshot test guards against silent
-breaking changes.
+For the `src/asana_api_cli/` module roles, see [`architecture.md`](architecture.md).
 
 ```
-src/asana_api_cli/
-├── __init__.py
-├── session.py            # SDK client wrapper + helpers used by the CLI
-├── redactor.py           # http.client debug-output Authorization redactor (stdlib-only, copyable)
-├── formatter.py          # CLI output formatting (@formatted decorator)
-├── click_ext.py          # LazyGroup + global-options propagation mixins
-├── version.py            # version_string()
-└── cli.py                # Runtime introspection + click command tree
-
 tests/
 ├── test_cli*.py                # CLI shape, invocation, and surface snapshot
 ├── test_*.py                   # Per-module unit tests (formatter, session, ...)
@@ -42,30 +30,51 @@ tools/
 └── e2e_init.py                 # One-time fixture provisioner for tests/e2e/
 ```
 
-- **`session.py`** — builds `asana.Configuration` + `ApiClient`, forwards
-  the `return_page_iterator` and `page_limit` kwargs to the matching SDK
-  `Configuration` properties, installs `HttpClientAuthRedactor` (from
-  `redactor.py`) when `--debug` is set, optionally augments multipart
-  uploads with the RFC 5987 `filename*=UTF-8''` parameter via
-  `MultibyteFilenameSupport` when `--multibyte-filenames` is set, and
-  exposes `resolve_body` / `resolve_workspace` to `cli.py`.
-- **`redactor.py`** — stdlib-only module exposing `HttpClientAuthRedactor`,
-  a context manager that masks `Authorization` headers in
-  `http.client`'s wire-level debug output. Has no third-party
-  dependencies so the file is copyable as-is into other projects.
-- **`formatter.py`** — supports `json` / `table` / `csv` / `text` output and
-  `--query` (jq).
-- **`click_ext.py`** — `LazyGroup` for cheap top-level help, plus the
-  `GroupWithGlobalOptions` / `CommandWithGlobalOptions` pair that lets
-  `--debug`, `--access-token`, etc. work at any level of the tree.
-- **`cli.py`** — introspects every `*Api` class on the installed `asana`
-  package and builds click commands per method. Method-level introspection
-  is deferred per group so top-level `--help` is cheap.
+## Bumping the `asana` SDK
 
-## Bumping the SDK
+The CLI surface snapshot test (see
+[`architecture.md`](architecture.md#surface-snapshot-guardrail)) catches
+group/command/option churn introduced by an SDK bump. Procedure:
 
-See [`architecture.md`](architecture.md#cli-surface-snapshot-test) for the
-procedure and how the CLI surface snapshot test guards the change.
+1. Edit `dependencies` in `pyproject.toml` to raise the lower bound.
+2. `uv sync` to install the new SDK.
+3. `uv run pytest` — failures in `test_cli_surface.py` print the diff.
+4. Review the diff; describe user-visible changes in `CHANGELOG.md`.
+5. Regenerate the fixture (exact command in `tests/test_cli_surface.py`'s module docstring).
+6. Verify the no-op disclosure on `--username` / `--password` / `--api-key` /
+   `--api-key-prefix` still holds for the new SDK. These four flags are
+   exposed for `Configuration` parity but are inert in python-asana 5.2.4
+   because every `*Api` method passes
+   `auth_settings = ['personalAccessToken']` only. Re-check with:
+
+   ```bash
+   grep -rh "auth_settings = \[" .venv/lib/python*/site-packages/asana/api/ | sort -u
+   ```
+
+   If the output is anything other than the single
+   `auth_settings = ['personalAccessToken']` line, the disclosure in
+   the `--help` text (and `docs/cli-sdk-mapping.md` /
+   `docs/sdk-deviations.md`) needs to be updated to reflect what the
+   new SDK actually wires up. Bump the python-asana version pin in the
+   `--help` strings too.
+7. *(Optional, soft improvement)* Review the group descriptions when
+   the SDK adds or removes resource groups:
+   - [`docs/api-groups.md`](api-groups.md) is the authoritative table
+     (CLI group → Asana reference link → short description).
+   - `_GROUP_DESCRIPTIONS` in `src/asana_api_cli/cli.py` mirrors that
+     table; the `test_group_descriptions_match_docs` test asserts the
+     two stay in sync.
+   - Groups that are new in this SDK render with a fallback English
+     name derived from the class name (e.g. `FooBar` → "Foo bar") so
+     the CLI keeps working without action. Add curated entries to both
+     the doc and the dict for richer wording.
+   - Removed groups can stay in both places — they're harmless dead
+     data and re-engage on downgrades.
+   - Source descriptions from
+     [developers.asana.com/llms.txt](https://developers.asana.com/llms.txt)
+     (an AI-friendly Markdown index of the reference) and/or the
+     individual `/reference/<group>.md` pages.
+8. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`, and `CHANGELOG.md` together.
 
 ## Trying shell completion locally
 

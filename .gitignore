@@ -11,5 +11,5 @@ dist/
 .coverage
 htmlcov/
 CLAUDE.local.md
-.claude/
+.claude/settings.local.json
 _local/

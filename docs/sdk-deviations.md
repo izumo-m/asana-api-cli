@@ -66,7 +66,7 @@ request path**: every generated `*Api` method passes
 actually emits a header. The `--help` text of each of those four flags
 calls this out explicitly with a python-asana version pin so the
 disclosure is re-verified when the SDK is bumped (see
-[`architecture.md`](architecture.md#when-bumping-the-asana-dependency)).
+[`development.md`](development.md#bumping-the-asana-sdk)).
 
 ## CLI behavior that differs from raw SDK behavior
 

@@ -255,7 +255,7 @@ for the exact destination of each.
 | `--cert-file PATH` | Client TLS certificate for mTLS |
 | `--key-file PATH` | Client TLS private key for mTLS |
 | `--assert-hostname / --no-assert-hostname` | Toggle urllib3 hostname assertion (tri-state: unspecified → urllib3 default) |
-| `--retry-strategy VALUE` | Override `Configuration.retry_strategy` fields. `VALUE` accepts shorthand (`total=5,backoff_factor=1.5,raise_on_status=false`), a JSON object (`'{"total":5,"status_forcelist":[429,500]}'`), or `@path` to a JSON file. List-typed fields require the JSON form. See [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#structured-value-format-api-key-api-key-prefix-retry-strategy) for the field list |
+| `--retry-strategy VALUE` | Override `Configuration.retry_strategy` fields. `VALUE` accepts shorthand (`total=5,backoff_factor=1.5,raise_on_status=false`), a JSON object (`'{"total":5,"status_forcelist":[429,500]}'`), or `@path` to a JSON file. List-typed fields require the JSON form. See [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#structured-value-format) for the field list |
 | `--request-timeout SECONDS` | Per-request timeout in seconds |
 | `--connection-pool-maxsize N` | Max urllib3 connections cached per host (default: cpu_count × 5) |
 | `--temp-folder-path PATH` | Directory for temporary downloads |

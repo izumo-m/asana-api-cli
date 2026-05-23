@@ -137,5 +137,5 @@ The descriptions above were sourced from
 the individual `*.md` page bodies linked in each row. When bumping the
 `python-asana` SDK, optionally re-run the index fetch and update this
 file plus `_GROUP_DESCRIPTIONS` for any new groups; see
-[`docs/architecture.md`](architecture.md) §"When bumping the asana
-dependency" for the soft procedure.
+[`docs/development.md`](development.md) §"Bumping the asana SDK"
+for the soft procedure.

@@ -18,7 +18,7 @@ this one documents the parity points.
 each SDK method's docstring `:param` lines (`opt_fields`, `workspace`,
 positional args, paginatable `limit` / `offset`, etc.). These are
 SDK-derived by construction and are tracked by the snapshot fixture
-(`tests/fixtures/cli_surface.json`); see [`architecture.md`](architecture.md#cli-surface-snapshot-test).
+(`tests/fixtures/cli_surface.json`); see [`architecture.md`](architecture.md#surface-snapshot-guardrail).
 
 ## Notation
 
@@ -71,10 +71,10 @@ property (or document the deviation in `sdk-deviations.md`).
 | `--debug` | `Configuration.debug = True` | Direct property. Also installs `HttpClientAuthRedactor` — a security override per [constitution #2](principles.md#constitution); see [`sdk-deviations.md`](sdk-deviations.md) "Personal access token in --debug output" |
 | `--multibyte-filenames` | *(none)* | CLI-only. Installs `MultibyteFilenameSupport` which patches `urllib3.fields.RequestField.make_multipart` to emit RFC 5987 `filename*=UTF-8''<percent-encoded>`. Cataloged in [`sdk-deviations.md`](sdk-deviations.md) |
 
-### Structured value format (`--api-key`, `--api-key-prefix`, `--retry-strategy`)
+### Structured value format
 
-These three options share a single VALUE format dispatched by the first
-character:
+`--api-key`, `--api-key-prefix`, and `--retry-strategy` share a single
+VALUE format dispatched by the first character:
 
 - `{...}` — parse as a JSON object.
 - `@<path>` — read the file at `<path>` and parse it as a JSON object.
@@ -102,7 +102,7 @@ entry. The four properties remain on the Configuration object but no
 header is ever emitted from them. The CLI surfaces them so future SDK
 versions that wire them up start working without a CLI release; the
 `--help` text pins the python-asana version so the disclosure is
-re-verified whenever the SDK is bumped (see [`architecture.md`](architecture.md#when-bumping-the-asana-dependency)).
+re-verified whenever the SDK is bumped (see [`development.md`](development.md#bumping-the-asana-sdk)).
 
 ### stdin (`-`) restriction
 
@@ -126,14 +126,9 @@ All three are also cataloged in [`sdk-deviations.md`](sdk-deviations.md).
 ## Paginatable command extras (`cli.py:_make_command`)
 
 Injected only when the SDK method is paginatable (has a `:param limit:`
-in its docstring). For the auto-generated `--limit` / `--offset` (which
-come from the docstring, not from `_make_command`), see
-[`architecture.md` §Pagination](architecture.md#pagination).
-
-> The pagination subset of this table is duplicated in
-> [`architecture.md` §Pagination](architecture.md#pagination). When
-> editing one, keep the other in sync; a follow-up may replace
-> architecture.md's table with a link to here.
+in its docstring). The `--limit` / `--offset` flags themselves are
+auto-generated from the docstring (not from `_make_command`) and are
+tracked by the CLI surface snapshot fixture.
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
