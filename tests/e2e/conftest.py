@@ -143,6 +143,27 @@ def _mask_object(obj: Any, bindings: dict[str, str]) -> None:
             _mask_object(item, bindings)
 
 
+def _harvest_user_identifiers(obj: Any, names: set[str], emails: set[str]) -> None:
+    """Collect every ``user.name`` / ``user.email`` value in *obj*.
+
+    Used by :func:`_before_record_response` to also strip these values
+    from free-text fields (e.g. ``story.text`` of the form
+    ``"<user> さんが ..."``) that the ``resource_type``-aware
+    :func:`_mask_object` cannot reach.
+    """
+    if isinstance(obj, dict):
+        if obj.get("resource_type") == "user":
+            for key, sink in (("name", names), ("email", emails)):
+                v = obj.get(key)
+                if isinstance(v, str) and v:
+                    sink.add(v)
+        for v in obj.values():
+            _harvest_user_identifiers(v, names, emails)
+    elif isinstance(obj, list):
+        for item in obj:
+            _harvest_user_identifiers(item, names, emails)
+
+
 def _before_record_response(response):  # type: ignore[no-untyped-def]
     body = response.get("body", {}).get("string")
     if not isinstance(body, bytes):
@@ -155,7 +176,36 @@ def _before_record_response(response):  # type: ignore[no-untyped-def]
         data = json.loads(text)
     except json.JSONDecodeError:
         return response
+    # Harvest real identifiers before they are masked away in-place, so we
+    # can also strip them from unstructured strings further down.
+    real_names: set[str] = set()
+    real_emails: set[str] = set()
+    _harvest_user_identifiers(data, real_names, real_emails)
     _mask_object(data, _bindings())
+    # Free-text substitution catches values embedded in fields such as
+    # ``story.text`` ("X さんが …"). Done on the parsed structure (rather
+    # than the serialized JSON) so names/emails containing JSON-escapable
+    # characters like ``"`` / ``\`` still match. Longest-first; emails
+    # before names because the user's display name is sometimes the email
+    # itself.
+    b = _bindings()
+    email_repl = b.get("USER_EMAIL", "")
+    name_repl = b.get("USER_NAME", "")
+    substitutions: list[tuple[str, str]] = []
+    if email_repl:
+        substitutions.extend((v, email_repl) for v in sorted(real_emails, key=len, reverse=True))
+    if name_repl:
+        substitutions.extend(
+            (v, name_repl) for v in sorted(real_names - real_emails, key=len, reverse=True)
+        )
+    if substitutions:
+
+        def _apply(s: str) -> str:
+            for old, new in substitutions:
+                s = s.replace(old, new)
+            return s
+
+        data = _walk(data, _apply)
     text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     response["body"]["string"] = text.encode("utf-8")
     return response
@@ -252,6 +302,37 @@ def _synthetic_gid(real_gid: str) -> str:
     return str(10**15 + (n % (9 * 10**15)))
 
 
+# Asana events API sync token: ``<32-hex>:<integer>``. Appears in request
+# URLs (``:`` URL-encoded as ``%3A``) and response bodies (literal ``:``).
+_SYNC_TOKEN_RE = re.compile(r"\b([a-f0-9]{32})(:|%3A)(\d+)\b")
+
+
+def _replace_sync_token(match: re.Match[str]) -> str:
+    prefix, sep, suffix = match.group(1), match.group(2), match.group(3)
+    digest = hashlib.sha256(prefix.encode("ascii")).hexdigest()[:32]
+    return f"{digest}{sep}{suffix}"
+
+
+def _mask_sync_tokens(obj: Any) -> Any:
+    """Replace each Asana events sync token with a deterministic synthetic.
+
+    Sync tokens are not credentials (they expire in ~24h and are useless
+    without the ``Authorization`` header, which is already masked) but
+    they are account-coupled opaque strings that need not survive into
+    a committed cassette. The events API echoes them in request URLs and
+    response bodies; hashing both consistently at record time preserves
+    vcrpy's request-matching invariant at replay (the test extracts the
+    synthetic sync from the response body and sends it back, matching
+    the synthetic in the recorded URL).
+
+    The 32-hex prefix is sha256'd back to 32 hex chars; the ``:N`` /
+    ``%3A:N`` suffix is preserved so the "same prefix family" relation
+    (Asana increments ``N`` between polls on one subscription) stays
+    visible in the cassette.
+    """
+    return _walk(obj, lambda s: _SYNC_TOKEN_RE.sub(_replace_sync_token, s))
+
+
 def _auto_template_gids(cassette_dict: Any) -> Any:
     """Replace each discovered identifier with a deterministic synthetic gid.
 
@@ -331,6 +412,7 @@ def _templated_yaml_serialize(cassette_dict):  # type: ignore[no-untyped-def]
     bindings = _bindings()
     templated = _walk(cassette_dict, lambda s: _template_string(s, bindings))
     templated = _auto_template_gids(templated)
+    templated = _mask_sync_tokens(templated)
     return _orig_yaml_serialize(templated)
 
 
