@@ -27,7 +27,7 @@ the same set of CLI groups. A drift test in `tests/test_cli.py`
 | `custom-field-settings`       | [Custom Field Settings](https://developers.asana.com/reference/custom-field-settings)                 | List custom fields attached to objects     |
 | `custom-fields`               | [Custom Fields](https://developers.asana.com/reference/custom-fields)                                 | Manage workspace custom fields             |
 | `custom-types`                | [Custom Types](https://developers.asana.com/reference/custom-types)                                   | Read workspace custom object types         |
-| `events`                      | [Events](https://developers.asana.com/reference/events)                                               | Poll resource change events (sync token)   |
+| `events`                      | [Events](https://developers.asana.com/reference/events) ([usage](api-events.md))                      | Poll resource change events (sync token)   |
 | `exports`                     | [Exports](https://developers.asana.com/reference/exports)                                             | Initiate bulk exports of project resources |
 | `goal-relationships`          | [Goal Relationships](https://developers.asana.com/reference/goal-relationships)                       | Manage links between goals                 |
 | `goals`                       | [Goals](https://developers.asana.com/reference/goals)                                                 | Manage organizational goals and metrics    |

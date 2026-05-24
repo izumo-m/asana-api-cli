@@ -13,6 +13,7 @@ miss -- for example forgetting to forward ``--max-items`` as the SDK's
 from __future__ import annotations
 
 import copy
+import dataclasses
 import http.client
 import json
 from collections.abc import Iterator
@@ -38,37 +39,14 @@ def _isolated_runtime(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Provide a token and clear ``runtime`` between tests.
 
     ``AsanaSession.from_env`` exits if no token is set. We also snapshot and
-    restore the process-wide ``runtime`` dataclass so flags set by one test
-    cannot leak into the next.
+    restore every field of the process-wide ``runtime`` dataclass so flags
+    set by one test (via CLI invocation or direct attribute write) cannot
+    leak into the next. Using ``dataclasses.fields`` rather than a manual
+    list keeps the snapshot in sync as ``_Runtime`` evolves.
     """
     monkeypatch.setenv("ASANA_ACCESS_TOKEN", "test-token")
     monkeypatch.delenv("ASANA_DEFAULT_WORKSPACE", raising=False)
-    saved = {
-        name: getattr(runtime, name)
-        for name in (
-            "debug",
-            "host",
-            "proxy",
-            "verify_ssl",
-            "ssl_ca_cert",
-            "cert_file",
-            "key_file",
-            "assert_hostname",
-            "retry_strategy_overrides",
-            "request_timeout",
-            "connection_pool_maxsize",
-            "access_token",
-            "username",
-            "password",
-            "api_key",
-            "api_key_prefix",
-            "temp_folder_path",
-            "safe_chars_for_path_param",
-            "logger_format",
-            "logger_file",
-            "multibyte_filenames",
-        )
-    }
+    saved = {f.name: getattr(runtime, f.name) for f in dataclasses.fields(runtime)}
     try:
         yield
     finally:
@@ -705,5 +683,213 @@ class TestWorkspaceResolution:
             return_value=_page([]),
         )
         result = make_runner().invoke(cmd, [])
-        assert result.exit_code != 0
+        # exit 2 = user-input error (workspace missing). docs/exit-codes.md
+        # — CLI never sets exit 1; reserved for Python uncaught.
+        assert result.exit_code == 2
         assert mock.call_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Error path: --output-errors / --query-errors / exit code policy (v3.1)
+# ---------------------------------------------------------------------------
+
+
+def _api_exception(status: int, body: str) -> Exception:
+    from asana.rest import ApiException
+
+    exc = ApiException(status=status, reason="Precondition Failed")
+    exc.body = body  # type: ignore[assignment]
+    return exc
+
+
+class TestErrorPathExitCodes:
+    """End-to-end verification of the v3.1 exit code policy.
+
+    Reference: docs/exit-codes.md. Default ``--output-errors=raw`` lets
+    Python's uncaught-exception handler print the traceback (exit 1, the
+    SDK-parity baseline). Opting into an envelope format produces a
+    machine-readable envelope on stdout (exit 3). User-input errors
+    (bad jq, query-without-format) are exit 2.
+    """
+
+    def test_api_error_default_is_raw_propagation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            side_effect=[_api_exception(412, '{"sync":"new-token","errors":[]}')],
+        )
+        # Default --output-errors=raw: exception propagates uncaught.
+        # CliRunner captures it and exits 1.
+        result = make_runner().invoke(cmd, ["--task", "T1"])
+        from asana.rest import ApiException
+
+        assert result.exit_code == 1
+        assert isinstance(result.exception, ApiException)
+        # No envelope on stdout.
+        assert result.stdout == ""
+
+    def test_api_error_explicit_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            side_effect=[_api_exception(412, '{"sync":"new-token","errors":[]}')],
+        )
+        result = make_runner().invoke(cmd, ["--output-errors", "json", "--task", "T1"])
+        assert result.exit_code == 3
+        # Envelope lands on stdout (not stderr).
+        env = json.loads(result.stdout)
+        assert env["exception"] == "asana.rest.ApiException"
+        assert env["status"] == 412
+        assert env["body"] == '{"sync":"new-token","errors":[]}'
+
+    def test_query_errors_with_json_yield(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            side_effect=[_api_exception(412, '{"sync":"recovered","errors":[]}')],
+        )
+        # --query-errors requires an explicit --output-errors format
+        # (the default 'raw' would refuse it). json yields the quoted scalar.
+        result = make_runner().invoke(
+            cmd,
+            [
+                "--output-errors",
+                "json",
+                "--query-errors",
+                ".body | fromjson | .sync",
+                "--task",
+                "T1",
+            ],
+        )
+        assert result.exit_code == 3
+        assert result.stdout.strip() == '"recovered"'
+
+    def test_query_errors_text_output_is_raw_scalar(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            side_effect=[_api_exception(412, '{"sync":"recovered","errors":[]}')],
+        )
+        # --output-errors text turns the scalar into raw output (no quotes) —
+        # the events-polling idiom (see docs/api-events.md).
+        result = make_runner().invoke(
+            cmd,
+            [
+                "--query-errors",
+                ".body | fromjson | .sync",
+                "--output-errors",
+                "text",
+                "--task",
+                "T1",
+            ],
+        )
+        assert result.exit_code == 3
+        assert result.stdout.strip() == "recovered"
+
+    def test_query_errors_invalid_jq_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            side_effect=[_api_exception(412, '{"sync":"x"}')],
+        )
+        result = make_runner().invoke(
+            cmd,
+            ["--output-errors", "json", "--query-errors", "bad((", "--task", "T1"],
+        )
+        # exit 2 = user-input error (bad jq syntax). docs/exit-codes.md
+        assert result.exit_code == 2
+        assert "Invalid jq expression" in full_output(result)
+
+    def test_query_errors_alone_warns(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            side_effect=[_api_exception(412, '{"sync":"x"}')],
+        )
+        # --query-errors paired with the default --output-errors=raw
+        # warns to stderr — the warning informs the user that the
+        # filter is being ignored, but the underlying SDK call
+        # behavior is preserved (raw mode lets the ApiException
+        # propagate, CliRunner reports exit 1). Warning (not error)
+        # avoids masking the actual exception with a usage error.
+        from asana.rest import ApiException
+
+        result = make_runner().invoke(
+            cmd,
+            ["--query-errors", ".exception", "--task", "T1"],
+        )
+        assert result.exit_code == 1
+        assert isinstance(result.exception, ApiException)
+        assert "--query-errors is ignored when --output-errors is 'raw'" in result.stderr
+
+    def test_query_errors_group_level_warns_exactly_once(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: the warning must fire exactly once even when the user
+        places ``--query-errors`` at a non-leaf level (sub-group), which
+        routes through both ``GroupWithGlobalOptions.invoke`` and
+        ``CommandWithGlobalOptions.invoke``. If ``_warn_global_combinations``
+        is ever moved back into ``_consume_global_options``, both layers
+        would emit and this test would fail with ``count == 2``.
+
+        Built from primitives (real ``GroupWithGlobalOptions`` wrapping a
+        real ``_make_command`` leaf) rather than dispatching through
+        ``cli.main`` so the test does not depend on ``_ApiGroup``'s
+        first-use lazy loading reading the patched stub's signature.
+        """
+        from asana_api_cli.click_ext import GroupWithGlobalOptions
+
+        leaf = _build_command("TasksApi", "get_task")
+        group = GroupWithGlobalOptions(name="tasks")
+        group.add_command(leaf, name="get-task")
+
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            side_effect=[_api_exception(412, '{"sync":"x"}')],
+        )
+        result = make_runner().invoke(
+            group,
+            ["--query-errors", ".exception", "get-task", "--task", "T1"],
+        )
+        warning_text = "--query-errors is ignored when --output-errors is 'raw'"
+        assert result.stderr.count(warning_text) == 1, (
+            f"Expected exactly 1 warning line, got:\n{result.stderr}"
+        )
+
+    def test_query_invalid_jq_on_success_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            return_value={"gid": "T1", "name": "task"},
+        )
+        result = make_runner().invoke(cmd, ["--query", "bad((", "--task", "T1"])
+        # Migrated from exit 1 → exit 2 in v3.1 (user-input error).
+        assert result.exit_code == 2
+        assert "Invalid jq expression" in full_output(result)
+
+    def test_success_exits_0(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            return_value={"gid": "T1", "name": "task"},
+        )
+        result = make_runner().invoke(cmd, ["--task", "T1"])
+        assert result.exit_code == 0

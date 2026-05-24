@@ -11,34 +11,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New global flag `--header-params VALUE` sends arbitrary HTTP request
   headers on every call. Accepts shorthand `'k1=v1,k2=v2,...'`, a JSON
-  object, or `@path/to/file.json` (same input format as `--api-key` and
-  `--retry-strategy`). Typical uses include Asana's `Asana-Enable` /
-  `Asana-Disable` deprecation opt-in/-out, custom tracing IDs, and
-  proxy authentication. **Not redacted in `--debug` output** — see
-  [`SECURITY.md`](SECURITY.md) for the full caveat.
+  object, or `@path/to/file.json` (same input format as `--retry-strategy`).
+  **Not redacted in `--debug` output** — see [`SECURITY.md`](SECURITY.md)
+  for the full caveat.
+- New global flag `--output-errors {raw|json|text|csv|table}` (default
+  `raw`). The default `raw` lets exceptions from the SDK call
+  propagate uncaught — Python's default handler prints the traceback
+  on stderr and the process exits `1`, matching the SDK's raw
+  behavior. The four envelope formats catch the exception, render it
+  on **stdout**, and exit `3`. `ApiException` produces a 5-field
+  envelope `{exception, status, reason, body, headers}` where
+  `exception` is the qualified import path (e.g.
+  `"asana.rest.ApiException"`) and `body` is the UTF-8 decoded
+  response *string* (`fromjson` it in `jq` to navigate). Other
+  exceptions raised from the SDK call path (e.g.
+  `urllib3.exceptions.MaxRetryError` on a connection failure) collapse
+  to a 2-field `{exception, reason}`. Envelope on stdout (rather than
+  stderr) keeps the machine-readable channel free of library noise
+  (urllib3 retry warnings, etc.). See
+  [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
+- New global flag `--query-errors EXPR` applies a `jq` filter to the
+  error envelope; each yield is rendered per `--output-errors`.
+  Pairing it with the default `raw` emits a stderr warning (the
+  filter would have no envelope to apply to) but does not block the
+  call — preserving the underlying exception behavior rather than
+  masking it with a usage error.
+- New documentation [`docs/exit-codes.md`](docs/exit-codes.md): success
+  `0`, uncaught exception `1`, user-input error `2`, envelope-rendered
+  API / connection error `3`.
 
 ### Changed
 
-- Four pagination / iterator flags promoted from per-command (paginatable
-  endpoints only) to global, so they work on every command:
+- Exit codes for failures changed: see
+  [`docs/exit-codes.md`](docs/exit-codes.md). The default `raw` mode
+  still emits Python's exit 1 on an uncaught exception; opt-in
+  envelope formats exit `3`; user-input errors exit `2`.
+
+- SDK call errors are now coverage-uniform: every exception raised
+  from the SDK call path (`ApiException`, `urllib3` connection
+  errors, etc.) flows through the same handler. With the default
+  `raw`, the exception propagates uncaught (was: a human-readable
+  `Error (status): message` line specific to `ApiException`). With
+  any envelope format, the exception is rendered on stdout and the
+  process exits `3` — connection errors etc. produce a
+  `{exception, reason}` envelope instead of a Python traceback.
+
+- `--output text` / `--output csv` / `--output table` now render nested
+  dict / list cell values as JSON strings (`{"a":"b"}`) rather than
+  Python `repr` (`{'a': 'b'}`). The same applies to `--output-errors`.
+
+- Four pagination / iterator flags promoted from per-command to global
+  for SDK parity (no-op on methods that don't support pagination):
   - `--full-payload`
   - `--item-limit N`
   - `--page-limit N`
   - `--return-page-iterator / --no-return-page-iterator`
-
-  Previously these appeared only on commands whose SDK method declared a
-  `limit` parameter (e.g. `tasks get-tasks`). They now appear under the
-  new `Pagination / iteration` group in `asana-api --help`, and behave
-  identically whether you write them before or after the subcommand.
-
-  **Practical win for `events get-events`**: with `--full-payload`, the
-  command now returns `{"data": [...], "sync": "...", "has_more": ...}`
-  so the next sync token is reachable from shell scripts, enabling
-  CLI-driven polling loops.
-
-  On commands whose SDK method does not consume these flags (e.g.
-  `tasks delete-task`), passing one is harmless — the underlying SDK
-  accepts the kwarg uniformly and ignores it where it has no effect.
 
 - Auto-iteration of paged responses is now triggered by the SDK's actual
   return value (an iterator) rather than by a per-method pre-judgement

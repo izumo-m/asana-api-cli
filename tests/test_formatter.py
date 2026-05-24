@@ -12,7 +12,8 @@ from asana.rest import ApiException
 
 from asana_api_cli.formatter import (
     _format_output,
-    _handle_api_exception,
+    _handle_exception,
+    _scalar_text,
     _to_rows,
     formatted,
 )
@@ -320,139 +321,325 @@ class TestCsvFieldnamesUnion:
 
 
 # ---------------------------------------------------------------------------
-# _handle_api_exception
+# _handle_exception (envelope schema + format dispatch)
 # ---------------------------------------------------------------------------
 
 
 class TestHandleApiException:
-    def _make_exception(
-        self,
-        status: int = 400,
-        body: str | bytes | None = None,
-        reason: str = "Bad Request",
-    ) -> ApiException:
-        exc = ApiException(status=status, reason=reason)
-        exc.body = body  # type: ignore[assignment]
-        return exc
+    """Cover the JSON envelope path with ``--output-errors json``.
 
-    def test_extracts_error_messages(self, capsys: pytest.CaptureFixture[str]) -> None:
-        body = json.dumps({"errors": [{"message": "project not found"}]})
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(status=404, body=body))
-        err = capsys.readouterr().err
-        assert "project not found" in err
-        assert "404" in err
+    The default of ``--output-errors`` is ``raw`` (let the exception
+    propagate); these tests opt into the envelope by pre-setting
+    ``runtime.output_errors`` via the autouse fixture below.
 
-    def test_multiple_errors(self, capsys: pytest.CaptureFixture[str]) -> None:
-        body = json.dumps({"errors": [{"message": "err1"}, {"message": "err2"}]})
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=body))
-        err = capsys.readouterr().err
-        assert "err1" in err
-        assert "err2" in err
+    Schema: ``{exception, status, reason, body, headers}`` where ``body``
+    is the UTF-8 decoded response *string* (or null). See
+    ``docs/sdk-deviations.md``.
+    """
 
-    def test_bytes_body(self, capsys: pytest.CaptureFixture[str]) -> None:
-        body = json.dumps({"errors": [{"message": "bytes err"}]}).encode()
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=body))
-        assert "bytes err" in capsys.readouterr().err
-
-    def test_fallback_to_reason(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(reason="Forbidden", body=None))
-        assert "Forbidden" in capsys.readouterr().err
-
-    def test_unparseable_body_falls_back(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(reason="Oops", body="not json"))
-        assert "Oops" in capsys.readouterr().err
-
-
-class TestHandleNonJsonResponse:
-    """Tests for non-JSON error responses (HTML, XML, plain text, etc.)."""
+    @pytest.fixture(autouse=True)
+    def _opt_into_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "output_errors", "json")
 
     def _make_exception(
         self,
-        status: int = 502,
+        status: int | None = 412,
+        reason: str | None = "Precondition Failed",
         body: str | bytes | None = None,
-        reason: str = "Bad Gateway",
+        headers: dict[str, str] | None = None,
     ) -> ApiException:
         exc = ApiException(status=status, reason=reason)
         exc.body = body  # type: ignore[assignment]
+        exc.headers = headers  # type: ignore[assignment]
         return exc
 
-    def test_html_body_shows_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        html = "<html><body><h1>502 Bad Gateway</h1></body></html>"
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=html))
-        err = capsys.readouterr().err
-        assert "non-JSON response" in err
-        assert "--debug" in err
-        # Raw body should NOT appear without debug mode
-        assert html not in err
+    def _envelope(self, capsys: pytest.CaptureFixture[str]) -> Any:
+        return json.loads(capsys.readouterr().out)
 
-    def test_xml_body_shows_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        xml = '<?xml version="1.0"?><Error><Message>fail</Message></Error>'
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(status=500, body=xml))
-        err = capsys.readouterr().err
-        assert "non-JSON response" in err
+    def test_string_body_preserved(self, capsys: pytest.CaptureFixture[str]) -> None:
+        body = json.dumps({"sync": "abc", "errors": [{"message": "Sync token invalid"}]})
+        exc = self._make_exception(body=body, headers={"X-Asana-Request-Id": "r1"})
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_exception(exc)
+        assert exc_info.value.code == 3
+        env = self._envelope(capsys)
+        assert env["exception"] == "asana.rest.ApiException"
+        assert env["status"] == 412
+        assert env["reason"] == "Precondition Failed"
+        assert env["body"] == body
+        assert env["headers"] == {"X-Asana-Request-Id": "r1"}
 
-    def test_plain_text_body_shows_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_non_json_body_preserved_verbatim(self, capsys: pytest.CaptureFixture[str]) -> None:
+        html = "<html><body>502</body></html>"
+        exc = self._make_exception(status=502, reason="Bad Gateway", body=html)
         with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body="upstream connect error"))
-        err = capsys.readouterr().err
-        assert "non-JSON response" in err
+            _handle_exception(exc)
+        env = self._envelope(capsys)
+        assert env["status"] == 502
+        assert env["body"] == html
 
-    def test_debug_dumps_raw_body(
+    def test_bytes_body_decoded(self, capsys: pytest.CaptureFixture[str]) -> None:
+        body_bytes = json.dumps({"errors": []}).encode("utf-8")
+        exc = self._make_exception(body=body_bytes)
+        with pytest.raises(SystemExit):
+            _handle_exception(exc)
+        env = self._envelope(capsys)
+        assert env["body"] == body_bytes.decode("utf-8")
+
+    def test_undecodable_bytes_use_replace(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # Production rarely sees this, but the policy is errors="replace"
+        # so the envelope still emits a string rather than failing.
+        exc = self._make_exception(body=b"\x80\x81\x82")
+        with pytest.raises(SystemExit):
+            _handle_exception(exc)
+        env = self._envelope(capsys)
+        assert isinstance(env["body"], str)
+
+    def test_none_body_emits_null(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # SDK's SSLError-wrapping path raises ApiException(status=0,
+        # reason=..., body=None, headers=None).
+        exc = self._make_exception(status=0, reason="SSLError\n...", body=None, headers=None)
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_exception(exc)
+        assert exc_info.value.code == 3
+        env = self._envelope(capsys)
+        assert env["status"] == 0
+        assert env["body"] is None
+        assert env["headers"] is None
+
+    def test_exception_field_is_fqdn_for_subclass(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A subclass surfaces its own ``module.qualname`` — SDK users
+        catch the exact class via the printed import path."""
+
+        class CustomApiException(ApiException):
+            pass
+
+        exc = CustomApiException(status=500, reason="Boom")
+        with pytest.raises(SystemExit):
+            _handle_exception(exc)
+        env = self._envelope(capsys)
+        # Module is this test file; qualname includes the nested class
+        # path. Asserting the suffix is robust to test-runner module
+        # naming differences.
+        assert env["exception"].endswith(".CustomApiException")
+        assert "." in env["exception"]  # FQDN, not bare name
+
+
+class TestHandleApiExceptionFormats:
+    """``--output-errors`` reuses ``_format_output``; cover the four formats."""
+
+    def _make_exception(self) -> ApiException:
+        exc = ApiException(status=412, reason="Precondition Failed")
+        exc.body = '{"sync":"abc","errors":[{"message":"Sync token invalid"}]}'  # type: ignore[assignment]
+        exc.headers = {"X-Asana-Request-Id": "r1"}  # type: ignore[assignment]
+        return exc
+
+    def test_text_format(
         self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(runtime, "debug", True)
-        html = "<html><body><h1>502 Bad Gateway</h1></body></html>"
+        monkeypatch.setattr(runtime, "output_errors", "text")
         with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=html))
-        err = capsys.readouterr().err
-        assert "--- raw response body ---" in err
-        assert html in err
-        assert "--- end of response body ---" in err
-        monkeypatch.setattr(runtime, "debug", False)
+            _handle_exception(self._make_exception())
+        # _print_text for a dict joins values by tab.
+        out = capsys.readouterr().out.rstrip("\n")
+        cells = out.split("\t")
+        assert cells[0] == "asana.rest.ApiException"
+        assert cells[1] == "412"
+        assert cells[2] == "Precondition Failed"
+        # headers (dict) is rendered via _scalar_text → JSON, not Python repr
+        assert cells[4].startswith("{") and '"X-Asana-Request-Id"' in cells[4]
 
-    def test_debug_off_hides_raw_body(
+    def test_csv_format(
         self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(runtime, "debug", False)
-        html = "<html><body>error</body></html>"
+        monkeypatch.setattr(runtime, "output_errors", "csv")
         with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=html))
-        err = capsys.readouterr().err
-        assert "--- raw response body ---" not in err
-        assert "<html>" not in err
+            _handle_exception(self._make_exception())
+        out = capsys.readouterr().out.strip().splitlines()
+        assert out[0] == "exception,status,reason,body,headers"
+        # data row begins with FQDN exception + status etc.; headers cell is JSON
+        assert out[1].startswith("asana.rest.ApiException,412,Precondition Failed,")
+        assert '"X-Asana-Request-Id"' in out[1]
 
-    def test_json_body_does_not_trigger_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        body = json.dumps({"errors": [{"message": "not found"}]})
+    def test_table_format(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(runtime, "output_errors", "table")
         with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(status=404, body=body))
-        err = capsys.readouterr().err
-        assert "non-JSON response" not in err
+            _handle_exception(self._make_exception())
+        out = capsys.readouterr().out
+        # tabulate's "simple" format puts column headers on line 0.
+        assert "exception" in out and "status" in out and "headers" in out
+        assert "ApiException" in out
 
-    def test_empty_body_does_not_trigger_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_json_format(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(runtime, "output_errors", "json")
         with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=""))
-        err = capsys.readouterr().err
-        assert "non-JSON response" not in err
+            _handle_exception(self._make_exception())
+        env = json.loads(capsys.readouterr().out)
+        assert env["exception"] == "asana.rest.ApiException"
+        assert env["status"] == 412
 
-    def test_none_body_does_not_trigger_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=None))
-        err = capsys.readouterr().err
-        assert "non-JSON response" not in err
 
-    def test_bytes_html_body(self, capsys: pytest.CaptureFixture[str]) -> None:
-        html_bytes = b"<html><body>nginx error</body></html>"
+class TestHandleApiExceptionQuery:
+    """``--query-errors`` applies jq to the envelope; output format follows
+    ``--output-errors``."""
+
+    @pytest.fixture(autouse=True)
+    def _opt_into_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "output_errors", "json")
+
+    def _make_exception(self) -> ApiException:
+        exc = ApiException(status=412, reason="Precondition Failed")
+        exc.body = '{"sync":"new-token","errors":[]}'  # type: ignore[assignment]
+        return exc
+
+    def test_query_filter_default_json(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(runtime, "query_errors", ".status")
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_exception(self._make_exception())
+        assert exc_info.value.code == 3
+        assert capsys.readouterr().out.strip() == "412"
+
+    def test_query_with_fromjson_text_format(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The events-polling idiom: fromjson on body to navigate parsed
+        fields, then output raw text for shell consumption."""
+        monkeypatch.setattr(runtime, "query_errors", ".body | fromjson | .sync")
+        monkeypatch.setattr(runtime, "output_errors", "text")
         with pytest.raises(SystemExit):
-            _handle_api_exception(self._make_exception(body=html_bytes))
-        err = capsys.readouterr().err
-        assert "non-JSON response" in err
+            _handle_exception(self._make_exception())
+        # text format outputs the bare scalar (no JSON quotes)
+        assert capsys.readouterr().out.strip() == "new-token"
+
+    def test_query_invalid_jq_exits_2(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(runtime, "query_errors", "bad((")
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_exception(self._make_exception())
+        # exit 2 = user-input error (jq syntax). docs/exit-codes.md.
+        assert exc_info.value.code == 2
+        # The error message ("Invalid jq expression: ...") is the one
+        # consistently-stderr path: a user-input error that *isn't* the
+        # rendered envelope.
+        assert "Invalid jq expression" in capsys.readouterr().err
+
+
+class TestScalarText:
+    """``_scalar_text`` renders nested containers as JSON, scalars as str()."""
+
+    def test_scalars_unchanged(self) -> None:
+        assert _scalar_text("hello") == "hello"
+        assert _scalar_text(42) == "42"
+        assert _scalar_text(True) == "True"
+        assert _scalar_text(None) == "None"
+
+    def test_dict_as_json(self) -> None:
+        assert _scalar_text({"a": 1, "b": "x"}) == '{"a": 1, "b": "x"}'
+
+    def test_list_as_json(self) -> None:
+        assert _scalar_text([1, "two", None]) == '[1, "two", null]'
+
+    def test_nested_dict_uses_double_quotes_not_python_repr(self) -> None:
+        # str(dict) gives `{'a': 'b'}` (Python repr); _scalar_text gives
+        # JSON `{"a": "b"}` so the cell is shell-tool friendly.
+        out = _scalar_text({"a": "b"})
+        assert "'" not in out
+        assert '"a"' in out and '"b"' in out
+
+    def test_unicode_preserved(self) -> None:
+        assert _scalar_text({"name": "日本語"}) == '{"name": "日本語"}'
+
+    def test_unserializable_falls_back_to_str(self) -> None:
+        class NotJson:
+            def __repr__(self) -> str:
+                return "<NotJson>"
+
+        assert _scalar_text(NotJson()) == "<NotJson>"
+
+
+class TestHandleNonApiException:
+    """Non-ApiException exceptions (urllib3 connection errors, generic
+    Python errors) collapse to ``{exception, reason}`` — no HTTP context
+    fields, since none apply. Plan: docs/sdk-deviations.md (sub-phase 2)."""
+
+    @pytest.fixture(autouse=True)
+    def _opt_into_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "output_errors", "json")
+
+    def _envelope(self, capsys: pytest.CaptureFixture[str]) -> Any:
+        return json.loads(capsys.readouterr().out)
+
+    def test_urllib3_max_retry_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+        from urllib3.exceptions import MaxRetryError
+
+        exc = MaxRetryError(
+            pool=None,  # type: ignore[arg-type]
+            url="https://x.invalid/y",
+            reason=Exception("connection refused"),
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_exception(exc)
+        assert exc_info.value.code == 3
+        env = self._envelope(capsys)
+        assert env["exception"] == "urllib3.exceptions.MaxRetryError"
+        assert "reason" in env and env["reason"]
+        # status/body/headers are absent (not null) because the exception
+        # carries no HTTP response context.
+        assert "status" not in env
+        assert "body" not in env
+        assert "headers" not in env
+
+    def test_builtin_exception(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_exception(RuntimeError("oops"))
+        assert exc_info.value.code == 3
+        env = self._envelope(capsys)
+        assert env["exception"] == "builtins.RuntimeError"
+        assert env["reason"] == "oops"
+        assert set(env.keys()) == {"exception", "reason"}
+
+
+class TestFormattedDecoratorReraisesClickExceptions:
+    """ClickException / Abort / Exit raised from inside the callback must
+    bubble up to Click's own handler — *not* be wrapped in an envelope."""
+
+    def _run(self, raise_exc: Exception) -> Any:
+        @click.command()
+        @formatted
+        def cmd() -> Any:
+            raise raise_exc
+
+        return make_runner().invoke(cmd)
+
+    def test_click_usage_error_propagates(self) -> None:
+        result = self._run(click.UsageError("bad usage"))
+        # Click's UsageError exits 2 with its own formatting; the envelope
+        # is *not* emitted (no JSON, no exit 3).
+        assert result.exit_code == 2
+        assert "bad usage" in full_output(result)
+
+    def test_click_abort_propagates(self) -> None:
+        result = self._run(click.Abort())
+        # Abort is Click's aborted-command sentinel; CliRunner translates
+        # it to exit 1 with the literal "Aborted!" output. Asserting both
+        # the exit code AND the absence of an envelope guards against
+        # the regression "decorator swallows Abort and returns normally"
+        # which a plain ``!= 3`` would not catch.
+        assert result.exit_code == 1
+        out = full_output(result)
+        assert "Aborted" in out
+        assert "exception" not in out  # envelope must NOT be emitted
+
+    def test_click_exit_propagates(self) -> None:
+        result = self._run(click.exceptions.Exit(7))
+        assert result.exit_code == 7
 
 
 # ---------------------------------------------------------------------------
@@ -515,7 +702,11 @@ class TestFormattedDecorator:
     # ``Authorization``-in-``--debug`` leak risk the upstream gate exists
     # to prevent. Test removed.
 
-    def test_api_exception_handled(self) -> None:
+    def test_api_exception_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """With --output-errors json, ApiException is rendered as an
+        envelope on stdout (exit 3)."""
+        monkeypatch.setattr(runtime, "output_errors", "json")
+
         @click.command()
         @formatted
         def cmd() -> Any:
@@ -524,5 +715,53 @@ class TestFormattedDecorator:
 
         runner = make_runner()
         result = runner.invoke(cmd)
-        assert result.exit_code != 0
-        assert "Forbidden" in full_output(result)  # CliRunner merges stderr
+        assert result.exit_code == 3
+        env = json.loads(result.stdout)
+        assert env["exception"] == "asana.rest.ApiException"
+        assert env["reason"] == "Forbidden"
+
+
+class TestRawDefault:
+    """``--output-errors raw`` (the default) lets exceptions propagate
+    uncaught — Python's default handler prints the traceback on stderr
+    and exits 1. This is the SDK-parity baseline."""
+
+    def test_api_exception_propagates(self) -> None:
+        @click.command()
+        @formatted
+        def cmd() -> Any:
+            raise ApiException(status=403, reason="Forbidden")
+
+        runner = make_runner()
+        result = runner.invoke(cmd)
+        # CliRunner catches the exception and exits 1 by default.
+        assert result.exit_code == 1
+        assert isinstance(result.exception, ApiException)
+        # Nothing rendered to stdout — no envelope.
+        assert result.stdout == ""
+
+    def test_generic_exception_propagates(self) -> None:
+        @click.command()
+        @formatted
+        def cmd() -> Any:
+            raise RuntimeError("boom")
+
+        runner = make_runner()
+        result = runner.invoke(cmd)
+        assert result.exit_code == 1
+        assert isinstance(result.exception, RuntimeError)
+        assert result.stdout == ""
+
+
+class TestFormatOutputExitCodes:
+    """``--query`` invalid jq must exit 2 (user-input), not 1 (Python uncaught).
+
+    Anchors the new exit-code policy: CLI never sets ``sys.exit(1)`` itself
+    (see ``docs/exit-codes.md``).
+    """
+
+    def test_invalid_jq_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            _format_output({"data": [1]}, output_format="json", jq_query="bad((")
+        assert exc_info.value.code == 2
+        assert "Invalid jq expression" in capsys.readouterr().err

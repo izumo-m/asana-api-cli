@@ -225,6 +225,12 @@ class TestGlobalOptionNamesInventory:
             "item_limit",
             "full_payload",
             "header_params",
+            # v3.1: error output controls. output_errors picks the envelope
+            # format on stderr (json default; text/csv/table mirror --output);
+            # query_errors filters via jq, rendered per output_errors.
+            # See docs/exit-codes.md / docs/sdk-deviations.md.
+            "output_errors",
+            "query_errors",
         ]
         if _SDK_HAS_RETRY_STRATEGY:
             expected_names.append("retry_strategy_overrides")

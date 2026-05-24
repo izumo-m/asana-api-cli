@@ -46,18 +46,10 @@ environment variable. Treat this token as a secret:
 
 ## Debug output
 
-`asana-api --debug` enables HTTP request/response logging to stderr to help
-diagnose issues. The CLI installs an `HttpClientAuthRedactor` that masks
-the `Authorization` header before printing, so debug logs are safe to copy
-into bug reports.
+`asana-api --debug` writes HTTP request/response traces to stderr.
+The CLI masks only the request `Authorization` header (which carries
+the personal access token); everything else is shown verbatim.
 
-**Only the `Authorization` header is redacted.** If you supply additional
-credentials via `--header-params` (e.g., a `Proxy-Authorization` header,
-a third-party `X-Api-Key`, or any other secret-bearing custom header),
-those headers appear verbatim in `--debug` output. Review the log before
-sharing, or strip such headers manually.
-
-Note that this masking is provided by the CLI, not by the SDK. If you
-enable the SDK's HTTP debug logging directly from Python (without going
-through `asana-api`), the `Authorization` header — which contains your
-personal access token — appears in the output in clear text.
+This masking lives in the CLI, not the SDK. Direct use of the SDK's
+HTTP debug logging from Python leaves the `Authorization` header in
+clear text.

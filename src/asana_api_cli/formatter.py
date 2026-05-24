@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import csv
 import functools
 import io
@@ -58,59 +57,112 @@ def formatted(f: Any) -> Any:
             # here — outside that context — would leak ``Authorization``
             # into ``--debug`` log on multi-page iterators, so the upstream
             # gate is load-bearing.
-        except ApiException as e:
-            _handle_api_exception(e)
+        except (
+            click.exceptions.ClickException,
+            click.exceptions.Abort,
+            click.exceptions.Exit,
+        ):
+            # Click's own control flow (BadParameter, ctx.exit, Ctrl-C in
+            # prompts) is not an "API call exception" — let Click handle it.
+            raise
+        except Exception as e:
+            if runtime.output_errors == "raw":
+                # SDK-parity default: let the exception propagate. Python's
+                # default handler prints the traceback on stderr and exits 1.
+                raise
+            # Otherwise render as a ``{exception, ...}`` envelope on stdout
+            # and exit 3.
+            _handle_exception(e)
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
     return wrapper
 
 
-def _handle_api_exception(e: ApiException) -> NoReturn:
-    """Print an Asana API error in human-readable form and exit."""
-    status = e.status or "error"
-    messages: list[str] = []
-    body = e.body
-    if isinstance(body, bytes):
-        with contextlib.suppress(UnicodeDecodeError):
-            body = body.decode("utf-8")
-    if isinstance(body, str):
-        with contextlib.suppress(json.JSONDecodeError):
-            payload = json.loads(body)
-            if isinstance(payload, dict):
-                for err in payload.get("errors") or []:
-                    if isinstance(err, dict) and "message" in err:
-                        messages.append(str(err["message"]))
-    if not messages:
-        messages.append(e.reason or "Unknown API error")
-    for msg in messages:
-        click.echo(f"Error ({status}): {msg}", err=True)
-    # When the body was not JSON, show a hint and,
-    # in debug mode, dump the raw body so the user can diagnose the issue.
-    if isinstance(body, str) and body and not _is_json(body):
-        click.echo(
-            "The server returned a non-JSON response. "
-            "Re-run with --debug to see the full response body.",
-            err=True,
-        )
-        if runtime.debug:
-            click.echo("--- raw response body ---", err=True)
-            click.echo(body, err=True)
-            click.echo("--- end of response body ---", err=True)
-    sys.exit(1)
+def _qualified_exception_name(e: BaseException) -> str:
+    """Return ``module.qualname`` so SDK users can import the same symbol.
+
+    Example: ``urllib3.exceptions.MaxRetryError`` — readers can
+    ``from urllib3.exceptions import MaxRetryError`` to handle the same
+    error in their own SDK code. Built-ins surface as
+    ``builtins.<name>``; the ``builtins.`` prefix is technically
+    correct and is left as-is rather than special-cased.
+    """
+    cls = type(e)
+    return f"{cls.__module__}.{cls.__qualname__}"
 
 
-def _is_json(text: str) -> bool:
-    """Return True if *text* looks like JSON."""
-    try:
-        json.loads(text)
-    except (json.JSONDecodeError, ValueError):
-        return False
-    return True
+def _handle_exception(e: Exception) -> NoReturn:
+    """Render an exception envelope on stdout and exit.
+
+    Only called when ``runtime.output_errors`` is one of
+    ``json|text|csv|table`` (an envelope format was explicitly
+    requested). When it is the default ``raw``, the caller re-raises
+    instead so Python's default handler prints the traceback on
+    stderr and exits 1 — SDK-parity behavior.
+
+    ApiException carries full HTTP context: 5-field envelope
+    ``{exception, status, reason, body, headers}`` where ``body`` is
+    the UTF-8 decoded response *string* (or null). Other exceptions
+    (urllib3 connection errors, etc.) collapse to the 2-field
+    ``{exception, reason}`` since status/body/headers have no HTTP
+    meaning. The ``exception`` field is always the qualified
+    ``module.qualname`` form. See ``docs/sdk-deviations.md`` for the
+    full schema.
+
+    The envelope lands on **stdout** (not stderr) so that
+    ``exit_code == 3`` paired with stdout-only consumption gives a
+    clean machine-readable error channel — independent of whatever
+    noise urllib3 or other libraries write to stderr. Exit code is
+    ``3`` for the rendered envelope; a malformed ``--query-errors``
+    expression short-circuits with exit ``2`` from inside
+    :func:`_format_output` (user-input error, per
+    ``docs/exit-codes.md``).
+    """
+    envelope: dict[str, Any]
+    if isinstance(e, ApiException):
+        raw_body = e.body
+        body_text: str | None
+        if isinstance(raw_body, (bytes, bytearray)):
+            body_text = bytes(raw_body).decode("utf-8", errors="replace")
+        elif isinstance(raw_body, str):
+            body_text = raw_body
+        else:
+            body_text = None
+        envelope = {
+            "exception": _qualified_exception_name(e),
+            "status": e.status,
+            "reason": e.reason,
+            "body": body_text,
+            "headers": dict(e.headers) if e.headers is not None else None,
+        }
+    else:
+        envelope = {
+            "exception": _qualified_exception_name(e),
+            "reason": str(e),
+        }
+
+    _format_output(
+        envelope,
+        output_format=runtime.output_errors,
+        jq_query=runtime.query_errors,
+    )
+    sys.exit(3)
 
 
 def _format_output(
-    data: Any, *, output_format: str, jq_query: str | None, csv_bom: bool = False
+    data: Any,
+    *,
+    output_format: str,
+    jq_query: str | None,
+    csv_bom: bool = False,
 ) -> None:
+    """Render *data* on stdout.
+
+    The same renderer powers both the success path (``--output``) and
+    the error envelope path (``--output-errors``); both write to
+    stdout, so scripts can consume them uniformly. ``exit_code``
+    (``0`` vs ``3``) is the discriminator.
+    """
     # ``--query EXPR`` is treated as the equivalent of piping through
     # ``jq 'EXPR'``: jq may yield 0, 1, or many values and each output
     # format renders them naturally. When no query is given, the data
@@ -120,13 +172,11 @@ def _format_output(
             results = jqlib.all(jq_query, data)
         except ValueError as e:
             click.echo(f"Invalid jq expression: {e}", err=True)
-            sys.exit(1)
+            sys.exit(2)
     else:
         results = [data]
 
     if output_format == "json":
-        # Stream of values: each yield is its own JSON document. Matches
-        # external ``jq``'s default output.
         for v in results:
             click.echo(json.dumps(v, indent=2, ensure_ascii=False))
         return
@@ -152,8 +202,12 @@ def _format_output(
 
     if not rows and non_rowable:
         for v in non_rowable:
-            click.echo(v)
+            click.echo(_scalar_text(v))
         return
+
+    # Stringify nested values (dict / list) as JSON so cells use JSON
+    # syntax (`{"a":"b"}`) rather than Python repr (`{'a': 'b'}`).
+    rows = [{k: _scalar_text(v) for k, v in row.items()} for row in rows]
 
     if output_format == "table":
         click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
@@ -178,25 +232,35 @@ def _to_rows(data: Any) -> list[dict[str, Any]] | None:
     return None
 
 
+def _scalar_text(value: Any) -> str:
+    """Single-cell text representation.
+
+    Scalars (None / str / int / float / bool) are stringified naturally;
+    nested containers (dict / list) are JSON-encoded so that text / csv /
+    table cells use JSON syntax (``{"a":"b"}``) rather than Python repr
+    (``{'a': 'b'}``).
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return str(value)
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def _print_text(data: Any) -> None:
     """Print data in plain text format (like ``aws --output text``)."""
-    if data is None:
-        click.echo("None")
-        return
-    if isinstance(data, (str, int, float, bool)):
-        click.echo(data)
-        return
     if isinstance(data, dict):
-        click.echo("\t".join(str(v) for v in data.values()))
+        click.echo("\t".join(_scalar_text(v) for v in data.values()))
         return
     if isinstance(data, list):
         for item in data:
             if isinstance(item, dict):
-                click.echo("\t".join(str(v) for v in item.values()))
+                click.echo("\t".join(_scalar_text(v) for v in item.values()))
             else:
-                click.echo(item)
+                click.echo(_scalar_text(item))
         return
-    click.echo(data)
+    click.echo(_scalar_text(data))
 
 
 def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:

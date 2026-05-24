@@ -14,7 +14,7 @@ flags switch to live API access; see [Running](#running) below.
 | `test_pagination.py` | Every paginatable-command flag exposed by `tasks get-tasks` (`--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`) and the v2 deprecation aliases. |
 | `test_crud.py` | `project` and `task` create → get → update → delete. |
 | `test_attachments.py` | Attachment upload / get / delete across ASCII / Japanese text / binary content and Japanese filenames (the latter via the `--multibyte-filenames` flag). |
-| `test_events.py` | `events get-events` sync-token cycle: 412 bootstrap (exit 3 + `--json-errors` envelope) → trigger → poll (`--full-payload`). Exercises the v3.1 `--json-errors` + `--full-payload` combination needed to surface the fresh sync token. |
+| `test_events.py` | `events get-events` sync-token cycle: 412 bootstrap (`--output-errors json` → envelope on stdout, exit 3) → trigger → poll (`--full-payload`). Exercises the v3.1 `--output-errors` + `--full-payload` combination needed to surface the fresh sync token. |
 
 ## Environment variables
 

@@ -114,15 +114,23 @@ def test_full_payload_without_limit_errors(pagination_project_gid: str) -> None:
     Pairs with ``test_full_payload_under_threshold`` which covers the
     success case.
     """
-    code, _, err = _run(
+    # --output-errors json opts into the envelope path so we can inspect
+    # the API body programmatically. The default 'raw' would let the
+    # exception propagate uncaught (exit 1) and bury the body in a
+    # Python traceback.
+    code, out, _ = _run(
         "tasks",
         "get-tasks",
         "--project",
         pagination_project_gid,
         "--full-payload",
+        "--output-errors",
+        "json",
     )
-    assert code != 0
-    assert "too large" in err.lower()
+    assert code == 3
+    envelope = json.loads(out)
+    assert envelope["status"] == 400
+    assert "too large" in envelope["body"].lower()
 
 
 @pytest.mark.vcr

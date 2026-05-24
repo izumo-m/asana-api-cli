@@ -2,7 +2,7 @@
 
 Asana's events endpoint returns HTTP 412 with a fresh sync token in the
 response body on the initial poll (no sync given). The CLI surfaces this
-via ``--json-errors`` (exit 3, stderr JSON envelope) when
+via ``--output-errors json`` (envelope on stdout, exit 3) when
 ``--full-payload`` is also set; without ``--full-payload`` the SDK's
 ``EventIterator`` absorbs the 412 silently and the fresh token is lost
 inside the iterator. The test exercises the bootstrap → trigger → poll
@@ -82,19 +82,25 @@ def test_events_sync_cycle(
     # BOOTSTRAP — initial poll returns 412 with a fresh sync token.
     # --full-payload is load-bearing: without it the SDK's EventIterator
     # absorbs the 412 and the token is lost.
-    code, _, err = _run(
+    # --output-errors json is required: the default 'raw' would let the
+    # ApiException propagate uncaught (exit 1) instead of giving us an
+    # envelope to parse.
+    code, out, err = _run(
         "events",
         "get-events",
         "--resource",
         task_gid,
         "--full-payload",
-        "--json-errors",
+        "--output-errors",
+        "json",
     )
     assert code == 3, f"bootstrap should exit 3 (412), got {code}: {err}"
-    envelope = json.loads(err)
-    assert envelope["kind"] == "api_error"
+    envelope = json.loads(out)
+    assert envelope["exception"] == "asana.rest.ApiException"
     assert envelope["status"] == 412
-    sync = envelope["body"]["json"]["sync"]
+    # body is the UTF-8 decoded response string; parse to extract the sync token.
+    body = json.loads(envelope["body"])
+    sync = body["sync"]
     assert sync, "bootstrap envelope must contain a sync token"
 
     # TRIGGER — rename the task

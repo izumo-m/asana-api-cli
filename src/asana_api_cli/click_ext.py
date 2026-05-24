@@ -68,7 +68,10 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
             "full_payload",
         ],
     ),
-    ("Logging / Debug", ["debug", "logger_format", "logger_file"]),
+    (
+        "Logging / Debug",
+        ["debug", "logger_format", "logger_file", "output_errors", "query_errors"],
+    ),
     ("Advanced", ["temp_folder_path", "safe_chars_for_path_param"]),
     ("CLI extension", ["multibyte_filenames"]),
     (
@@ -304,6 +307,29 @@ def _make_global_option_params() -> list[click.Option]:
                 "opt-in. Not redacted in --debug output — see SECURITY.md."
             ),
         ),
+        click.Option(
+            ["--output-errors", "output_errors"],
+            type=click.Choice(["raw", "json", "text", "csv", "table"], case_sensitive=False),
+            default="raw",
+            show_default=True,
+            help=(
+                "How to surface exceptions from the SDK call. 'raw' (default) lets "
+                "the exception propagate uncaught (Python traceback on stderr, "
+                "exit 1). json/text/csv/table render an envelope "
+                "(exception/status/reason/body/headers) on stdout and exit 3 "
+                "[asana-api extension]"
+            ),
+        ),
+        click.Option(
+            ["--query-errors", "query_errors"],
+            default=None,
+            help=(
+                "Apply a jq filter to the error envelope; result is rendered via "
+                "--output-errors. Pairing with the default 'raw' emits a stderr "
+                "warning (the filter would be a no-op) but does not block the call "
+                "[asana-api extension]"
+            ),
+        ),
     ]
 
 
@@ -374,6 +400,10 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.full_payload = value
     elif name == "header_params":
         runtime.header_params = value
+    elif name == "output_errors":
+        runtime.output_errors = value
+    elif name == "query_errors":
+        runtime.query_errors = value
 
 
 def _consume_global_options(ctx: click.Context) -> None:
@@ -391,6 +421,25 @@ def _consume_global_options(ctx: click.Context) -> None:
         value = ctx.params.pop(name)
         if ctx.get_parameter_source(name) is ParameterSource.COMMANDLINE:
             _apply_global_to_runtime(name, value)
+
+
+def _warn_global_combinations() -> None:
+    """Surface usability mistakes in the runtime flag state as stderr warnings.
+
+    Warns rather than raises so the user sees the mistake without
+    masking any other error (e.g. a v2-alias deprecation reject from
+    ``cli.py:_make_command``, or the SDK call exception itself in raw
+    mode). Currently checks: ``--query-errors`` paired with
+    ``--output-errors raw`` produces no envelope to filter — the
+    expression would silently do nothing.
+    """
+    if runtime.output_errors == "raw" and runtime.query_errors is not None:
+        click.echo(
+            "warning: --query-errors is ignored when --output-errors is "
+            "'raw' (the default) — pass --output-errors {json,text,csv,table} "
+            "to enable error filtering.",
+            err=True,
+        )
 
 
 def _write_compact_dl(
@@ -520,6 +569,10 @@ class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):
 
     def invoke(self, ctx: click.Context) -> Any:
         _consume_global_options(ctx)
+        # Leaf-only warning: parent groups (``GroupWithGlobalOptions`` /
+        # ``LazyGroup``) also run ``_consume_global_options`` and we would
+        # double-emit if we warned inside that helper.
+        _warn_global_combinations()
         return super().invoke(ctx)
 
 

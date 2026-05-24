@@ -107,23 +107,23 @@ def resolve_body(value: str) -> JsonValue:
             # so non-UTF-8 input from a pipe surfaces here instead of being
             # silently misdecoded with the locale code page.
             click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
-            sys.exit(1)
+            sys.exit(2)
     elif value.startswith("@"):
         path = Path(value[1:])
         try:
             raw = path.read_text(encoding="utf-8")
         except FileNotFoundError:
             click.echo(f"Body file not found: {path}", err=True)
-            sys.exit(1)
+            sys.exit(2)
         except UnicodeDecodeError as exc:
             click.echo(
                 f"Body file {path} is not valid UTF-8: {exc}",
                 err=True,
             )
-            sys.exit(1)
+            sys.exit(2)
         except OSError as exc:
             click.echo(f"Cannot read body file {path}: {exc}", err=True)
-            sys.exit(1)
+            sys.exit(2)
     else:
         raw = value
 
@@ -131,7 +131,7 @@ def resolve_body(value: str) -> JsonValue:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
         click.echo(f"Invalid JSON in body: {exc}", err=True)
-        sys.exit(1)
+        sys.exit(2)
 
 
 @dataclass
@@ -172,6 +172,8 @@ class _Runtime:
     full_payload: bool = False
     item_limit: int | None = None
     header_params: dict[str, str] | None = None
+    output_errors: str = "raw"
+    query_errors: str | None = None
 
 
 runtime = _Runtime()
@@ -328,7 +330,7 @@ class AsanaSession:
                 f"Access token is not set. Pass --access-token or set {ACCESS_TOKEN_ENV}.",
                 err=True,
             )
-            sys.exit(1)
+            sys.exit(2)
         return cls(token=token)
 
 
@@ -359,5 +361,5 @@ def resolve_workspace(
             f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
             err=True,
         )
-        sys.exit(1)
+        sys.exit(2)
     return None
