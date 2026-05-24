@@ -14,28 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   object, or `@path/to/file.json` (same input format as `--retry-strategy`).
   **Not redacted in `--debug` output** — see [`SECURITY.md`](SECURITY.md)
   for the full caveat.
-- New global flag `--output-errors {raw|json|text|csv|table}` (default
-  `raw`). The default `raw` lets exceptions from the SDK call
-  propagate uncaught — Python's default handler prints the traceback
-  on stderr and the process exits `1`, matching the SDK's raw
-  behavior. The four envelope formats catch the exception, render it
-  on **stdout**, and exit `3`. `ApiException` produces a 5-field
-  envelope `{exception, status, reason, body, headers}` where
-  `exception` is the qualified import path (e.g.
-  `"asana.rest.ApiException"`) and `body` is the UTF-8 decoded
-  response *string* (`fromjson` it in `jq` to navigate). Other
-  exceptions raised from the SDK call path (e.g.
-  `urllib3.exceptions.MaxRetryError` on a connection failure) collapse
-  to a 2-field `{exception, reason}`. Envelope on stdout (rather than
-  stderr) keeps the machine-readable channel free of library noise
-  (urllib3 retry warnings, etc.). See
-  [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
-- New global flag `--query-errors EXPR` applies a `jq` filter to the
-  error envelope; each yield is rendered per `--output-errors`.
-  Pairing it with the default `raw` emits a stderr warning (the
-  filter would have no envelope to apply to) but does not block the
-  call — preserving the underlying exception behavior rather than
-  masking it with a usage error.
+- New global flags `--output-errors {raw|json|text|csv|table}` and
+  `--query-errors EXPR`. API error responses (JSON) are processed the
+  same way `--output` handles success responses and written to
+  **stdout**. Default `raw` preserves SDK-native exception behavior.
+  See [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 - New documentation [`docs/exit-codes.md`](docs/exit-codes.md): success
   `0`, uncaught exception `1`, user-input error `2`, envelope-rendered
   API / connection error `3`.
@@ -43,18 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Exit codes for failures changed: see
-  [`docs/exit-codes.md`](docs/exit-codes.md). The default `raw` mode
-  still emits Python's exit 1 on an uncaught exception; opt-in
-  envelope formats exit `3`; user-input errors exit `2`.
-
-- SDK call errors are now coverage-uniform: every exception raised
-  from the SDK call path (`ApiException`, `urllib3` connection
-  errors, etc.) flows through the same handler. With the default
-  `raw`, the exception propagates uncaught (was: a human-readable
-  `Error (status): message` line specific to `ApiException`). With
-  any envelope format, the exception is rendered on stdout and the
-  process exits `3` — connection errors etc. produce a
-  `{exception, reason}` envelope instead of a Python traceback.
+  [`docs/exit-codes.md`](docs/exit-codes.md).
 
 - `--output text` / `--output csv` / `--output table` now render nested
   dict / list cell values as JSON strings (`{"a":"b"}`) rather than
