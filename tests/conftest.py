@@ -11,7 +11,35 @@ See ``tests/e2e/README.md`` for the full workflow.
 
 from __future__ import annotations
 
+import dataclasses
+from collections.abc import Iterator
+
 import pytest
+
+from asana_api_cli.session import _Runtime, runtime
+
+
+@pytest.fixture(autouse=True)
+def _reset_runtime() -> Iterator[None]:
+    """Reset the module-level ``runtime`` singleton between tests.
+
+    Global flags promoted in v3.1 (``--page-limit``, ``--item-limit``,
+    ``--return-page-iterator``, ``--full-payload``, ``--header-params``)
+    are written into ``runtime`` by ``_consume_global_options`` whenever
+    a test invokes a CLI command with those flags. Without this fixture
+    the value persists into the next test, producing order-dependent
+    failures.
+
+    Snapshots all ``_Runtime`` fields up-front and restores them after
+    each test so any field — including ones added in the future — gets
+    rolled back automatically.
+    """
+    saved = {f.name: getattr(runtime, f.name) for f in dataclasses.fields(_Runtime)}
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            setattr(runtime, name, value)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

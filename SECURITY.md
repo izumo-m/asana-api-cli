@@ -51,6 +51,12 @@ diagnose issues. The CLI installs an `HttpClientAuthRedactor` that masks
 the `Authorization` header before printing, so debug logs are safe to copy
 into bug reports.
 
+**Only the `Authorization` header is redacted.** If you supply additional
+credentials via `--header-params` (e.g., a `Proxy-Authorization` header,
+a third-party `X-Api-Key`, or any other secret-bearing custom header),
+those headers appear verbatim in `--debug` output. Review the log before
+sharing, or strip such headers manually.
+
 Note that this masking is provided by the CLI, not by the SDK. If you
 enable the SDK's HTTP debug logging directly from Python (without going
 through `asana-api`), the `Authorization` header — which contains your

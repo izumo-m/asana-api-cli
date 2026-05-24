@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 
 import click
-import pytest
 from _cli_runner import full_output, make_runner
 
 from asana_api_cli.click_ext import (
@@ -37,30 +36,10 @@ def _count_option_appearances(output: str, flag: str) -> int:
     return len(re.findall(pattern, output, re.MULTILINE))
 
 
-@pytest.fixture(autouse=True)
-def _reset_runtime() -> None:
-    """Reset the shared runtime singleton between tests."""
-    runtime.debug = False
-    runtime.host = None
-    runtime.proxy = None
-    runtime.verify_ssl = None
-    runtime.ssl_ca_cert = None
-    runtime.cert_file = None
-    runtime.key_file = None
-    runtime.assert_hostname = None
-    runtime.retry_strategy_overrides = None
-    runtime.request_timeout = None
-    runtime.connection_pool_maxsize = None
-    runtime.access_token = None
-    runtime.username = None
-    runtime.password = None
-    runtime.api_key = None
-    runtime.api_key_prefix = None
-    runtime.temp_folder_path = None
-    runtime.safe_chars_for_path_param = None
-    runtime.logger_format = None
-    runtime.logger_file = None
-    runtime.multibyte_filenames = False
+# Runtime isolation between tests is provided by the autouse
+# ``_reset_runtime`` fixture in ``tests/conftest.py``. It snapshots all
+# ``_Runtime`` fields via ``dataclasses.fields`` so new fields are picked
+# up automatically — no per-file maintenance needed here.
 
 
 def _build_cli() -> click.Group:
@@ -239,6 +218,13 @@ class TestGlobalOptionNamesInventory:
             "logger_format",
             "logger_file",
             "multibyte_filenames",
+            # v3.1: pagination / iterator control promoted from per-command
+            # to global, plus header_params for parity with the SDK kwarg.
+            "return_page_iterator",
+            "page_limit",
+            "item_limit",
+            "full_payload",
+            "header_params",
         ]
         if _SDK_HAS_RETRY_STRATEGY:
             expected_names.append("retry_strategy_overrides")

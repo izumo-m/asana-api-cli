@@ -310,14 +310,16 @@ class TestMultibyteFilenameSupport:
 
 
 class TestAsanaSessionPaginationKwargs:
-    """``AsanaSession`` exposes ``return_page_iterator`` and ``page_limit``
-    that forward 1:1 to the underlying ``asana.Configuration`` properties of
-    the same name. The defaults (``True`` and ``None``) match the SDK's own
-    defaults so the SDK behavior is preserved when callers omit them."""
+    """``AsanaSession`` reads ``return_page_iterator`` and ``page_limit``
+    from the shared ``runtime`` singleton (set by the ``--return-page-iterator``
+    / ``--page-limit`` global flags). When unset, the SDK's own defaults
+    (``True`` and ``100``) are preserved."""
 
-    def test_from_env_explicit_kwargs_propagate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_runtime_values_propagate(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ASANA_ACCESS_TOKEN", "x" * 20)
-        with AsanaSession.from_env(return_page_iterator=False, page_limit=50) as session:
+        monkeypatch.setattr(runtime, "return_page_iterator", False)
+        monkeypatch.setattr(runtime, "page_limit", 50)
+        with AsanaSession.from_env() as session:
             assert session.client.configuration.return_page_iterator is False
             assert session.client.configuration.page_limit == 50
 
@@ -372,26 +374,16 @@ class TestNoopAuthPropertiesDoNotLeak:
             "api_key_prefix": "LEAK_CANARY_PREFIX_8675309",
         }
 
-        saved = {
-            "debug": runtime.debug,
-            "username": runtime.username,
-            "password": runtime.password,
-            "api_key": runtime.api_key,
-            "api_key_prefix": runtime.api_key_prefix,
-            "host": runtime.host,
-        }
+        # Restoration of these ``runtime`` fields after the test is handled
+        # by the autouse ``_reset_runtime`` fixture in ``tests/conftest.py``.
         runtime.debug = True
         runtime.username = canaries["username"]
         runtime.password = canaries["password"]
         runtime.api_key = {"k1": canaries["api_key"]}
         runtime.api_key_prefix = {"k1": canaries["api_key_prefix"]}
         runtime.host = f"http://127.0.0.1:{port}"
-        try:
-            with AsanaSession(token="x" * 20) as session:
-                asana.TasksApi(session.client).get_task("X", opts={})
-        finally:
-            for name, value in saved.items():
-                setattr(runtime, name, value)
+        with AsanaSession(token="x" * 20) as session:
+            asana.TasksApi(session.client).get_task("X", opts={})
 
         captured = capsys.readouterr()
         combined = captured.out + captured.err

@@ -372,10 +372,13 @@ class TestBuiltCommands:
 
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
-        # v3 primary pagination flags (1:1 with SDK).
+        # Per-command (docstring opts): --limit / --offset come from the
+        # SDK method's docstring entries.
+        for expected in ("--limit", "--offset"):
+            assert expected in flags, f"missing {expected}"
+        # v3.1 global iterator-control flags appear on every command via
+        # CommandWithGlobalOptions; verify they are present here too.
         for expected in (
-            "--limit",
-            "--offset",
             "--page-limit",
             "--item-limit",
             "--no-return-page-iterator",
@@ -398,49 +401,40 @@ class TestBuiltCommands:
 
     def test_get_task_no_pagination(self, get_task_cmd: click.Command) -> None:
         flags = _option_flags(get_task_cmd)
-        # Neither v3 primary flags nor v2 deprecation aliases are added on
-        # non-paginatable commands.
+        # Docstring-derived opts (--limit / --offset) and v2 deprecation
+        # aliases are absent on non-paginatable commands (get-task's
+        # docstring declares neither limit/offset, and aliases are gated
+        # by paginatable in _make_command).
         for unexpected in (
             "--limit",
-            "--page-limit",
-            "--item-limit",
-            "--no-return-page-iterator",
-            "--full-payload",
+            "--offset",
             "--all-items",
             "--page-size",
             "--max-items",
         ):
             assert unexpected not in flags, f"{unexpected} should not be on non-paginatable cmd"
+        # v3.1 global flags ARE present on every command (incl. non-paginatable);
+        # the SDK accepts them uniformly via boilerplate kwargs / Configuration.
+        for expected in (
+            "--page-limit",
+            "--item-limit",
+            "--no-return-page-iterator",
+            "--full-payload",
+        ):
+            assert expected in flags, f"{expected} should be global on every cmd"
 
     def test_output_query_options_present(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
         assert "--output" in flags
         assert "--query" in flags
 
-    def test_paginatable_command_has_pagination_epilog(self, get_tasks_cmd: click.Command) -> None:
-        # Per issue #9: the consolidated epilog at the bottom of `--help`
-        # explains the two modes and the SDK kwarg mapping in one place,
-        # so each pagination flag can carry a short self-contained help
-        # line. Spot-check the epilog markers.
-        epilog = get_tasks_cmd.epilog or ""
-        assert "Pagination:" in epilog
-        assert "Iterator mode" in epilog
-        assert "Single payload" in epilog
-        # The "per-page vs total" warning sentence — the most common
-        # newcomer pitfall #9 was meant to address.
-        assert "Per-page size (--limit) and total cap (--item-limit)" in epilog
-        # The SDK-mapping table rows (relies on the leading \b that tells
-        # click's wrap_text not to rewrap).
-        assert 'opts["limit"]' in epilog
-        assert "kwarg item_limit" in epilog
-        assert "kwarg full_payload=True" in epilog
-        # --page-limit must be flagged as equivalent to --limit (CLI users
-        # rarely need the Configuration-level form).
-        assert "same effect as --limit" in epilog
-
-    def test_non_paginatable_command_has_no_epilog(self, get_task_cmd: click.Command) -> None:
-        # The pagination epilog is only attached when the operation is
-        # paginatable; non-paginatable commands stay clean.
+    def test_no_pagination_epilog_per_command(
+        self, get_tasks_cmd: click.Command, get_task_cmd: click.Command
+    ) -> None:
+        # In v3.1 the per-command Pagination epilog was removed (the flags
+        # became global and self-document via their own help text). Neither
+        # paginatable nor non-paginatable commands attach an epilog now.
+        assert not (get_tasks_cmd.epilog or "")
         assert not (get_task_cmd.epilog or "")
 
     def test_long_sdk_descriptions_are_not_truncated(self, get_tasks_cmd: click.Command) -> None:
@@ -529,31 +523,14 @@ class TestBuiltCommands:
         assert "[Deprecated v3.0]" not in out
         assert "Removed in a future release" not in out
 
-    def test_pagination_flag_help_is_self_contained(self, get_tasks_cmd: click.Command) -> None:
-        # Per issue #9, the cross-reference soup is gone: no pagination
-        # flag's help text should mention the names of the other
-        # pagination flags. (The interactions are now described once in
-        # the epilog.)
-        pagination_flags = {
-            "--page-limit",
-            "--item-limit",
-            "--full-payload",
-            "--return-page-iterator",
-        }
-        for param in get_tasks_cmd.params:
-            if not isinstance(param, click.Option):
-                continue
-            self_flag = param.opts[0]
-            if self_flag not in pagination_flags:
-                continue
-            help_text = param.help or ""
-            for other_flag in pagination_flags - {self_flag}:
-                # ``--no-return-page-iterator`` is the toggle's secondary
-                # opt of ``--return-page-iterator``; allow self-mention.
-                assert other_flag not in help_text, (
-                    f"{self_flag}'s help mentions {other_flag} "
-                    f"(should be moved to the epilog): {help_text!r}"
-                )
+    # ``test_pagination_flag_help_is_self_contained`` (pre-v3.1) constrained
+    # each per-command pagination flag's help text to avoid naming other
+    # pagination flags — the consolidated per-command epilog (now removed
+    # in v3.1) carried the interaction story instead. With the flags
+    # promoted to global and the epilog gone, the help text IS the only
+    # place to describe equivalences, so cross-references are now both
+    # allowed and expected (e.g. ``--full-payload`` notes equivalence with
+    # ``--no-return-page-iterator``). Test removed.
 
 
 # ---------------------------------------------------------------------------

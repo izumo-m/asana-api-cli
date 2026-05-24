@@ -123,19 +123,24 @@ substitution: `--api-key @<(echo '{"k":"v"}')`.
 
 All three are also cataloged in [`sdk-deviations.md`](sdk-deviations.md).
 
-## Paginatable command extras (`cli.py:_make_command`)
+## Pagination / iteration globals (v3.1+)
 
-Injected only when the SDK method is paginatable (has a `:param limit:`
-in its docstring). The `--limit` / `--offset` flags themselves are
-auto-generated from the docstring (not from `_make_command`) and are
-tracked by the CLI surface snapshot fixture.
+As of v3.1 these are global flags (available on every command) — they map
+1:1 to ``Configuration`` properties or boilerplate ``**kwargs`` that the
+SDK accepts uniformly on every method. The CLI no longer pre-judges which
+endpoint they apply to.
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
-| `--return-page-iterator / --no-return-page-iterator` | `Configuration.return_page_iterator` | Forwarded through `AsanaSession(return_page_iterator=...)`. Tri-state toggle: unspecified leaves the SDK default (True) intact |
-| `--page-limit N` | `Configuration.page_limit` | Forwarded through `AsanaSession(page_limit=N)` |
-| `--item-limit N` | per-call kwarg `item_limit` | Forwarded as a method kwarg by `_make_command` |
-| `--full-payload` | per-call kwarg `full_payload=True` | Forwarded as a method kwarg by `_make_command` |
+| `--return-page-iterator / --no-return-page-iterator` | `Configuration.return_page_iterator` | Written to `runtime` and applied in `AsanaSession.__init__`. Tri-state toggle: unspecified leaves the SDK default (True) intact |
+| `--page-limit N` | `Configuration.page_limit` | Written to `runtime` and applied in `AsanaSession.__init__` |
+| `--item-limit N` | per-call kwarg `item_limit` | Forwarded from `runtime` as a method kwarg by `_make_command` |
+| `--full-payload` | per-call kwarg `full_payload=True` | Forwarded from `runtime` as a method kwarg by `_make_command` |
+| `--header-params VALUE` | per-call kwarg `header_params` | Parsed by `structured_arg` (`'k=v,...'` / JSON / `@path`), forwarded from `runtime`. **Not redacted in `--debug` — see SECURITY.md** |
+
+The `--limit` / `--offset` flags themselves are docstring-derived (per-method)
+and appear only on commands whose SDK method declares them — same category
+as `--sync` / `--assignee` / other per-method opts.
 
 ### v2 deprecation aliases (paginatable, deprecated in v3.0)
 

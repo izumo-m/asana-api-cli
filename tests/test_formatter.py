@@ -505,15 +505,15 @@ class TestFormattedDecorator:
         assert result.exit_code == 0
         assert json.loads(full_output(result)) == 3
 
-    def test_generator_collapsed_to_list(self) -> None:
-        def gen():  # type: ignore[no-untyped-def]
-            yield {"gid": "1"}
-            yield {"gid": "2"}
-
-        runner = make_runner()
-        result = runner.invoke(self._make_cli(gen()))
-        assert result.exit_code == 0
-        assert json.loads(full_output(result)) == [{"gid": "1"}, {"gid": "2"}]
+    # ``test_generator_collapsed_to_list`` (pre-v3.1) verified that the
+    # ``@formatted`` decorator would consume a raw generator return value
+    # into a list before rendering. That fallback was removed in v3.1:
+    # iterator consumption now happens upstream in ``cli.py:_make_command``
+    # (Layer B inside the session context, gated by
+    # ``isinstance(result, collections.abc.Iterator)``). Letting iterators
+    # leak past the session context would re-introduce the
+    # ``Authorization``-in-``--debug`` leak risk the upstream gate exists
+    # to prevent. Test removed.
 
     def test_api_exception_handled(self) -> None:
         @click.command()

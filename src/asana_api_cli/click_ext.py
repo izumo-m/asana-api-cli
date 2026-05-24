@@ -24,6 +24,7 @@ Three concerns live here:
 from __future__ import annotations
 
 import importlib
+import textwrap
 from typing import Any
 
 import asana
@@ -51,13 +52,22 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
     ("Authentication", ["access_token"]),
     (
         "Connection",
-        ["host", "proxy", "request_timeout", "connection_pool_maxsize"],
+        ["host", "proxy", "request_timeout", "connection_pool_maxsize", "header_params"],
     ),
     (
         "TLS",
         ["verify_ssl", "ssl_ca_cert", "cert_file", "key_file", "assert_hostname"],
     ),
     *([("Retry", ["retry_strategy_overrides"])] if _SDK_HAS_RETRY_STRATEGY else []),
+    (
+        "Pagination / iteration",
+        [
+            "return_page_iterator",
+            "page_limit",
+            "item_limit",
+            "full_payload",
+        ],
+    ),
     ("Logging / Debug", ["debug", "logger_format", "logger_file"]),
     ("Advanced", ["temp_folder_path", "safe_chars_for_path_param"]),
     ("CLI extension", ["multibyte_filenames"]),
@@ -72,10 +82,11 @@ GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
 )
 
 # Shorter labels used in the compact (non-root) Global Options table.
-# Most section names are already short enough to render inline; only the
-# No-op section's full title would dominate the column width.
+# The first column's width is driven by the longest label, so trimming the
+# few longest ones widens the right-hand option column on narrow terminals.
 _COMPACT_SECTION_LABELS: dict[str, str] = {
     "No-op (SDK parity placeholders — inert in python-asana 5.2.4)": "No-op (inert)",
+    "Pagination / iteration": "Pagination",
 }
 
 # Endpoint-local option ``name``s that should render under their own
@@ -239,6 +250,60 @@ def _make_global_option_params() -> list[click.Option]:
                 "[asana-api extension]"
             ),
         ),
+        click.Option(
+            ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
+            default=None,
+            help=(
+                "Toggle the SDK page iterator (default: enabled). With "
+                "--no-return-page-iterator, paginatable endpoints return a "
+                "single {data, next_page} dict from one HTTP call instead of "
+                "auto-walking every page. (Configuration.return_page_iterator)"
+            ),
+        ),
+        click.Option(
+            ["--page-limit", "page_limit"],
+            type=int,
+            default=None,
+            help=(
+                "Per-page size when the iterator falls back to Configuration "
+                "(default: 100). Equivalent to --limit on paginatable endpoints; "
+                '--limit (per-call opts["limit"]) takes precedence when both '
+                "are set. (Configuration.page_limit)"
+            ),
+        ),
+        click.Option(
+            ["--item-limit", "item_limit"],
+            type=int,
+            default=None,
+            help=(
+                "Stop after this many items total in iterator mode (kwarg "
+                "item_limit). Silently ignored in --full-payload / "
+                "--no-return-page-iterator modes."
+            ),
+        ),
+        click.Option(
+            ["--full-payload", "full_payload"],
+            is_flag=True,
+            default=False,
+            help=(
+                "Return a single raw payload dict from one HTTP call "
+                "(kwarg full_payload=True). Equivalent to "
+                "--no-return-page-iterator. For events get-events this yields "
+                "{data, sync, has_more} so sync tokens stay reachable from "
+                "shell scripts."
+            ),
+        ),
+        click.Option(
+            ["--header-params", "header_params"],
+            default=None,
+            callback=click_callback(),
+            help=(
+                "Custom HTTP request headers merged into the request "
+                "(kwarg header_params). VALUE: 'k1=v1,k2=v2,...', JSON object, "
+                "or @path. Use cases include Asana-Enable/-Disable deprecation "
+                "opt-in. Not redacted in --debug output — see SECURITY.md."
+            ),
+        ),
     ]
 
 
@@ -294,6 +359,21 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.debug = value
     elif name == "multibyte_filenames":
         runtime.multibyte_filenames = value
+    elif name == "return_page_iterator":
+        # No ``is not None`` guard needed here (cf. the symmetric guard in
+        # ``cli.py:main`` for the root-level decorator): this function is
+        # only called from ``_consume_global_options`` after the
+        # ``ParameterSource.COMMANDLINE`` check, which excludes the
+        # tri-state's ``None`` default value.
+        runtime.return_page_iterator = value
+    elif name == "page_limit":
+        runtime.page_limit = value
+    elif name == "item_limit":
+        runtime.item_limit = value
+    elif name == "full_payload":
+        runtime.full_payload = value
+    elif name == "header_params":
+        runtime.header_params = value
 
 
 def _consume_global_options(ctx: click.Context) -> None:
@@ -311,6 +391,38 @@ def _consume_global_options(ctx: click.Context) -> None:
         value = ctx.params.pop(name)
         if ctx.get_parameter_source(name) is ParameterSource.COMMANDLINE:
             _apply_global_to_runtime(name, value)
+
+
+def _write_compact_dl(
+    formatter: click.HelpFormatter, rows: list[tuple[str, str]], *, col_spacing: int = 2
+) -> None:
+    """Two-column rendering for the compact "Global Options" table.
+
+    Used instead of ``formatter.write_dl`` because the latter wraps the
+    right column with ``break_on_hyphens=True``, which splits multi-hyphen
+    option names like ``--connection-pool-maxsize`` mid-word. We render
+    by hand with ``textwrap`` configured to wrap only at whitespace
+    (option boundaries), so a long row breaks between options rather than
+    inside one.
+    """
+    if not rows:
+        return
+    label_width = max(len(label) for label, _ in rows)
+    first_col = label_width + col_spacing
+    indent = formatter.current_indent
+    text_width = max(formatter.width - first_col - indent, 30)
+    pad = " " * indent
+    cont_pad = " " * (indent + first_col)
+    for label, options in rows:
+        wrapped = textwrap.wrap(
+            options,
+            width=text_width,
+            break_long_words=False,
+            break_on_hyphens=False,
+        ) or [""]
+        formatter.write(f"{pad}{label}{' ' * (first_col - len(label))}{wrapped[0]}\n")
+        for line in wrapped[1:]:
+            formatter.write(f"{cont_pad}{line}\n")
 
 
 class _GlobalOptionsMixin:
@@ -390,7 +502,7 @@ class _GlobalOptionsMixin:
                     )
                     for section_name, section_params in grouped_params
                 ]
-                formatter.write_dl(rows)
+                _write_compact_dl(formatter, rows)
 
         # Subcommand listing (groups only); placed last so the commands table
         # is the final thing the user sees before the prompt.

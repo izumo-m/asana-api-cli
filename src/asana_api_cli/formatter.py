@@ -52,10 +52,12 @@ def formatted(f: Any) -> Any:
     ) -> None:
         try:
             data = f(*args, **kwargs)
-            # Collapse the asana SDK PageIterator / generator into a list
-            if not isinstance(data, (dict, list, str, int, float, bool, type(None))):
-                with contextlib.suppress(TypeError):
-                    data = list(data)
+            # Iterator consumption is done inside the session context in
+            # ``cli.py:_make_command`` (Layer B post-judge via
+            # ``isinstance(result, collections.abc.Iterator)``). Iterating
+            # here — outside that context — would leak ``Authorization``
+            # into ``--debug`` log on multi-page iterators, so the upstream
+            # gate is load-bearing.
         except ApiException as e:
             _handle_api_exception(e)
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)

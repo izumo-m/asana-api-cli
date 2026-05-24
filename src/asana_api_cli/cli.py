@@ -18,13 +18,18 @@ Translation rules:
   ``$ASANA_DEFAULT_WORKSPACE`` only when the parameter is required.
 * Methods that accept a ``body`` positional get a required ``--body`` option
   routed through ``resolve_body`` (supports ``@file`` / ``-`` / JSON string).
-* Paginatable methods (those with a ``limit`` doc-param) expose ``--limit``,
-  ``--offset``, ``--page-limit``, ``--item-limit``,
-  ``--return-page-iterator/--no-return-page-iterator``, and ``--full-payload``.
-  Each maps 1:1 to a python-asana SDK input (opts key, ``Configuration``
-  property, or method kwarg) so the CLI works as a thin probe for SDK
-  behavior. v2.x flags ``--all-items``, ``--page-size``, and ``--max-items``
-  are retained as deprecation aliases that warn and forward.
+* Docstring opts (``limit``, ``offset``, ``sync``, ``assignee``, ...) are
+  generated per-command from the SDK docstring — methods that declare
+  them get the corresponding ``--`` flag, others do not. This is the
+  natural per-method category.
+* SDK-uniform inputs are exposed globally (v3.1): the boilerplate kwargs
+  ``--full-payload``, ``--item-limit``, ``--header-params``, and the
+  ``Configuration`` knobs ``--return-page-iterator/--no-return-page-iterator``
+  and ``--page-limit`` appear on every command, since the SDK accepts them
+  uniformly across all methods.
+* v2.x flags ``--all-items``, ``--page-size``, and ``--max-items`` are
+  retained as per-command deprecation aliases (gated by ``paginatable``)
+  that warn and forward to their v3 replacements.
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
@@ -33,6 +38,7 @@ pick up newly added SDK methods without releasing a new asana-api-cli.
 
 from __future__ import annotations
 
+import collections.abc
 import inspect
 import re
 import sys
@@ -196,29 +202,6 @@ _OPT_HELP_OVERRIDES: dict[tuple[str, str, str], str] = {
 }
 
 
-# Shown at the bottom of ``--help`` on every paginatable command. Centralises
-# the two-mode mental model and the SDK kwarg / Configuration mapping so each
-# pagination flag's own help text can stay one short sentence about *what* the
-# flag does (no cross-references). The leading ``\b`` lines disable click's
-# rewrap on the aligned columns so the alignment survives in the rendered
-# output.
-_PAGINATION_EPILOG = (
-    "\b\n"
-    "Pagination:\n"
-    "  Per-page size (--limit) and total cap (--item-limit) are different.\n"
-    "\n"
-    "  Iterator mode (default): walks every page and prints a flat list.\n"
-    '    --limit         per-page size sent to the server (opts["limit"]; 1-100)\n'
-    "    --page-limit    same effect as --limit, via Configuration (parity)\n"
-    "    --item-limit    stop after this many items total (kwarg item_limit)\n"
-    '    --offset        resume from a server-issued page token (opts["offset"])\n'
-    "\n"
-    "  Single payload: --full-payload (≡ --no-return-page-iterator) makes one\n"
-    "  HTTP call return one {data, next_page} dict (kwarg full_payload=True).\n"
-    "  In this mode --item-limit is silently ignored."
-)
-
-
 def _method_to_command(method_name: str) -> str:
     """get_tasks → 'get-tasks'."""
     return method_name.replace("_", "-")
@@ -371,6 +354,14 @@ class _Operation:
 
     @property
     def paginatable(self) -> bool:
+        """True iff the SDK method declares a ``limit`` query parameter.
+
+        Used as the gate for the deprecated v2.x alias flags
+        (``--all-items`` / ``--page-size`` / ``--max-items``) which only
+        make sense on endpoints that page. The pagination/iterator control
+        flags themselves are global as of v3.1; this predicate stays only
+        until the v2 aliases are removed in a future version.
+        """
         return any(p.name == "limit" for p in self.opts_params)
 
 
@@ -522,7 +513,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 (api_cls.__name__[:-3], op.method_name, p.name),
                 "",
             )
-        if p.name == "limit" and paginatable:
+        if p.name == "limit":
             help_text = f"{help_text} Use --item-limit to cap the total."
         kw: dict[str, Any] = {"help": help_text}
         click_type = _click_type(p.py_type)
@@ -534,58 +525,18 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             kw["default"] = None
         options.append(click.Option([flag], **kw))
 
-    # Pagination options. Each flag's help is a single self-contained
-    # sentence describing *what* it does; the *when / how* (mode
-    # interactions, mutually-exclusive equivalences, SDK kwarg/Configuration
-    # mapping) is consolidated in the pagination epilog at the bottom of
-    # ``--help`` so the flag descriptions don't have to cross-reference
-    # each other.
+    # Pagination/iterator control flags (--full-payload, --item-limit,
+    # --return-page-iterator/--no-return-page-iterator, --page-limit) are
+    # global as of v3.1 — defined once on the root and inherited by every
+    # command via ``CommandWithGlobalOptions``. Per-command injection of
+    # those flags is no longer needed.
+    #
+    # Deprecated v2.x aliases remain per-command (gated by ``paginatable``)
+    # until they are removed. Each emits a stderr warning at runtime and
+    # forwards to the corresponding v3 flag. The option ``name``
+    # (``all_items``, ``page_size``, ``max_items``) is what
+    # ``_DEPRECATED_OPTION_NAMES`` matches on.
     if paginatable:
-        options.append(
-            click.Option(
-                ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
-                default=None,
-                help="Toggle the SDK page iterator (default: enabled).",
-            )
-        )
-        options.append(
-            click.Option(
-                ["--page-limit", "page_limit"],
-                type=int,
-                default=None,
-                # Functionally equivalent to --limit for a single CLI call;
-                # --limit goes through opts and --page-limit goes through
-                # Configuration, but the SDK consults Configuration only
-                # when opts has no limit, so they boil down to the same
-                # per-page size. --page-limit exists for SDK parity (every
-                # Configuration property gets a flag) — prefer --limit.
-                help="Same as --limit via Configuration (default: 100).",
-            )
-        )
-        options.append(
-            click.Option(
-                ["--item-limit", "item_limit"],
-                type=int,
-                default=None,
-                help="Stop after this many items total. Iterator mode only.",
-            )
-        )
-        options.append(
-            click.Option(
-                ["--full-payload", "full_payload"],
-                is_flag=True,
-                default=False,
-                help="Return one {data, next_page} dict from a single HTTP call.",
-            )
-        )
-        # Deprecated v2.x aliases. Each emits a stderr warning at runtime
-        # and forwards to the corresponding v3 flag (or no-ops when the
-        # behavior is now the default). Their help text is intentionally
-        # short — the "Deprecated (v3.0; will be removed)" section heading
-        # (rendered by ``_GlobalOptionsMixin.format_options``) carries the
-        # deprecation status, so each entry only has to say what the v3
-        # replacement is. The option ``name`` (``all_items``, ``page_size``,
-        # ``max_items``) is what ``_DEPRECATED_OPTION_NAMES`` matches on.
         options.append(
             click.Option(
                 ["--all-items", "all_items"],
@@ -612,29 +563,15 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Pop all pagination control flags before later code touches kwargs,
-        # so the opts loop and positional extractor see only docstring-derived
-        # parameters. The else branch keeps these names bound for
-        # non-paginatable commands so the listify check below need not
-        # re-guard them.
-        if paginatable:
-            return_page_iterator: bool | None = kwargs.pop("return_page_iterator")
-            page_limit = kwargs.pop("page_limit")
-            item_limit = kwargs.pop("item_limit")
-            full_payload = kwargs.pop("full_payload")
-            all_items = kwargs.pop("all_items")
-            page_size = kwargs.pop("page_size")
-            max_items = kwargs.pop("max_items")
-        else:
-            return_page_iterator = None
-            full_payload = False
-            page_limit = item_limit = page_size = max_items = None
-            all_items = False
-        # Unspecified ⇒ SDK default (True). Tracked as a separate name so
-        # the original tri-state survives for any future logic that needs it.
-        effective_iter = True if return_page_iterator is None else return_page_iterator
+        # v2.x deprecated aliases: pop from kwargs (per-command) and warn.
+        # Effective values fold into local vars without mutating ``runtime``,
+        # so the dispatch state stays scoped to this invocation.
+        all_items = kwargs.pop("all_items", False) if paginatable else False
+        page_size = kwargs.pop("page_size", None) if paginatable else None
+        max_items = kwargs.pop("max_items", None) if paginatable else None
 
-        # Deprecated v2.x aliases: warn and resolve to the v3 flag.
+        effective_item_limit = runtime.item_limit
+
         if all_items:
             click.echo(
                 "warning: --all-items is deprecated; walking every page is "
@@ -658,11 +595,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 "instead (will be removed in a future release)",
                 err=True,
             )
-            if item_limit is not None:
+            if effective_item_limit is not None:
                 raise click.UsageError(
                     "--max-items is the deprecated alias of --item-limit; specify only one"
                 )
-            item_limit = max_items
+            effective_item_limit = max_items
 
         if has_body:
             body_value = kwargs.pop("body")  # click marks --body as required
@@ -676,15 +613,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         else:
             resolved_workspace = None
 
-        if paginatable:
-            session_ctx = AsanaSession.from_env(
-                return_page_iterator=effective_iter,
-                page_limit=page_limit,
-            )
-        else:
-            session_ctx = AsanaSession.from_env()
-
-        with session_ctx as session:
+        with AsanaSession.from_env() as session:
             api = api_cls(session.client)
 
             opts: dict[str, Any] = {}
@@ -708,22 +637,37 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                     call_args.append(kwargs.pop(_option_name(name)))
 
             method = getattr(api, op.method_name)
+            # Forward global iterator / header kwargs uniformly. The SDK
+            # accepts ``full_payload`` / ``item_limit`` / ``header_params``
+            # on every method (boilerplate kwargs in every ``all_params``
+            # list), so we pass them without per-method gating. Methods
+            # that do not act on them simply ignore the kwarg.
             method_kwargs: dict[str, Any] = {}
-            if item_limit is not None:
-                method_kwargs["item_limit"] = item_limit
-            if full_payload:
+            if effective_item_limit is not None:
+                method_kwargs["item_limit"] = effective_item_limit
+            if runtime.full_payload:
                 method_kwargs["full_payload"] = True
+            if runtime.header_params is not None:
+                method_kwargs["header_params"] = runtime.header_params
             result = (
                 method(*call_args, opts, **method_kwargs) if op.has_opts else method(*call_args)
             )
-            # When the SDK returns a PageIterator it lazily issues an HTTP
-            # request per page on iteration. The formatter would otherwise
-            # iterate it after this ``with`` block exits — that is, after
-            # the debug redactor has been uninstalled — leaking Authorization
-            # headers on every page past the first. Consume it here so every
-            # page request lands while the session (and its redactor) is
-            # still live.
-            if paginatable and effective_iter and not full_payload:
+            # Lazy iterator consumption inside the session context.
+            #
+            # Two independent layers:
+            #   - Layer A (session lifecycle, above): every SDK call runs
+            #     inside ``with AsanaSession.from_env() as session:``, which
+            #     keeps the ``HttpClientAuthRedactor`` installed.
+            #   - Layer B (this block): when the SDK returns a lazy iterator
+            #     (PageIterator / EventIterator), iterating it issues one
+            #     HTTP request per page. We must consume the iterator *before*
+            #     leaving Layer A's ``with`` block — otherwise pages 2..N
+            #     are fetched after the redactor is uninstalled and leak
+            #     ``Authorization`` into ``--debug`` log.
+            #
+            # post-judge by return value type: any ``Iterator`` is consumed
+            # here regardless of which endpoint produced it.
+            if isinstance(result, collections.abc.Iterator):
                 result = list(result)
             return result
 
@@ -741,7 +685,6 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         params=options,
         callback=callback,
         help=summary,
-        epilog=_PAGINATION_EPILOG if paginatable else None,
     )
 
 
@@ -976,6 +919,63 @@ def _retry_strategy_option(f: Any) -> Any:
         "[asana-api extension]"
     ),
 )
+@click.option(
+    "--return-page-iterator/--no-return-page-iterator",
+    "return_page_iterator",
+    default=None,
+    help=(
+        "Toggle the SDK page iterator (default: enabled). With "
+        "--no-return-page-iterator, paginatable endpoints return a "
+        "single {data, next_page} dict from one HTTP call instead of "
+        "auto-walking every page. (Configuration.return_page_iterator)"
+    ),
+)
+@click.option(
+    "--page-limit",
+    "page_limit",
+    type=int,
+    default=None,
+    help=(
+        "Per-page size when the iterator falls back to Configuration "
+        "(default: 100). Equivalent to --limit on paginatable endpoints; "
+        '--limit (per-call opts["limit"]) takes precedence when both '
+        "are set. (Configuration.page_limit)"
+    ),
+)
+@click.option(
+    "--item-limit",
+    "item_limit",
+    type=int,
+    default=None,
+    help=(
+        "Stop after this many items total in iterator mode (kwarg item_limit). "
+        "Silently ignored in --full-payload / --no-return-page-iterator modes."
+    ),
+)
+@click.option(
+    "--full-payload",
+    "full_payload",
+    is_flag=True,
+    default=False,
+    help=(
+        "Return a single raw payload dict from one HTTP call "
+        "(kwarg full_payload=True). Equivalent to --no-return-page-iterator. "
+        "For events get-events this yields {data, sync, has_more} so sync "
+        "tokens stay reachable from shell scripts."
+    ),
+)
+@click.option(
+    "--header-params",
+    "header_params",
+    default=None,
+    callback=click_callback(),
+    help=(
+        "Custom HTTP request headers merged into the request "
+        "(kwarg header_params). VALUE: 'k1=v1,k2=v2,...', JSON object, "
+        "or @path. Use cases include Asana-Enable/-Disable deprecation "
+        "opt-in. Not redacted in --debug output — see SECURITY.md."
+    ),
+)
 def main(
     host: str | None,
     proxy: str | None,
@@ -1002,6 +1002,11 @@ def main(
     logger_file: str | None = None,
     debug: bool = False,
     multibyte_filenames: bool = False,
+    return_page_iterator: bool | None = None,
+    page_limit: int | None = None,
+    item_limit: int | None = None,
+    full_payload: bool = False,
+    header_params: dict[str, str] | None = None,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
@@ -1044,6 +1049,12 @@ def main(
     runtime.logger_file = logger_file
     runtime.debug = debug
     runtime.multibyte_filenames = multibyte_filenames
+    if return_page_iterator is not None:
+        runtime.return_page_iterator = return_page_iterator
+    runtime.page_limit = page_limit
+    runtime.item_limit = item_limit
+    runtime.full_payload = full_payload
+    runtime.header_params = header_params
 
 
 def _register_groups(root: click.Group) -> None:

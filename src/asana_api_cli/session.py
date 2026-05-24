@@ -165,6 +165,13 @@ class _Runtime:
     api_key: dict[str, str] | None = None
     api_key_prefix: dict[str, str] | None = None
     retry_strategy_overrides: dict[str, Any] | None = None
+    # Iterator / pagination control. Promoted from per-command (paginatable)
+    # to global in v3.1 — the SDK accepts these uniformly across all methods.
+    return_page_iterator: bool | None = None
+    page_limit: int | None = None
+    full_payload: bool = False
+    item_limit: int | None = None
+    header_params: dict[str, str] | None = None
 
 
 runtime = _Runtime()
@@ -181,23 +188,18 @@ class AsanaSession:
     longer-lived library use.
     """
 
-    def __init__(
-        self, token: str, *, return_page_iterator: bool = True, page_limit: int | None = None
-    ) -> None:
+    def __init__(self, token: str) -> None:
         config = asana.Configuration()
         config.access_token = token
-        # *return_page_iterator* and *page_limit* mirror the SDK's
-        # ``asana.Configuration`` properties of the same names: with
-        # ``return_page_iterator=True`` (the SDK default) paginatable
-        # methods return an iterator that walks every page; with False
-        # they return a single ``{data, next_page}`` dict per HTTP call.
-        # ``page_limit`` (SDK default 100) is the per-page size used on the
-        # iterator path when ``opts["limit"]`` is not set.
-        config.return_page_iterator = return_page_iterator
-        if page_limit is not None:
-            config.page_limit = page_limit
 
-        # Apply runtime values to Configuration
+        # Apply runtime values to Configuration.
+        # ``return_page_iterator`` / ``page_limit`` are read from runtime
+        # like the other Configuration knobs (promoted to globals in v3.1).
+        # Unspecified ⇒ leave the SDK default (True / 100) in place.
+        if runtime.return_page_iterator is not None:
+            config.return_page_iterator = runtime.return_page_iterator
+        if runtime.page_limit is not None:
+            config.page_limit = runtime.page_limit
         if runtime.host:
             config.host = runtime.host
         if runtime.proxy:
@@ -318,9 +320,7 @@ class AsanaSession:
         self.close()
 
     @classmethod
-    def from_env(
-        cls, *, return_page_iterator: bool = True, page_limit: int | None = None
-    ) -> AsanaSession:
+    def from_env(cls) -> AsanaSession:
         """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
         token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
         if not token:
@@ -329,7 +329,7 @@ class AsanaSession:
                 err=True,
             )
             sys.exit(1)
-        return cls(token=token, return_page_iterator=return_page_iterator, page_limit=page_limit)
+        return cls(token=token)
 
 
 def resolve_workspace(

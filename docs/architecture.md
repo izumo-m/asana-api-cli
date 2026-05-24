@@ -26,14 +26,14 @@ Method-level introspection is deferred per group so top-level `--help` cost stay
 
 ## Invocation flow
 
-1. `main` parses global options and constructs `AsanaSession` (`Configuration` + `ApiClient`; installs the auth redactor on `--debug`; optionally patches multipart filename encoding).
-2. The resolved command invokes the SDK `*Api` method via `_make_command()`, forwarding pagination kwargs and materializing the page iterator inside the session context.
+1. `main` parses global options and writes them into the shared `runtime` singleton; `AsanaSession.__init__` reads them and applies the `Configuration` knobs (host, retry, page_limit, return_page_iterator, ...). Installs the auth redactor on `--debug`; optionally patches multipart filename encoding.
+2. The resolved command invokes the SDK `*Api` method via `_make_command()`, forwarding global per-call kwargs (`full_payload` / `item_limit` / `header_params`) from `runtime` and any docstring-derived `opts` from the per-command flags. If the SDK returns a lazy iterator (`isinstance(result, collections.abc.Iterator)` check), it is consumed into a list inside the session context so multi-page HTTP requests stay under the auth redactor.
 3. `@formatted` (in `formatter.py`) renders the response, optionally piped through `jq` via `--query`.
 
 ## Extension point
 
-All changes to how an SDK method becomes a CLI command go through `_make_command()` in `cli.py` — pagination flags, hidden params, deprecation aliases, option renames.
+All changes to how an SDK method becomes a CLI command go through `_make_command()` in `cli.py` — docstring-derived per-method opts, deprecation aliases, option renames. SDK-uniform inputs (boilerplate kwargs / `Configuration` knobs) are added as global flags in `cli.py:main()` + `click_ext.py:_make_global_option_params()` and consumed via `runtime`.
 
 ## Surface snapshot guardrail
 
-`tests/test_cli_surface.py` deep-compares `introspect_to_manifest()` against `tests/fixtures/cli_surface.json`. An SDK bump that adds, removes, or renames a docstring-derived option fails this test. Synthetic options injected inside `_make_command` (pagination flags, deprecation aliases) are intentionally outside the manifest.
+`tests/test_cli_surface.py` deep-compares `introspect_to_manifest()` against `tests/fixtures/cli_surface.json`. An SDK bump that adds, removes, or renames a docstring-derived option fails this test. Synthetic options (global flags, deprecation aliases) are intentionally outside the manifest.

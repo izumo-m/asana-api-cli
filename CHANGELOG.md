@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New global flag `--header-params VALUE` sends arbitrary HTTP request
+  headers on every call. Accepts shorthand `'k1=v1,k2=v2,...'`, a JSON
+  object, or `@path/to/file.json` (same input format as `--api-key` and
+  `--retry-strategy`). Typical uses include Asana's `Asana-Enable` /
+  `Asana-Disable` deprecation opt-in/-out, custom tracing IDs, and
+  proxy authentication. **Not redacted in `--debug` output** — see
+  [`SECURITY.md`](SECURITY.md) for the full caveat.
+
+### Changed
+
+- Four pagination / iterator flags promoted from per-command (paginatable
+  endpoints only) to global, so they work on every command:
+  - `--full-payload`
+  - `--item-limit N`
+  - `--page-limit N`
+  - `--return-page-iterator / --no-return-page-iterator`
+
+  Previously these appeared only on commands whose SDK method declared a
+  `limit` parameter (e.g. `tasks get-tasks`). They now appear under the
+  new `Pagination / iteration` group in `asana-api --help`, and behave
+  identically whether you write them before or after the subcommand.
+
+  **Practical win for `events get-events`**: with `--full-payload`, the
+  command now returns `{"data": [...], "sync": "...", "has_more": ...}`
+  so the next sync token is reachable from shell scripts, enabling
+  CLI-driven polling loops.
+
+  On commands whose SDK method does not consume these flags (e.g.
+  `tasks delete-task`), passing one is harmless — the underlying SDK
+  accepts the kwarg uniformly and ignores it where it has no effect.
+
+- Auto-iteration of paged responses is now triggered by the SDK's actual
+  return value (an iterator) rather than by a per-method pre-judgement
+  in the CLI. Current behavior is unchanged for every existing SDK
+  method; the CLI no longer needs an update when an SDK release adds or
+  changes a method's pagination shape.
+
 - Documentation reorganization.
 
 ## [3.0.0] - 2026-05-23
