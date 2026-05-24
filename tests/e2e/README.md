@@ -14,6 +14,7 @@ flags switch to live API access; see [Running](#running) below.
 | `test_pagination.py` | Every paginatable-command flag exposed by `tasks get-tasks` (`--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`) and the v2 deprecation aliases. |
 | `test_crud.py` | `project` and `task` create → get → update → delete. |
 | `test_attachments.py` | Attachment upload / get / delete across ASCII / Japanese text / binary content and Japanese filenames (the latter via the `--multibyte-filenames` flag). |
+| `test_events.py` | `events get-events` sync-token cycle: 412 bootstrap (exit 3 + `--json-errors` envelope) → trigger → poll (`--full-payload`). Exercises the v3.1 `--json-errors` + `--full-payload` combination needed to surface the fresh sync token. |
 
 ## Environment variables
 
@@ -157,6 +158,17 @@ are dispatched by `resource_type`:
   (Asana issues presigned `?e=<expiry>&t=<HMAC>` URLs against
   `asanausercontent.com`; the token grants read access to the asset
   until expiry and must not be committed)
+- Real `user.name` / `user.email` values that leak into free-text
+  fields (e.g. `story.text` "X さんが …") are harvested before the
+  structured masking runs and substituted to the bound `USER_NAME` /
+  `USER_EMAIL` values in the serialized response body.
+- Asana events sync tokens (`<32-hex>:<int>`) in request URLs and
+  response bodies are hashed (sha256 of the prefix) at serialize time.
+  Sync tokens are not credentials but they are account-coupled opaque
+  strings; hashing keeps the cassette portable while preserving
+  vcrpy's request-matching (same real token always hashes to the same
+  synthetic, so the test can extract the token from a response and
+  send it back in the next request unmodified).
 
 Test assertions should compare on structure or against the bound values,
 not on real account data.
@@ -189,5 +201,9 @@ SDK path to confirm parity behavior.
   least one workspace already existing (the user provides its gid via
   `ASANA_PYTEST_WORKSPACE`). Tests do not attempt to create or remove
   workspaces.
+- **Events sync-token expiry is not exercised.** `events get-events`
+  rotates a fresh token after ~24h; reproducing the 412-expire path
+  deterministically would require a >24h-old fixture token. Verification
+  is manual.
 
 [pytest-recording]: https://github.com/kiwicom/pytest-recording
