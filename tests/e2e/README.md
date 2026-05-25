@@ -15,6 +15,7 @@ flags switch to live API access; see [Running](#running) below.
 | `test_crud.py` | `project` and `task` create → get → update → delete. |
 | `test_attachments.py` | Attachment upload / get / delete across ASCII / Japanese text / binary content and Japanese filenames (the latter via the `--multibyte-filenames` flag). |
 | `test_events.py` | `events get-events` sync-token cycle: 412 bootstrap (`--output-errors json` → envelope on stdout, exit 3) → trigger → poll (`--full-payload`). Exercises the v3.1 `--output-errors` + `--full-payload` combination needed to surface the fresh sync token. |
+| `test_webhooks.py` | `webhooks` group lifecycle: create (workspace subscribe with `project added`/`deleted` filters) → list → get → trigger events (create + delete a project) → assert events arrived at the receiver → delete → list again. **Live only, opt-in** — Asana's `X-Hook-Secret` handshake POST flows Asana → receiver, outside vcrpy's CLI → Asana hook, so cassettes cannot replay it. The fixture spawns a Cloudflare Quick Tunnel (`cloudflared tunnel --url`) and an in-process receiver. |
 
 ## Environment variables
 
@@ -22,6 +23,7 @@ flags switch to live API access; see [Running](#running) below.
 |---|---|---|
 | `ASANA_ACCESS_TOKEN` | live mode | Personal access token. Replay auto-injects a dummy token if absent — vcrpy never hits the network. |
 | `ASANA_PYTEST_WORKSPACE` | live mode | GID of the workspace under test. Treat as **test-dedicated** — CRUD tests create and delete projects / tasks in it. Cassettes store the gid as `${WORKSPACE_GID}` and substitute it back at load time; replay falls back to the literal `WORKSPACE_GID` sentinel if the env is unset. |
+| `ASANA_PYTEST_WEBHOOK_TUNNEL` | `test_webhooks.py` | `<provider>:<port>`. Currently only `cloudflare-quick:<port>` is wired (e.g. `cloudflare-quick:8765`). Anything else (unset, unknown provider, missing port) skips the module. Requires the `cloudflared` binary on `$PATH`. |
 
 ## One-time provisioning (live mode only)
 
@@ -59,6 +61,26 @@ Two project-specific flags select the mode:
 Live modes require `ASANA_ACCESS_TOKEN` + `ASANA_PYTEST_WORKSPACE` to be
 set; tests that need a workspace gid skip automatically when it is
 missing.
+
+### Webhook tests
+
+`test_webhooks.py` is **live only and opt-in**, independent of the
+`--live` / `--record` flags. Asana's `X-Hook-Secret` handshake is
+delivered to the target inline during `POST /webhooks`, outside vcrpy's
+CLI → Asana hook, so it cannot be replayed. The test always hits the
+real API and runs an in-process receiver fronted by a Cloudflare Quick
+Tunnel.
+
+```bash
+ASANA_PYTEST_WORKSPACE=<gid> \
+  ASANA_PYTEST_WEBHOOK_TUNNEL=cloudflare-quick:8765 \
+  uv run pytest tests/e2e/test_webhooks.py
+```
+
+Prerequisites: `cloudflared` on `$PATH`. The fixture invokes cloudflared
+with `--config /dev/null` so an existing named-tunnel
+`~/.cloudflared/config.yml` (if any) does not hijack the Quick Tunnel
+ingress and respond `http_status:404` to every edge request.
 
 To re-record a subset of cassettes (e.g. after changing the CLI
 surface), delete the affected files first — `--record` writes new
