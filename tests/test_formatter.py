@@ -328,7 +328,7 @@ class TestCsvFieldnamesUnion:
 class TestHandleApiException:
     """Cover the JSON envelope path with ``--output-errors json``.
 
-    The default of ``--output-errors`` is ``raw`` (let the exception
+    The default of ``--output-errors`` is ``none`` (let the exception
     propagate); these tests opt into the envelope by pre-setting
     ``runtime.output_errors`` via the autouse fixture below.
 
@@ -606,6 +606,71 @@ class TestHandleNonApiException:
         assert set(env.keys()) == {"exception", "reason"}
 
 
+class TestHandleExceptionStderrEcho:
+    """``--output-errors {json|text|csv|table}`` also writes a
+    human-readable echo of the exception to **stderr** so unexpected
+    error shapes stay diagnosable even when ``--query-errors`` strips
+    them from the stdout envelope.
+
+    Format: ``traceback.format_exception_only(type(e), e)`` — the
+    qualified class name followed by the exception's ``__str__``,
+    matching what Python's default top-level handler prints, but
+    without the traceback frames.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _opt_into_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "output_errors", "json")
+
+    def test_api_exception_echoed_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
+        exc = ApiException(status=412, reason="Precondition Failed")
+        exc.body = '{"sync":"new-token"}'  # type: ignore[assignment]
+        exc.headers = {"X-Asana-Request-Id": "r1"}  # type: ignore[assignment]
+        with pytest.raises(SystemExit):
+            _handle_exception(exc)
+        captured = capsys.readouterr()
+        # ApiException.__str__ embeds status / reason / headers / body.
+        assert "ApiException" in captured.err
+        assert "(412)" in captured.err
+        assert "Precondition Failed" in captured.err
+        assert '{"sync":"new-token"}' in captured.err
+        # Stdout envelope is unaffected.
+        env = json.loads(captured.out)
+        assert env["status"] == 412
+
+    def test_generic_exception_echoed_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit):
+            _handle_exception(RuntimeError("boom"))
+        err = capsys.readouterr().err
+        # ``format_exception_only`` for a builtin yields "RuntimeError:
+        # boom\n" (no module prefix on the short form). The exact line
+        # is stable across Python versions.
+        assert "RuntimeError" in err
+        assert "boom" in err
+        # No traceback frames.
+        assert "Traceback" not in err
+        assert ".py" not in err  # no source-line references
+
+    def test_stderr_echo_ignores_query_errors(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """``--query-errors`` filters the stdout envelope but the stderr
+        echo carries the *raw* exception so a filter that drops info
+        cannot hide unexpected error shapes."""
+        monkeypatch.setattr(runtime, "query_errors", ".status")
+        exc = ApiException(status=500, reason="Internal Server Error")
+        exc.body = "<html>oops</html>"  # type: ignore[assignment]
+        with pytest.raises(SystemExit):
+            _handle_exception(exc)
+        captured = capsys.readouterr()
+        # Stdout: only ``.status`` after the jq filter.
+        assert captured.out.strip() == "500"
+        # Stderr: full Python-style exception including body / reason.
+        assert "500" in captured.err
+        assert "Internal Server Error" in captured.err
+        assert "<html>oops</html>" in captured.err
+
+
 class TestFormattedDecoratorReraisesClickExceptions:
     """ClickException / Abort / Exit raised from inside the callback must
     bubble up to Click's own handler — *not* be wrapped in an envelope."""
@@ -721,8 +786,8 @@ class TestFormattedDecorator:
         assert env["reason"] == "Forbidden"
 
 
-class TestRawDefault:
-    """``--output-errors raw`` (the default) lets exceptions propagate
+class TestNoneDefault:
+    """``--output-errors none`` (the default) lets exceptions propagate
     uncaught — Python's default handler prints the traceback on stderr
     and exits 1. This is the SDK-parity baseline."""
 
@@ -765,3 +830,43 @@ class TestFormatOutputExitCodes:
             _format_output({"data": [1]}, output_format="json", jq_query="bad((")
         assert exc_info.value.code == 2
         assert "Invalid jq expression" in capsys.readouterr().err
+
+
+class TestFormatOutputNone:
+    """``--output none`` suppresses the success payload but still runs the
+    ``--query`` pass, so value-level validation is independent of the chosen
+    format. Symmetric with ``--output-errors none``."""
+
+    def test_no_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output({"gid": "1", "name": "T"}, output_format="none", jq_query=None)
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == ""
+
+    def test_no_output_with_list(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _format_output([{"a": 1}, {"a": 2}], output_format="none", jq_query=None)
+        assert capsys.readouterr().out == ""
+
+    def test_invalid_jq_still_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Even with output silenced, an invalid jq expression must surface
+        as exit 2 — otherwise scripts that flip ``--output`` to ``none`` would
+        silently lose jq-bug detection."""
+        with pytest.raises(SystemExit) as exc_info:
+            _format_output({"data": [1]}, output_format="none", jq_query="bad((")
+        assert exc_info.value.code == 2
+        assert "Invalid jq expression" in capsys.readouterr().err
+
+    def test_jq_runtime_error_still_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """jq runtime errors (e.g. type-mismatch against the actual input)
+        also surface — not just syntax errors. ``.foo`` on a non-object
+        raises a jq runtime error which jqlib re-raises as ValueError."""
+        with pytest.raises(SystemExit) as exc_info:
+            _format_output(42, output_format="none", jq_query=".foo")
+        assert exc_info.value.code == 2
+        assert "Invalid jq expression" in capsys.readouterr().err
+
+    def test_csv_bom_ignored(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """``--csv-bom`` is silently ignored when output is suppressed,
+        same as for ``--output json``."""
+        _format_output({"a": 1}, output_format="none", jq_query=None, csv_bom=True)
+        assert capsys.readouterr().out == ""

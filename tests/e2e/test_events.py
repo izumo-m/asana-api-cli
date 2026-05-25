@@ -82,7 +82,7 @@ def test_events_sync_cycle(
     # BOOTSTRAP — initial poll returns 412 with a fresh sync token.
     # --full-payload is load-bearing: without it the SDK's EventIterator
     # absorbs the 412 and the token is lost.
-    # --output-errors json is required: the default 'raw' would let the
+    # --output-errors json is required: the default 'none' would let the
     # ApiException propagate uncaught (exit 1) instead of giving us an
     # envelope to parse.
     code, out, err = _run(

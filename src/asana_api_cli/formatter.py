@@ -5,6 +5,7 @@ import functools
 import io
 import json
 import sys
+import traceback
 from typing import Any, NoReturn
 
 import click
@@ -21,9 +22,15 @@ def formatted(f: Any) -> Any:
     @click.option(
         "--output",
         "output_format",
-        type=click.Choice(["json", "table", "csv", "text"], case_sensitive=False),
+        type=click.Choice(["json", "table", "csv", "text", "none"], case_sensitive=False),
         default="json",
-        help="Output format (default: json) [asana-api extension]",
+        help=(
+            "Output format (default: json). 'none' suppresses the success "
+            "payload entirely — useful when only the exit code matters "
+            "(e.g. side-effect-only operations like delete-task). "
+            "Symmetric counterpart of --output-errors 'none' "
+            "[asana-api extension]"
+        ),
     )
     @click.option(
         "--query",
@@ -66,7 +73,7 @@ def formatted(f: Any) -> Any:
             # prompts) is not an "API call exception" — let Click handle it.
             raise
         except Exception as e:
-            if runtime.output_errors == "raw":
+            if runtime.output_errors == "none":
                 # SDK-parity default: let the exception propagate. Python's
                 # default handler prints the traceback on stderr and exits 1.
                 raise
@@ -96,7 +103,7 @@ def _handle_exception(e: Exception) -> NoReturn:
 
     Only called when ``runtime.output_errors`` is one of
     ``json|text|csv|table`` (an envelope format was explicitly
-    requested). When it is the default ``raw``, the caller re-raises
+    requested). When it is the default ``none``, the caller re-raises
     instead so Python's default handler prints the traceback on
     stderr and exits 1 — SDK-parity behavior.
 
@@ -117,7 +124,25 @@ def _handle_exception(e: Exception) -> NoReturn:
     expression short-circuits with exit ``2`` from inside
     :func:`_format_output` (user-input error, per
     ``docs/exit-codes.md``).
+
+    A human-readable echo of the exception (Python's top-level format
+    without the traceback) is also written to **stderr**. This is the
+    raw exception — pre-``--query-errors`` — so an unexpected error
+    shape (e.g. a 500 when the script only expected 412) stays
+    diagnosable even when the user's jq filter strips it from
+    stdout. Stderr is separate from the stdout envelope channel, so
+    a ``$(cmd)`` capture still gets the clean machine-readable value.
     """
+    # ApiException.__str__ formats as "(status)\nReason: ...\nHTTP
+    # response headers: ...\nHTTP response body: ...\n" so the
+    # status / reason / body all surface here without us reaching
+    # into the envelope first.
+    click.echo(
+        "".join(traceback.format_exception_only(type(e), e)),
+        err=True,
+        nl=False,
+    )
+
     envelope: dict[str, Any]
     if isinstance(e, ApiException):
         raw_body = e.body
@@ -167,6 +192,12 @@ def _format_output(
     # ``jq 'EXPR'``: jq may yield 0, 1, or many values and each output
     # format renders them naturally. When no query is given, the data
     # is treated as a single yield.
+    #
+    # The jq pass runs *before* the ``output_format == "none"`` short-circuit
+    # so the user-supplied expression is still validated (syntax + runtime
+    # errors surface as exit 2). Skipping it when output is silenced would
+    # make ``--query`` checking depend on the chosen format, masking
+    # script-side jq bugs the moment ``--output none`` is added.
     if jq_query:
         try:
             results = jqlib.all(jq_query, data)
@@ -175,6 +206,12 @@ def _format_output(
             sys.exit(2)
     else:
         results = [data]
+
+    if output_format == "none":
+        # ``--output none`` suppresses the success payload entirely. The jq
+        # pass above has already executed (and exited 2 on any error), so
+        # value-level validation is the same as for the rendered formats.
+        return
 
     if output_format == "json":
         for v in results:

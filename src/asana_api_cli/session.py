@@ -172,7 +172,7 @@ class _Runtime:
     full_payload: bool = False
     item_limit: int | None = None
     header_params: dict[str, str] | None = None
-    output_errors: str = "raw"
+    output_errors: str = "none"
     query_errors: str | None = None
 
 

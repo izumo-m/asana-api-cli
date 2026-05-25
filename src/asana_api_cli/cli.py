@@ -979,14 +979,16 @@ def _retry_strategy_option(f: Any) -> Any:
 @click.option(
     "--output-errors",
     "output_errors",
-    type=click.Choice(["raw", "json", "text", "csv", "table"], case_sensitive=False),
-    default="raw",
+    type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
+    default="none",
     show_default=True,
     help=(
-        "How to surface exceptions from the SDK call. 'raw' (default) lets "
+        "How to surface exceptions from the SDK call. 'none' (default) lets "
         "the exception propagate uncaught (Python traceback on stderr, "
         "exit 1). json/text/csv/table render an envelope "
-        "(exception/status/reason/body/headers) on stdout and exit 3 "
+        "(exception/status/reason/body/headers) on stdout and exit 3; the "
+        "exception is also echoed to stderr (without traceback) so "
+        "unexpected errors stay visible "
         "[asana-api extension]"
     ),
 )
@@ -996,7 +998,7 @@ def _retry_strategy_option(f: Any) -> Any:
     default=None,
     help=(
         "Apply a jq filter to the error envelope; result is rendered via "
-        "--output-errors. Pairing with the default 'raw' emits a stderr "
+        "--output-errors. Pairing with the default 'none' emits a stderr "
         "warning (the filter would be a no-op) but does not block the call "
         "[asana-api extension]"
     ),
@@ -1032,7 +1034,7 @@ def main(
     item_limit: int | None = None,
     full_payload: bool = False,
     header_params: dict[str, str] | None = None,
-    output_errors: str = "raw",
+    output_errors: str = "none",
     query_errors: str | None = None,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
@@ -1084,7 +1086,7 @@ def main(
     runtime.header_params = header_params
     runtime.output_errors = output_errors
     runtime.query_errors = query_errors
-    # The warning for ``--query-errors`` paired with ``--output-errors=raw``
+    # The warning for ``--query-errors`` paired with ``--output-errors=none``
     # fires from ``click_ext._consume_global_options`` (which runs on every
     # leaf-command invocation). Adding the call here too would double-warn.
 

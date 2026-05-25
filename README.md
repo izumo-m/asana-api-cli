@@ -163,6 +163,11 @@ asana-api tasks get-tasks --project <PID> --query '.data' --output csv
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
 # Windows, which otherwise displays non-ASCII characters as garbled text.
 asana-api tasks get-tasks --project <PID> --output csv --csv-bom > tasks.csv
+
+# --output none suppresses the success payload — handy for side-effect-only
+# calls (delete/update) where only the exit code matters. The `--query` pass
+# still runs, so jq syntax errors are caught even when output is silenced.
+asana-api tasks delete-task --task <GID> --output none
 ```
 
 See [Pagination](#pagination) for fetching across pages and
@@ -264,8 +269,8 @@ for the exact destination of each.
 | `--logger-file PATH` | Path the SDK loggers write to when set |
 | `--multibyte-filenames` | Emit RFC 5987 `filename*=UTF-8''<percent-encoded>` on multipart uploads so Asana decodes non-ASCII attachment filenames correctly |
 | `--debug` | Print HTTP request/response traces to stderr for troubleshooting (`Authorization` values are masked) |
-| `--output-errors {raw\|json\|text\|csv\|table}` | How to surface SDK call exceptions (default `raw`). `raw` lets Python's traceback print to stderr and exits `1` (SDK-parity baseline). Any other format catches the exception, renders an envelope on **stdout**, and exits `3`. `ApiException`: 5-field `{exception, status, reason, body, headers}` where `exception` is the FQDN (`"asana.rest.ApiException"`) and `body` is the response *string* (use `.body \| fromjson` in jq to parse). Connection errors (`urllib3.exceptions.MaxRetryError` etc.): 2-field `{exception, reason}`. See [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md) |
-| `--query-errors EXPR` | Apply a `jq` filter to the error envelope (stdout); each yield is rendered per `--output-errors`. Symmetric counterpart of `--query` on the success path. Pairing with the default `raw` emits a stderr warning (the filter would do nothing) but the call still runs |
+| `--output-errors {none\|json\|text\|csv\|table}` | How to surface SDK call exceptions (default `none`). `none` lets Python's traceback print to stderr and exits `1` (SDK-parity baseline). Any other format catches the exception, renders an envelope on **stdout**, exits `3`, and *also* echoes the exception (Python's top-level format, no traceback) to **stderr** so unexpected error shapes stay visible. `ApiException`: 5-field `{exception, status, reason, body, headers}` where `exception` is the FQDN (`"asana.rest.ApiException"`) and `body` is the response *string* (use `.body \| fromjson` in jq to parse). Connection errors (`urllib3.exceptions.MaxRetryError` etc.): 2-field `{exception, reason}`. See [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md) |
+| `--query-errors EXPR` | Apply a `jq` filter to the error envelope (stdout); each yield is rendered per `--output-errors`. Symmetric counterpart of `--query` on the success path. Pairing with the default `none` emits a stderr warning (the filter would do nothing) but the call still runs |
 
 Asana only accepts Bearer-token authentication, so `--username`,
 `--password`, `--api-key`, and `--api-key-prefix` are also exposed for

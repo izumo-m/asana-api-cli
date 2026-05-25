@@ -309,14 +309,16 @@ def _make_global_option_params() -> list[click.Option]:
         ),
         click.Option(
             ["--output-errors", "output_errors"],
-            type=click.Choice(["raw", "json", "text", "csv", "table"], case_sensitive=False),
-            default="raw",
+            type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
+            default="none",
             show_default=True,
             help=(
-                "How to surface exceptions from the SDK call. 'raw' (default) lets "
+                "How to surface exceptions from the SDK call. 'none' (default) lets "
                 "the exception propagate uncaught (Python traceback on stderr, "
                 "exit 1). json/text/csv/table render an envelope "
-                "(exception/status/reason/body/headers) on stdout and exit 3 "
+                "(exception/status/reason/body/headers) on stdout and exit 3; the "
+                "exception is also echoed to stderr (without traceback) so "
+                "unexpected errors stay visible "
                 "[asana-api extension]"
             ),
         ),
@@ -325,7 +327,7 @@ def _make_global_option_params() -> list[click.Option]:
             default=None,
             help=(
                 "Apply a jq filter to the error envelope; result is rendered via "
-                "--output-errors. Pairing with the default 'raw' emits a stderr "
+                "--output-errors. Pairing with the default 'none' emits a stderr "
                 "warning (the filter would be a no-op) but does not block the call "
                 "[asana-api extension]"
             ),
@@ -428,15 +430,15 @@ def _warn_global_combinations() -> None:
 
     Warns rather than raises so the user sees the mistake without
     masking any other error (e.g. a v2-alias deprecation reject from
-    ``cli.py:_make_command``, or the SDK call exception itself in raw
-    mode). Currently checks: ``--query-errors`` paired with
-    ``--output-errors raw`` produces no envelope to filter — the
+    ``cli.py:_make_command``, or the SDK call exception itself in
+    ``none`` mode). Currently checks: ``--query-errors`` paired with
+    ``--output-errors none`` produces no envelope to filter — the
     expression would silently do nothing.
     """
-    if runtime.output_errors == "raw" and runtime.query_errors is not None:
+    if runtime.output_errors == "none" and runtime.query_errors is not None:
         click.echo(
             "warning: --query-errors is ignored when --output-errors is "
-            "'raw' (the default) — pass --output-errors {json,text,csv,table} "
+            "'none' (the default) — pass --output-errors {json,text,csv,table} "
             "to enable error filtering.",
             err=True,
         )

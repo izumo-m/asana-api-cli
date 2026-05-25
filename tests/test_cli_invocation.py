@@ -705,14 +705,14 @@ def _api_exception(status: int, body: str) -> Exception:
 class TestErrorPathExitCodes:
     """End-to-end verification of the v3.1 exit code policy.
 
-    Reference: docs/exit-codes.md. Default ``--output-errors=raw`` lets
+    Reference: docs/exit-codes.md. Default ``--output-errors=none`` lets
     Python's uncaught-exception handler print the traceback (exit 1, the
     SDK-parity baseline). Opting into an envelope format produces a
     machine-readable envelope on stdout (exit 3). User-input errors
     (bad jq, query-without-format) are exit 2.
     """
 
-    def test_api_error_default_is_raw_propagation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_api_error_default_is_none_propagation(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(
             monkeypatch,
@@ -720,7 +720,7 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"new-token","errors":[]}')],
         )
-        # Default --output-errors=raw: exception propagates uncaught.
+        # Default --output-errors=none: exception propagates uncaught.
         # CliRunner captures it and exits 1.
         result = make_runner().invoke(cmd, ["--task", "T1"])
         from asana.rest import ApiException
@@ -755,7 +755,7 @@ class TestErrorPathExitCodes:
             side_effect=[_api_exception(412, '{"sync":"recovered","errors":[]}')],
         )
         # --query-errors requires an explicit --output-errors format
-        # (the default 'raw' would refuse it). json yields the quoted scalar.
+        # (the default 'none' would refuse it). json yields the quoted scalar.
         result = make_runner().invoke(
             cmd,
             [
@@ -818,10 +818,10 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"x"}')],
         )
-        # --query-errors paired with the default --output-errors=raw
+        # --query-errors paired with the default --output-errors=none
         # warns to stderr — the warning informs the user that the
         # filter is being ignored, but the underlying SDK call
-        # behavior is preserved (raw mode lets the ApiException
+        # behavior is preserved (``none`` mode lets the ApiException
         # propagate, CliRunner reports exit 1). Warning (not error)
         # avoids masking the actual exception with a usage error.
         from asana.rest import ApiException
@@ -832,7 +832,7 @@ class TestErrorPathExitCodes:
         )
         assert result.exit_code == 1
         assert isinstance(result.exception, ApiException)
-        assert "--query-errors is ignored when --output-errors is 'raw'" in result.stderr
+        assert "--query-errors is ignored when --output-errors is 'none'" in result.stderr
 
     def test_query_errors_group_level_warns_exactly_once(
         self, monkeypatch: pytest.MonkeyPatch
@@ -865,7 +865,7 @@ class TestErrorPathExitCodes:
             group,
             ["--query-errors", ".exception", "get-task", "--task", "T1"],
         )
-        warning_text = "--query-errors is ignored when --output-errors is 'raw'"
+        warning_text = "--query-errors is ignored when --output-errors is 'none'"
         assert result.stderr.count(warning_text) == 1, (
             f"Expected exactly 1 warning line, got:\n{result.stderr}"
         )
@@ -893,3 +893,34 @@ class TestErrorPathExitCodes:
         )
         result = make_runner().invoke(cmd, ["--task", "T1"])
         assert result.exit_code == 0
+
+    def test_output_none_suppresses_success_payload(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--output none`` runs the call and exits 0 but emits nothing on
+        stdout — useful for side-effect-only operations (delete, update)
+        where only the exit code matters."""
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            return_value={"gid": "T1", "name": "task"},
+        )
+        result = make_runner().invoke(cmd, ["--output", "none", "--task", "T1"])
+        assert result.exit_code == 0
+        assert result.stdout == ""
+
+    def test_output_none_still_validates_query(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--output none`` does not silence ``--query`` validation: a
+        broken jq expression still exits 2. Regression guard: skipping the
+        jq pass under ``--output none`` would let scripts that flip the
+        format lose jq-bug detection silently."""
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(
+            monkeypatch,
+            "TasksApi",
+            "get_task",
+            return_value={"gid": "T1", "name": "task"},
+        )
+        result = make_runner().invoke(cmd, ["--output", "none", "--query", "bad((", "--task", "T1"])
+        assert result.exit_code == 2
+        assert "Invalid jq expression" in full_output(result)

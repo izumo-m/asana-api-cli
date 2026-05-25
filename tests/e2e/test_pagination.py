@@ -115,7 +115,7 @@ def test_full_payload_without_limit_errors(pagination_project_gid: str) -> None:
     success case.
     """
     # --output-errors json opts into the envelope path so we can inspect
-    # the API body programmatically. The default 'raw' would let the
+    # the API body programmatically. The default 'none' would let the
     # exception propagate uncaught (exit 1) and bury the body in a
     # Python traceback.
     code, out, _ = _run(

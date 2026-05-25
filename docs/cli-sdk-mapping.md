@@ -70,8 +70,8 @@ property (or document the deviation in `sdk-deviations.md`).
 | `--logger-file PATH` | `Configuration.logger_file` | Direct property |
 | `--debug` | `Configuration.debug = True` | Direct property. Also installs `HttpClientAuthRedactor` — a security override per [constitution #2](principles.md#constitution); see [`sdk-deviations.md`](sdk-deviations.md) "Personal access token in --debug output" |
 | `--multibyte-filenames` | *(none)* | CLI-only. Installs `MultibyteFilenameSupport` which patches `urllib3.fields.RequestField.make_multipart` to emit RFC 5987 `filename*=UTF-8''<percent-encoded>`. Cataloged in [`sdk-deviations.md`](sdk-deviations.md) |
-| `--output-errors {raw\|json\|text\|csv\|table}` | *(none)* | CLI-only. Default `raw` lets the SDK exception propagate uncaught (Python traceback, exit `1`); any envelope format catches it, renders on **stdout**, and exits `3`. Reuses the success-path `_format_output`. See [`sdk-deviations.md`](sdk-deviations.md) for the schema and [`exit-codes.md`](exit-codes.md) for exit codes |
-| `--query-errors EXPR` | *(none)* | CLI-only. Applies a `jq` filter to the error envelope; each yield is rendered per `--output-errors`. Pairing with the default `raw` warns to stderr (the filter is a no-op) but does not block the call |
+| `--output-errors {none\|json\|text\|csv\|table}` | *(none)* | CLI-only. Default `none` lets the SDK exception propagate uncaught (Python traceback, exit `1`); any envelope format catches it, renders on **stdout**, exits `3`, and echoes the exception (Python's top-level format, no traceback) to **stderr** for diagnostics. Reuses the success-path `_format_output`. See [`sdk-deviations.md`](sdk-deviations.md) for the schema and [`exit-codes.md`](exit-codes.md) for exit codes |
+| `--query-errors EXPR` | *(none)* | CLI-only. Applies a `jq` filter to the error envelope; each yield is rendered per `--output-errors`. Pairing with the default `none` warns to stderr (the filter is a no-op) but does not block the call |
 
 ### Structured value format
 
@@ -119,8 +119,8 @@ substitution: `--api-key @<(echo '{"k":"v"}')`.
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
-| `--output FORMAT` | *(none)* | CLI-only. `json` / `table` / `csv` / `text` rendering by `_format_output`. Default `json` is canonical/lossless |
-| `--query EXPR` | *(none)* | CLI-only. Pipes the response through `jq` (`jqlib.all`) |
+| `--output FORMAT` | *(none)* | CLI-only. `json` / `table` / `csv` / `text` rendering by `_format_output`; `none` suppresses output (use when only the exit code matters). Default `json` is canonical/lossless. Symmetric with `--output-errors none` |
+| `--query EXPR` | *(none)* | CLI-only. Pipes the response through `jq` (`jqlib.all`). Runs and validates even under `--output none` so jq errors stay observable (exit 2) regardless of the format flag |
 | `--csv-bom` | *(none)* | CLI-only. Prepends UTF-8 BOM in `_print_csv` |
 
 All three are also cataloged in [`sdk-deviations.md`](sdk-deviations.md).
