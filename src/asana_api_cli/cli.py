@@ -108,9 +108,23 @@ def _humanize_class_name(name: str) -> str:
 # with the trailing ``Api`` stripped. Wording is sourced from
 # ``docs/api-groups.md``, which is the authoritative human-reviewable
 # table; ``test_group_descriptions_match_docs`` asserts the two stay in
-# sync. Each entry is intentionally kept ≤ 45 chars so click's
-# ``make_default_short_help`` (max_length=45) renders it verbatim — no
-# "…" truncation that would otherwise drop the key noun.
+# sync.
+#
+# Length constraint: each entry must fit in ≤ 45 chars. click's
+# ``make_default_short_help`` (max_length=45) renders the Commands table
+# on ``asana-api --help``; longer strings get truncated mid-sentence
+# with "…", routinely dropping the key noun (``organization-wide…``,
+# ``tasks and…``). The same wording also appears verbatim as the
+# group-level ``--help`` header, so the limit keeps both renderings
+# aligned. When tempted to write something richer than 45 chars allows,
+# prefer:
+#   - a stronger, shorter verb (``Trigger and download org-wide
+#     exports`` over ``Request and retrieve organization-wide exports``)
+#   - the Asana resource word over an explanatory paraphrase
+#     (``(deprecated)`` parenthetical over "legacy … prefer X")
+#   - omitting redundant context the section already implies
+#     (``Read who has access to portfolios``, not "List the user
+#     records who have access to a given portfolio")
 #
 # Entries are intentionally kept across SDK versions: if a future SDK
 # removes a group, its description is harmless dead data (and re-engages
@@ -129,7 +143,7 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "CustomFields": "Manage workspace custom fields",
     "CustomTypes": "Read workspace custom object types",
     "Events": "Poll resource change events (sync token)",
-    "Exports": "Initiate bulk exports of project resources",
+    "Exports": "Initiate graph or resource exports",
     "GoalRelationships": "Manage links between goals",
     "Goals": "Manage organizational goals and metrics",
     "Jobs": "Check status of async background jobs",
@@ -137,31 +151,31 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "OrganizationExports": "Trigger and download org-wide exports",
     "PortfolioMemberships": "Read who has access to portfolios",
     "Portfolios": "Manage portfolios (project collections)",
-    "ProjectBriefs": "Manage project brief documents",
+    "ProjectBriefs": "Manage project briefs",
     "ProjectMemberships": "Read who has access to projects",
-    "ProjectPortfolioSettings": "Settings for projects within portfolios",
-    "ProjectStatuses": "Per-project status updates (deprecated)",
-    "ProjectTemplates": "Manage and instantiate project templates",
-    "Projects": "Manage projects (CRUD + members, etc.)",
+    "ProjectPortfolioSettings": "Read/update project-portfolio settings",
+    "ProjectStatuses": "Post project statuses (deprecated)",
+    "ProjectTemplates": "Instantiate or remove project templates",
+    "Projects": "Manage projects, members, and followers",
     "Rates": "Manage per-user billing rates on projects",
     "Reactions": "Read emoji reactions on stories",
-    "Roles": "Manage RBAC roles within a workspace",
+    "Roles": "Manage user roles within a workspace",
     "Rules": "Trigger Asana rule via incoming webhook",
     "Sections": "Manage project sections (board/list)",
-    "StatusUpdates": "Manage status updates on any object",
+    "StatusUpdates": "Post status updates on any object",
     "Stories": "Manage stories (comments + activity)",
     "Tags": "Manage tags applied to tasks",
-    "TaskTemplates": "Manage and instantiate task templates",
-    "Tasks": "Manage tasks (CRUD + lifecycle ops)",
+    "TaskTemplates": "Instantiate or remove task templates",
+    "Tasks": "Manage tasks, subtasks, and dependencies",
     "TeamMemberships": "Read who belongs to teams",
     "Teams": "Manage teams within organizations",
     "TimePeriods": "Read time periods (for goals, reporting)",
     "TimeTrackingCategories": "Manage time-tracking categories",
     "TimeTrackingEntries": "Manage time-tracking entries on tasks",
-    "TimesheetApprovalStatuses": "Manage weekly timesheet approval states",
-    "Typeahead": "Auto-complete search for workspace objects",
+    "TimesheetApprovalStatuses": "Manage weekly timesheet approval statuses",
+    "Typeahead": "Type-ahead lookup of workspace resources",
     "UserTaskLists": "Read a user's My Tasks list",
-    "Users": "Manage user records (`me` = authenticated)",
+    "Users": "Read/update users (`me` = authenticated)",
     "Webhooks": "Manage webhook subscriptions (real-time)",
     "WorkspaceMemberships": "Read workspace members (admin/guest flags)",
     "Workspaces": "Update workspace and manage its users",
