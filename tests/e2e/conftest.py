@@ -211,7 +211,7 @@ def _before_record_response(response):  # type: ignore[no-untyped-def]
     return response
 
 
-# ---------- GID auto-templating ---------------------------------------------
+# ---------- GID auto-hashing ------------------------------------------------
 
 
 def _gid_parent_segments() -> frozenset[str]:
@@ -268,7 +268,7 @@ def _collect_gids(cassette_dict: Any) -> list[str]:
             for m in pattern.finditer(text):
                 value = m.group(1)
                 # Skip ``${VAR}`` placeholders the explicit-binding pass left
-                # behind; only digit-form ids participate in auto-templating.
+                # behind; only digit-form ids participate in auto-hashing.
                 if value.isdigit():
                     seen.setdefault(value, None)
 
@@ -333,7 +333,7 @@ def _mask_sync_tokens(obj: Any) -> Any:
     return _walk(obj, lambda s: _SYNC_TOKEN_RE.sub(_replace_sync_token, s))
 
 
-def _auto_template_gids(cassette_dict: Any) -> Any:
+def _auto_hash_gids(cassette_dict: Any) -> Any:
     """Replace each discovered identifier with a deterministic synthetic gid.
 
     Runs AFTER the explicit binding pass so ``${WORKSPACE_GID}`` /
@@ -411,7 +411,7 @@ _orig_yaml_deserialize = yamlserializer.deserialize
 def _templated_yaml_serialize(cassette_dict):  # type: ignore[no-untyped-def]
     bindings = _bindings()
     templated = _walk(cassette_dict, lambda s: _template_string(s, bindings))
-    templated = _auto_template_gids(templated)
+    templated = _auto_hash_gids(templated)
     templated = _mask_sync_tokens(templated)
     return _orig_yaml_serialize(templated)
 
@@ -603,9 +603,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     """Delete the cassette file before re-recording.
 
     vcrpy's ``record_mode="all"`` re-records every interaction but APPENDS
-    to the existing cassette rather than overwriting. Auto-templated
+    to the existing cassette rather than overwriting. Auto-hashed
     synthetic gids from a prior recording would then be re-collected by
-    ``_auto_template_gids`` as if they were real, double-hashing them on
+    ``_auto_hash_gids`` as if they were real, double-hashing them on
     the next save. Wiping the file in ``pytest_runtest_setup`` — which
     runs before pytest-recording's ``vcr`` fixture loads it — gives VCR
     an empty cassette to start from.

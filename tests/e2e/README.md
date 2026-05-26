@@ -142,7 +142,7 @@ A different developer can replay the same cassettes by setting their own
 `ASANA_PYTEST_WORKSPACE`; the cassette's request URL and response body
 adapt to their value at load time.
 
-### Auto-templated gids
+### Auto-hashed gids
 
 Identifiers that don't have a semantic name (user gid, team gid, transient
 task / project / section gids, attachment asset ids) are replaced with a
