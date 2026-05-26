@@ -1,0 +1,482 @@
+interactions:
+- request:
+    body: '{"data": {"name": "pytest-e2e-test_batch_crud_lifecycle"}}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json; charset=utf-8
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.10.12&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects
+  response:
+    body:
+      string: '{"data":{"gid":"7432421435548794","resource_type":"project","created_at":"2026-05-26T08:44:19.591Z","modified_at":"2026-05-26T08:44:19.591Z","due_date":null,"due_on":null,"notes":"","archived":false,"default_view":"list","default_access_level":"editor","minimum_access_level_for_customization":"editor","minimum_access_level_for_sharing":"editor","start_on":null,"color":null,"completed":false,"completed_at":null,"completed_by":null,"public":false,"privacy_setting":"private","current_status_update":null,"name":"pytest-e2e-test_batch_crud_lifecycle","icon":"list","permalink_url":"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794","current_status":null,"workspace":{"gid":"${WORKSPACE_GID}","resource_type":"workspace","name":"${WORKSPACE_NAME}"},"owner":{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"},"team":{"gid":"2262018960161802","resource_type":"team","name":"${TEAM_NAME}"},"members":[{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"}],"followers":[{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"}]}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1096'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 26 May 2026 08:44:21 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=2,cdn-upstream-connect;dur=307,cdn-upstream-fbl;dur=2384,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="VNB4zjJg6edlvhtznf9iKI3fHVBRPnZUEymYyDUzqCI_RXbdpcrYdA==",cdn-downstream-fbl;dur=2402
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 541e5d3b5498d8e150f91f6bf5b393be.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - VNB4zjJg6edlvhtznf9iKI3fHVBRPnZUEymYyDUzqCI_RXbdpcrYdA==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      cache-control:
+      - no-store
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      location:
+      - /api/1.0/projects/7432421435548794
+      pragma:
+      - no-cache
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.0'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '1920'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 201
+      message: Created
+- request:
+    body: '{"data": {"actions": [{"relative_path": "/tasks", "method": "post", "data":
+      {"name": "batch-task-00", "projects": ["7432421435548794"]}}, {"relative_path":
+      "/tasks", "method": "post", "data": {"name": "batch-task-01", "projects": ["7432421435548794"]}},
+      {"relative_path": "/tasks", "method": "post", "data": {"name": "batch-task-02",
+      "projects": ["7432421435548794"]}}, {"relative_path": "/tasks", "method": "post",
+      "data": {"name": "batch-task-03", "projects": ["7432421435548794"]}}, {"relative_path":
+      "/tasks", "method": "post", "data": {"name": "batch-task-04", "projects": ["7432421435548794"]}},
+      {"relative_path": "/tasks", "method": "post", "data": {"name": "batch-task-05",
+      "projects": ["7432421435548794"]}}, {"relative_path": "/tasks", "method": "post",
+      "data": {"name": "batch-task-06", "projects": ["7432421435548794"]}}, {"relative_path":
+      "/tasks", "method": "post", "data": {"name": "batch-task-07", "projects": ["7432421435548794"]}},
+      {"relative_path": "/tasks", "method": "post", "data": {"name": "batch-task-08",
+      "projects": ["7432421435548794"]}}, {"relative_path": "/tasks", "method": "post",
+      "data": {"name": "batch-task-09", "projects": ["7432421435548794"]}}]}}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json; charset=utf-8
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.10.12&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/batch
+  response:
+    body:
+      string: "{\"data\":[{\"body\":{\"data\":{\"gid\":\"3904621183323894\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.918Z\",\"modified_at\":\"2026-05-26T08:44:24.157Z\",\"name\":\"batch-task-00\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/3904621183323894\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/3904621183323894\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/3904621183323894\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"8536165244784889\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.907Z\",\"modified_at\":\"2026-05-26T08:44:23.542Z\",\"name\":\"batch-task-01\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/8536165244784889\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/8536165244784889\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/8536165244784889\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"8944508626142620\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.882Z\",\"modified_at\":\"2026-05-26T08:44:22.274Z\",\"name\":\"batch-task-02\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/8944508626142620\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/8944508626142620\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/8944508626142620\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"9620853122187666\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.891Z\",\"modified_at\":\"2026-05-26T08:44:23.266Z\",\"name\":\"batch-task-03\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/9620853122187666\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/9620853122187666\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/9620853122187666\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"4709320275918842\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.871Z\",\"modified_at\":\"2026-05-26T08:44:22.044Z\",\"name\":\"batch-task-04\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/4709320275918842\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/4709320275918842\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/4709320275918842\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"1881874665915391\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.880Z\",\"modified_at\":\"2026-05-26T08:44:22.521Z\",\"name\":\"batch-task-05\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/1881874665915391\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/1881874665915391\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/1881874665915391\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"6185902126152911\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.880Z\",\"modified_at\":\"2026-05-26T08:44:22.771Z\",\"name\":\"batch-task-06\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/6185902126152911\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/6185902126152911\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/6185902126152911\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"7524235362942102\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.906Z\",\"modified_at\":\"2026-05-26T08:44:23.849Z\",\"name\":\"batch-task-07\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/7524235362942102\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/7524235362942102\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/7524235362942102\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"8942405042007741\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.926Z\",\"modified_at\":\"2026-05-26T08:44:24.519Z\",\"name\":\"batch-task-08\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/8942405042007741\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/8942405042007741\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/8942405042007741\"]],\"empty\":false}},{\"body\":{\"data\":{\"gid\":\"9725018898072965\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.880Z\",\"modified_at\":\"2026-05-26T08:44:23.013Z\",\"name\":\"batch-task-09\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/9725018898072965\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}]}},\"status_code\":201,\"headers\":{\"headers\":[{\"key\":\"location\",\"value\":\"/api/1.0/tasks/9725018898072965\"}],\"keys\":[\"location\"],\"as_tuples\":[[\"location\",\"/api/1.0/tasks/9725018898072965\"]],\"empty\":false}}]}"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '13060'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 26 May 2026 08:44:24 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=3386,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="ETOatKJiFTd-iWNsFxQQtS3pI82uG3AUS9kCOF523wKrkOm3UEyuIw==",cdn-downstream-fbl;dur=3405
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 81fac1c7319deef9db939ade015e10d8.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - ETOatKJiFTd-iWNsFxQQtS3pI82uG3AUS9kCOF523wKrkOm3UEyuIw==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '3234'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"data": {"actions": [{"relative_path": "/tasks/3904621183323894", "method":
+      "put", "data": {"notes": "batch-updated-00"}}, {"relative_path": "/tasks/8536165244784889",
+      "method": "put", "data": {"notes": "batch-updated-01"}}, {"relative_path": "/tasks/8944508626142620",
+      "method": "put", "data": {"notes": "batch-updated-02"}}, {"relative_path": "/tasks/9620853122187666",
+      "method": "put", "data": {"notes": "batch-updated-03"}}, {"relative_path": "/tasks/4709320275918842",
+      "method": "put", "data": {"notes": "batch-updated-04"}}, {"relative_path": "/tasks/1881874665915391",
+      "method": "put", "data": {"notes": "batch-updated-05"}}, {"relative_path": "/tasks/6185902126152911",
+      "method": "put", "data": {"notes": "batch-updated-06"}}, {"relative_path": "/tasks/7524235362942102",
+      "method": "put", "data": {"notes": "batch-updated-07"}}, {"relative_path": "/tasks/8942405042007741",
+      "method": "put", "data": {"notes": "batch-updated-08"}}, {"relative_path": "/tasks/9725018898072965",
+      "method": "put", "data": {"notes": "batch-updated-09"}}]}}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json; charset=utf-8
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.10.12&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/batch
+  response:
+    body:
+      string: "{\"data\":[{\"body\":{\"data\":{\"gid\":\"3904621183323894\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.918Z\",\"modified_at\":\"2026-05-26T08:44:25.617Z\",\"name\":\"batch-task-00\",\"notes\":\"batch-updated-00\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/3904621183323894\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"8536165244784889\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.907Z\",\"modified_at\":\"2026-05-26T08:44:25.472Z\",\"name\":\"batch-task-01\",\"notes\":\"batch-updated-01\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/8536165244784889\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"8944508626142620\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.882Z\",\"modified_at\":\"2026-05-26T08:44:25.493Z\",\"name\":\"batch-task-02\",\"notes\":\"batch-updated-02\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/8944508626142620\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"9620853122187666\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.891Z\",\"modified_at\":\"2026-05-26T08:44:25.513Z\",\"name\":\"batch-task-03\",\"notes\":\"batch-updated-03\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/9620853122187666\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"4709320275918842\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.871Z\",\"modified_at\":\"2026-05-26T08:44:25.503Z\",\"name\":\"batch-task-04\",\"notes\":\"batch-updated-04\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/4709320275918842\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"1881874665915391\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.880Z\",\"modified_at\":\"2026-05-26T08:44:25.508Z\",\"name\":\"batch-task-05\",\"notes\":\"batch-updated-05\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/1881874665915391\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"6185902126152911\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.880Z\",\"modified_at\":\"2026-05-26T08:44:25.544Z\",\"name\":\"batch-task-06\",\"notes\":\"batch-updated-06\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/6185902126152911\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"7524235362942102\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.906Z\",\"modified_at\":\"2026-05-26T08:44:25.532Z\",\"name\":\"batch-task-07\",\"notes\":\"batch-updated-07\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/7524235362942102\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"8942405042007741\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.926Z\",\"modified_at\":\"2026-05-26T08:44:25.483Z\",\"name\":\"batch-task-08\",\"notes\":\"batch-updated-08\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/8942405042007741\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}},{\"body\":{\"data\":{\"gid\":\"9725018898072965\",\"resource_type\":\"task\",\"created_at\":\"2026-05-26T08:44:21.880Z\",\"modified_at\":\"2026-05-26T08:44:25.532Z\",\"name\":\"batch-task-09\",\"notes\":\"batch-updated-09\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/7432421435548794/task/9725018898072965\",\"projects\":[{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"2347473602817760\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"7432421435548794\",\"resource_type\":\"project\",\"name\":\"pytest-e2e-test_batch_crud_lifecycle\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}},\"status_code\":200,\"headers\":{\"headers\":[],\"keys\":[],\"as_tuples\":[],\"empty\":true}}]}"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '12050'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 26 May 2026 08:44:25 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=1,cdn-upstream-fbl;dur=917,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="wwMV44derI9s4INAjAHSgg4Qm-mwlPWp8ECJj2P0mpS3TCmB6zzyNw==",cdn-downstream-fbl;dur=933
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 91ea4800b714e4bf02bff4b99c0dad5c.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - wwMV44derI9s4INAjAHSgg4Qm-mwlPWp8ECJj2P0mpS3TCmB6zzyNw==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '762'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"data": {"actions": [{"relative_path": "/tasks/3904621183323894", "method":
+      "get", "options": {"fields": ["gid", "name", "notes"]}}, {"relative_path": "/tasks/8536165244784889",
+      "method": "get", "options": {"fields": ["gid", "name", "notes"]}}, {"relative_path":
+      "/tasks/8944508626142620", "method": "get", "options": {"fields": ["gid", "name",
+      "notes"]}}, {"relative_path": "/tasks/9620853122187666", "method": "get", "options":
+      {"fields": ["gid", "name", "notes"]}}, {"relative_path": "/tasks/4709320275918842",
+      "method": "get", "options": {"fields": ["gid", "name", "notes"]}}, {"relative_path":
+      "/tasks/1881874665915391", "method": "get", "options": {"fields": ["gid", "name",
+      "notes"]}}, {"relative_path": "/tasks/6185902126152911", "method": "get", "options":
+      {"fields": ["gid", "name", "notes"]}}, {"relative_path": "/tasks/7524235362942102",
+      "method": "get", "options": {"fields": ["gid", "name", "notes"]}}, {"relative_path":
+      "/tasks/8942405042007741", "method": "get", "options": {"fields": ["gid", "name",
+      "notes"]}}, {"relative_path": "/tasks/9725018898072965", "method": "get", "options":
+      {"fields": ["gid", "name", "notes"]}}]}}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json; charset=utf-8
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.10.12&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/batch
+  response:
+    body:
+      string: '{"data":[{"body":{"data":{"gid":"3904621183323894","name":"batch-task-00","notes":"batch-updated-00"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"8536165244784889","name":"batch-task-01","notes":"batch-updated-01"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"8944508626142620","name":"batch-task-02","notes":"batch-updated-02"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9620853122187666","name":"batch-task-03","notes":"batch-updated-03"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"4709320275918842","name":"batch-task-04","notes":"batch-updated-04"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"1881874665915391","name":"batch-task-05","notes":"batch-updated-05"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"6185902126152911","name":"batch-task-06","notes":"batch-updated-06"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"7524235362942102","name":"batch-task-07","notes":"batch-updated-07"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"8942405042007741","name":"batch-task-08","notes":"batch-updated-08"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9725018898072965","name":"batch-task-09","notes":"batch-updated-09"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}}]}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1770'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 26 May 2026 08:44:26 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=354,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="PVvJ2BgD2Hjc-Qf26xKHgqTE6_PHGp25uB8zPvGLy0yBuV0okpN_nA==",cdn-downstream-fbl;dur=370
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 c9bacacdd678f5d95591fb7de8685414.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - PVvJ2BgD2Hjc-Qf26xKHgqTE6_PHGp25uB8zPvGLy0yBuV0okpN_nA==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '202'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"data": {"actions": [{"relative_path": "/tasks/3904621183323894", "method":
+      "delete"}, {"relative_path": "/tasks/8536165244784889", "method": "delete"},
+      {"relative_path": "/tasks/8944508626142620", "method": "delete"}, {"relative_path":
+      "/tasks/9620853122187666", "method": "delete"}, {"relative_path": "/tasks/4709320275918842",
+      "method": "delete"}, {"relative_path": "/tasks/1881874665915391", "method":
+      "delete"}, {"relative_path": "/tasks/6185902126152911", "method": "delete"},
+      {"relative_path": "/tasks/7524235362942102", "method": "delete"}, {"relative_path":
+      "/tasks/8942405042007741", "method": "delete"}, {"relative_path": "/tasks/9725018898072965",
+      "method": "delete"}]}}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json; charset=utf-8
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.10.12&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/batch
+  response:
+    body:
+      string: '{"data":[{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}}]}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1030'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 26 May 2026 08:44:27 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=876,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="otoGTzxbkChrZ_8U30FtBAdmfgTqVzXJuoiL_Ne-K1LI9mF0kAhsrg==",cdn-downstream-fbl;dur=899
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 7c8e8fe40f73c1f5c6ffc31ff8a21db6.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - otoGTzxbkChrZ_8U30FtBAdmfgTqVzXJuoiL_Ne-K1LI9mF0kAhsrg==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '730'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.10.12&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: DELETE
+    uri: https://app.asana.com/api/1.0/projects/7432421435548794
+  response:
+    body:
+      string: '{"data":{}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '11'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 26 May 2026 08:44:28 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=1,cdn-upstream-fbl;dur=763,cdn-cache-miss,cdn-pop;desc="NRT20-P1",cdn-rid;desc="iKx_LARpZ0fVfpKOUmTpsJdCvpxPQlrC9eypfaLpZ3yjgp-Y6FIPsQ==",cdn-downstream-fbl;dur=778
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 48234be61db76cf47aeb12eb1ab6756a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - iKx_LARpZ0fVfpKOUmTpsJdCvpxPQlrC9eypfaLpZ3yjgp-Y6FIPsQ==
+      X-Amz-Cf-Pop:
+      - NRT20-P1
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      cache-control:
+      - no-store
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      pragma:
+      - no-cache
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.0'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '612'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

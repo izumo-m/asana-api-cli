@@ -1,0 +1,88 @@
+interactions:
+- request:
+    body: '{"data": {"actions": [{"relative_path": "/users/me", "method": "get", "options":
+      {"fields": ["gid", "name", "resource_type"]}}, {"relative_path": "/users/me",
+      "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
+      {"relative_path": "/users/me", "method": "get", "options": {"fields": ["gid",
+      "name", "resource_type"]}}, {"relative_path": "/users/me", "method": "get",
+      "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
+      {"relative_path": "/users/me", "method": "get", "options": {"fields": ["gid",
+      "name", "resource_type"]}}, {"relative_path": "/users/me", "method": "get",
+      "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
+      {"relative_path": "/tasks/3354727812411525", "method": "get", "options": {"fields":
+      ["gid", "name"]}}]}}'
+    headers:
+      Accept:
+      - application/json; charset=utf-8
+      Content-Type:
+      - application/json; charset=utf-8
+      User-Agent:
+      - Swagger-Codegen/5.2.4/python
+      X-Asana-Client-Lib:
+      - language=Python&version=5.2.4&language_version=3.10.12&os=Linux&os_version=6.6.114.1-microsoft-standard-WSL2
+      authorization:
+      - Bearer ***REDACTED***
+    method: POST
+    uri: https://app.asana.com/api/1.0/batch
+  response:
+    body:
+      string: '{"data":[{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"errors":[{"message":"task:
+        Not a recognized ID: 3354727812411525","help":"For more information on API
+        status codes and how to handle them, read the docs on errors: https://developers.asana.com/docs/errors"}]},"status_code":404,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}}]}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1805'
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 26 May 2026 08:46:56 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Server-Timing:
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=434,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="0VVH_qiYN2XiO8gLGXxdla16h0rsBfpjPpdHLL3eJ5N9op9lg8RFwA==",cdn-downstream-fbl;dur=450
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 ac502c9dd4c6e702a01d1a66342b3c84.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 0VVH_qiYN2XiO8gLGXxdla16h0rsBfpjPpdHLL3eJ5N9op9lg8RFwA==
+      X-Amz-Cf-Pop:
+      - NRT20-P8
+      X-Cache:
+      - Miss from cloudfront
+      X-Robots-Tag:
+      - none
+      X-UA-Compatible:
+      - IE=edge,chrome=1
+      asana-change:
+      - name=new_user_task_lists;info=https://forum.asana.com/t/update-on-our-planned-api-changes-to-user-task-lists-a-k-a-my-tasks/103828
+      - name=cross_workspace_deprecation;info=https://forum.asana.com/t/change-get-projects-get-users-and-get-tags-will-require-a-workspace-or-team/1031581
+      - name=new_goal_memberships;info=https://forum.asana.com/t/launched-team-sharing-for-goals/378601;affected=true
+      - name=teamless_projects;info=https://forum.asana.com/t/change-teamless-projects/929205
+      - name=goal_sals_api;info=https://forum.asana.com/t/new-change-goal-access-levels-admin-editor-and-viewer/1089758
+      content-security-policy:
+      - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
+        'none';frame-src 'none';frame-ancestors 'none'
+      server:
+      - istio-envoy
+      x-asana-api-version:
+      - '1.1'
+      x-asana-cell:
+      - prod-us1-asana-cell16
+      x-content-type-options:
+      - nosniff
+      x-envoy-upstream-service-time:
+      - '289'
+      x-frame-options:
+      - DENY
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

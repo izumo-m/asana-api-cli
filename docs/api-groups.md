@@ -22,7 +22,7 @@ the same set of CLI groups. A drift test in `tests/test_cli.py`
 | `allocations`                 | [Allocations](https://developers.asana.com/reference/allocations)                                     | Manage user allocations across projects    |
 | `attachments`                 | [Attachments](https://developers.asana.com/reference/attachments)                                     | Upload, list, and remove file attachments  |
 | `audit-log-api`               | [Audit Log API](https://developers.asana.com/reference/audit-log-api)                                 | Read domain audit log events               |
-| `batch-api`                   | [Batch API](https://developers.asana.com/reference/batch-api)                                         | Execute multiple API requests in parallel  |
+| `batch-api`                   | [Batch API](https://developers.asana.com/reference/batch-api) ([usage](api-batch.md))                 | Execute multiple API requests in parallel  |
 | `budgets`                     | [Budgets](https://developers.asana.com/reference/budgets)                                             | Manage project and portfolio budgets       |
 | `custom-field-settings`       | [Custom Field Settings](https://developers.asana.com/reference/custom-field-settings)                 | List custom fields attached to objects     |
 | `custom-fields`               | [Custom Fields](https://developers.asana.com/reference/custom-fields)                                 | Manage workspace custom fields             |
