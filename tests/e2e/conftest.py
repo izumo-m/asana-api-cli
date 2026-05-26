@@ -363,6 +363,64 @@ def _auto_hash_gids(cassette_dict: Any) -> Any:
     return _walk(cassette_dict, lambda s: pattern.sub(lambda m: mapping[m.group(0)], s))
 
 
+# ---------- Per-test cassette mask hook (L3) --------------------------------
+
+# Maskers attached for the currently-running test. Populated by
+# ``_register_cassette_maskers`` (called from ``pytest_runtest_setup``)
+# from a ``@pytest.mark.cassette_mask.with_args(fn, ...)`` marker and
+# drained by ``pytest_runtest_teardown`` (``trylast=True``).
+#
+# The ``.with_args`` form is required: ``MarkDecorator``'s call sugar
+# treats a single callable positional argument as the decorated test
+# function and stores a bare (arg-less) mark on it instead, so
+# ``@pytest.mark.cassette_mask(fn)`` silently does nothing.
+#
+# Three masking layers run at cassette serialize time:
+#
+#   L1 — universal value/format pass: ``${VAR}`` templating,
+#        ``_auto_hash_gids``, ``_mask_sync_tokens``.
+#   L2 — schema-aware response hook: ``_before_record_response`` /
+#        ``_mask_object`` dispatch on ``resource_type``.
+#   L3 — per-test/API hook (this list): when L2 cannot fire because the
+#        response lacks ``resource_type`` (e.g. a ``/batch`` sub-response
+#        whose action did not request that field) the test attaches an
+#        API-specific masker that mutates the parsed cassette dict in
+#        place before L1 runs.
+_active_maskers: list[Callable[[Any], None]] = []
+
+
+def _register_cassette_maskers(item: pytest.Item) -> None:
+    """Populate ``_active_maskers`` from the test's ``cassette_mask`` marker.
+
+    Called from :func:`pytest_runtest_setup` so registration happens
+    *before* pytest-recording's ``vcr`` fixture sets up. That ordering
+    is critical: ``vcr`` saves the cassette during *its* fixture
+    teardown by invoking :func:`_templated_yaml_serialize`, which reads
+    ``_active_maskers``. If this list were drained too early — e.g. in
+    an autouse fixture's ``finally``, which under pytest's LIFO
+    semantics runs *before* the ``vcr`` teardown — the serializer
+    would observe an empty list and skip the L3 pass.
+
+    Drained from :func:`pytest_runtest_teardown` (``trylast=True``),
+    which runs *after* every fixture teardown for the test (so the
+    ``vcr`` save has already consumed the list by then).
+    """
+    _active_maskers.clear()
+    marker = item.get_closest_marker("cassette_mask")
+    if marker is not None:
+        _active_maskers.extend(marker.args)
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Register custom markers so pytest does not warn about them."""
+    config.addinivalue_line(
+        "markers",
+        "cassette_mask(*fns): attach per-test cassette-mask hooks (L3 PII "
+        "layer). Apply with `.with_args(fn, ...)` so the callable args are "
+        "not mistaken for the decorated test function.",
+    )
+
+
 # ---------- Templated YAML serializer ---------------------------------------
 
 
@@ -409,6 +467,10 @@ _orig_yaml_deserialize = yamlserializer.deserialize
 
 
 def _templated_yaml_serialize(cassette_dict):  # type: ignore[no-untyped-def]
+    # L3 first so per-test maskers can read the raw recorded values before
+    # L1 templating rewrites them (e.g. before USER_NAME becomes ${USER_NAME}).
+    for masker in _active_maskers:
+        masker(cassette_dict)
     bindings = _bindings()
     templated = _walk(cassette_dict, lambda s: _template_string(s, bindings))
     templated = _auto_hash_gids(templated)
@@ -600,16 +662,21 @@ def _ensure_token(request: pytest.FixtureRequest):
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    """Delete the cassette file before re-recording.
+    """Per-test pre-fixture setup: cassette wipe (for --record) + L3 masker registration.
 
-    vcrpy's ``record_mode="all"`` re-records every interaction but APPENDS
-    to the existing cassette rather than overwriting. Auto-hashed
-    synthetic gids from a prior recording would then be re-collected by
-    ``_auto_hash_gids`` as if they were real, double-hashing them on
-    the next save. Wiping the file in ``pytest_runtest_setup`` — which
-    runs before pytest-recording's ``vcr`` fixture loads it — gives VCR
-    an empty cassette to start from.
+    Both pieces must run *before* pytest-recording's ``vcr`` fixture
+    sets up, so they live in this hook rather than an autouse fixture:
+
+    * **Cassette wipe.** ``vcrpy`` 's ``record_mode="all"`` appends to
+      the existing cassette rather than overwriting it. Auto-hashed
+      synthetic gids from a prior recording would then be re-collected
+      by ``_auto_hash_gids`` as if they were real, double-hashing them
+      on the next save. Wiping here gives VCR an empty cassette to
+      start from.
+    * **Masker registration.** See :func:`_register_cassette_maskers`
+      for the timing rationale.
     """
+    _register_cassette_maskers(item)
     if not item.config.getoption("--record", default=False):
         return
     if item.get_closest_marker("vcr") is None:
@@ -617,3 +684,18 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     module_path = Path(str(item.fspath))
     cassette_path = module_path.parent / "cassettes" / module_path.stem / f"{item.name}.yaml"
     cassette_path.unlink(missing_ok=True)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:  # noqa: ARG001
+    """Drain ``_active_maskers`` after pytest has torn down every fixture.
+
+    ``trylast=True`` is essential. Without it our hook implementation
+    runs *before* the core ``_pytest.runner`` impl that actually tears
+    down fixtures (including pytest-recording's ``vcr``), so the clear
+    would race the cassette save and leave ``_templated_yaml_serialize``
+    looking at an empty list. ``trylast=True`` pushes us behind the
+    core impl, so by the time we run the L3 maskers have already been
+    consumed.
+    """
+    _active_maskers.clear()

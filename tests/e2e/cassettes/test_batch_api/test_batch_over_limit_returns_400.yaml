@@ -1,20 +1,17 @@
 interactions:
 - request:
     body: '{"data": {"actions": [{"relative_path": "/users/me", "method": "get", "options":
-      {"fields": ["gid", "name", "resource_type"]}}, {"relative_path": "/users/me",
-      "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
-      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
-      {"relative_path": "/users/me", "method": "get", "options": {"fields": ["gid",
-      "name", "resource_type"]}}, {"relative_path": "/users/me", "method": "get",
-      "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
-      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
-      {"relative_path": "/users/me", "method": "get", "options": {"fields": ["gid",
-      "name", "resource_type"]}}, {"relative_path": "/users/me", "method": "get",
-      "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
-      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
-      {"relative_path": "/users/me", "method": "get", "options": {"fields": ["gid",
-      "name", "resource_type"]}}, {"relative_path": "/users/me", "method": "get",
-      "options": {"fields": ["gid", "name", "resource_type"]}}]}}'
+      {"fields": ["gid", "name"]}}, {"relative_path": "/users/me", "method": "get",
+      "options": {"fields": ["gid", "name"]}}, {"relative_path": "/users/me", "method":
+      "get", "options": {"fields": ["gid", "name"]}}, {"relative_path": "/users/me",
+      "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}]}}'
     headers:
       Accept:
       - application/json; charset=utf-8
@@ -41,15 +38,15 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Tue, 26 May 2026 09:44:25 GMT
+      - Tue, 26 May 2026 10:41:35 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 918c5fa0268802c76cde9d59d951a06c.cloudfront.net (CloudFront)
+      - 1.1 c9bacacdd678f5d95591fb7de8685414.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - ke1edBev6p1d1-gOMZtMpRUot0hhOKAjkP47LCEvOL8ggz_OWBnQEw==
+      - qd96IOdWpR5iNVX5uzz646O3T6T8wSyKwp7EfFaec8Saa7ugKYrVmw==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -76,7 +73,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '361'
+      - '202'
       x-frame-options:
       - DENY
       x-xss-protection:

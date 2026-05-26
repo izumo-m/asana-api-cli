@@ -39,6 +39,7 @@ import pytest
 from _cli_runner import make_runner
 
 from asana_api_cli.cli import main
+from e2e._maskers import mask_users_in_batch_subresponses
 
 
 def _run(*args: str) -> "tuple[int, str, str]":
@@ -53,16 +54,16 @@ def _batch_body(actions: list[dict[str, Any]]) -> str:
 def _me_action() -> dict[str, Any]:
     """A trivial token-only GET used as filler in the limit / partial tests.
 
-    ``resource_type`` is requested explicitly so the response carries the
-    field; this lets ``_mask_object`` in ``conftest.py`` recognise each
-    object as a user and replace ``name`` with the bound ``USER_NAME``
-    at record time. Without it the cassette would leak the recording
-    account's real display name.
+    The L2 ``resource_type``-aware mask in ``conftest.py`` cannot reach
+    these sub-responses because ``options.fields`` deliberately omits
+    ``resource_type`` here — the goal of this test is to exercise the
+    L3 ``cassette_mask`` hook against a realistic batch sub-response
+    shape (one a caller might actually send).
     """
     return {
         "relative_path": "/users/me",
         "method": "get",
-        "options": {"fields": ["gid", "name", "resource_type"]},
+        "options": {"fields": ["gid", "name"]},
     }
 
 
@@ -101,6 +102,7 @@ def test_batch_over_limit_returns_400() -> None:
 
 
 @pytest.mark.vcr
+@pytest.mark.cassette_mask.with_args(mask_users_in_batch_subresponses)
 def test_batch_partial_failure() -> None:
     """9 valid + 1 invalid sub-action -> parent 200 with one per-action 4xx.
 

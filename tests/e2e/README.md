@@ -167,33 +167,87 @@ len(synthetics)` guards against hash collisions; at our scale (<2k gids
 per cassette) it is essentially impossible to hit, but a real hit forces
 a re-record against a fresh resource set.
 
-## PII masking
+## PII masking (three layers)
 
-Applied at record time by `_before_record_response` in `conftest.py`. Hits
-are dispatched by `resource_type`:
+Three layers run at cassette record time, in this order. Each layer
+covers PII shapes the next one cannot see, so adding a test rarely needs
+more than picking the right layer for the response shape at hand.
 
-- `Authorization` request header → `Bearer ***REDACTED***`
-- `user.email` / `user.name` / `user.photo` → bound values / `null`
-- `workspace.name` / `workspace.email_domains` → bound value / `["example.invalid"]`
-- `team.name` → bound value
-- `attachment.download_url` / `attachment.view_url` → query string stripped
-  (Asana issues presigned `?e=<expiry>&t=<HMAC>` URLs against
-  `asanausercontent.com`; the token grants read access to the asset
-  until expiry and must not be committed)
-- Real `user.name` / `user.email` values that leak into free-text
-  fields (e.g. `story.text` "X さんが …") are harvested before the
-  structured masking runs and substituted to the bound `USER_NAME` /
-  `USER_EMAIL` values in the serialized response body.
+### Layer 1 — Universal value- and format-based pass
+
+Applied to every cassette automatically (see `_templated_yaml_serialize`
+in `conftest.py`):
+
+- `Authorization` request header → `Bearer ***REDACTED***` (vcrpy
+  `filter_headers`).
+- `${VAR}` placeholders — see [Account-neutral templating](#account-neutral-templating)
+  above.
+- Auto-hashed gids — see [Auto-hashed gids](#auto-hashed-gids) above.
 - Asana events sync tokens (`<32-hex>:<int>`) in request URLs and
   response bodies are hashed (sha256 of the prefix) at serialize time.
   Sync tokens are not credentials but they are account-coupled opaque
   strings; hashing keeps the cassette portable while preserving
-  vcrpy's request-matching (same real token always hashes to the same
-  synthetic, so the test can extract the token from a response and
-  send it back in the next request unmodified).
+  vcrpy's request-matching invariant (same real token always hashes to
+  the same synthetic, so a test can extract the token from a response
+  and send it back in the next request unmodified).
 
-Test assertions should compare on structure or against the bound values,
-not on real account data.
+### Layer 2 — `resource_type`-aware response hook
+
+Applied by `_before_record_response` to every response body that parses
+as JSON. Hits are dispatched by each object's `resource_type` field:
+
+- `user.email` / `user.name` / `user.photo` → bound values / `null`
+- `workspace.name` / `workspace.email_domains` → bound value /
+  `["example.invalid"]`
+- `team.name` → bound value
+- `attachment.download_url` / `attachment.view_url` → query string
+  stripped (Asana issues presigned `?e=<expiry>&t=<HMAC>` URLs against
+  `asanausercontent.com`; the token grants read access to the asset
+  until expiry and must not be committed).
+
+Real `user.name` / `user.email` values that leak into free-text fields
+(e.g. `story.text` "X さんが …") are harvested before the structured
+masking runs and substituted to the bound `USER_NAME` / `USER_EMAIL`
+values in the serialized response body.
+
+**Gap**: L2 requires the response object to carry `resource_type`. Some
+APIs (notably `/batch` sub-responses) only return fields the caller
+explicitly asked for via `options.fields`, so when `resource_type` is
+absent L2 silently does nothing. Layer 3 covers that case.
+
+### Layer 3 — Per-test masker hook
+
+Tests opt in via `@pytest.mark.cassette_mask.with_args(fn, ...)`. Each
+`fn` is a callable `(cassette_dict) -> None` that mutates the parsed
+cassette in place; the `pytest_runtest_setup` hook in `conftest.py`
+reads the marker and populates the maskers list, the serializer
+invokes them before Layer 1 runs (so maskers write the bound value,
+e.g. `"E2E User"`, and Layer 1's templating then rewrites it to
+`${USER_NAME}` — keeping the bound value as the single source of
+truth), and the `pytest_runtest_teardown` hook (`trylast=True`)
+drains the list AFTER every fixture teardown — including
+pytest-recording's `vcr` — has finished, so the cassette save sees
+the populated list.
+
+The `.with_args` form is required: `@pytest.mark.X(callable)` is
+interpreted by `MarkDecorator` as "apply mark X (no args) to this
+*callable* as a test function," so without `.with_args` the masker is
+silently swallowed.
+
+Helpers live in `tests/e2e/_maskers.py`. The first one,
+`mask_users_in_batch_subresponses`, walks every `/batch` interaction
+and rewrites `data[i].body.data.name` for any sub-action whose
+`relative_path` starts with `/users/`. Add a new helper here when a
+test exposes a PII shape that the existing layers cannot reach (e.g.
+an API whose response embeds names without a `resource_type` tag or
+inside an API-specific nested structure).
+
+### What to compare on in test assertions
+
+Compare on structure or against bound values, never on real account
+data. Real names / emails / gids that leak into a cassette are
+verification failures regardless of which layer should have caught
+them.
 
 ## Attachment-specific notes
 

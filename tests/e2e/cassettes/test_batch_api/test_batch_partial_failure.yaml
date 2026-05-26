@@ -1,19 +1,16 @@
 interactions:
 - request:
     body: '{"data": {"actions": [{"relative_path": "/users/me", "method": "get", "options":
-      {"fields": ["gid", "name", "resource_type"]}}, {"relative_path": "/users/me",
-      "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
-      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
-      {"relative_path": "/users/me", "method": "get", "options": {"fields": ["gid",
-      "name", "resource_type"]}}, {"relative_path": "/users/me", "method": "get",
-      "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
-      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
-      {"relative_path": "/users/me", "method": "get", "options": {"fields": ["gid",
-      "name", "resource_type"]}}, {"relative_path": "/users/me", "method": "get",
-      "options": {"fields": ["gid", "name", "resource_type"]}}, {"relative_path":
-      "/users/me", "method": "get", "options": {"fields": ["gid", "name", "resource_type"]}},
-      {"relative_path": "/tasks/3354727812411525", "method": "get", "options": {"fields":
-      ["gid", "name"]}}]}}'
+      {"fields": ["gid", "name"]}}, {"relative_path": "/users/me", "method": "get",
+      "options": {"fields": ["gid", "name"]}}, {"relative_path": "/users/me", "method":
+      "get", "options": {"fields": ["gid", "name"]}}, {"relative_path": "/users/me",
+      "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
+      "/tasks/3354727812411525", "method": "get", "options": {"fields": ["gid", "name"]}}]}}'
     headers:
       Accept:
       - application/json; charset=utf-8
@@ -29,28 +26,28 @@ interactions:
     uri: https://app.asana.com/api/1.0/batch
   response:
     body:
-      string: '{"data":[{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"errors":[{"message":"task:
+      string: '{"data":[{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"errors":[{"message":"task:
         Not a recognized ID: 3354727812411525","help":"For more information on API
         status codes and how to handle them, read the docs on errors: https://developers.asana.com/docs/errors"}]},"status_code":404,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}}]}'
     headers:
       Connection:
       - keep-alive
       Content-Length:
-      - '1805'
+      - '1598'
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Tue, 26 May 2026 08:46:56 GMT
+      - Tue, 26 May 2026 10:30:26 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=434,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="0VVH_qiYN2XiO8gLGXxdla16h0rsBfpjPpdHLL3eJ5N9op9lg8RFwA==",cdn-downstream-fbl;dur=450
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=546,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="VYpEiNUvBFyHAi1lQqVnnZnGHaAFjOaGbUe8YfIseLBGR_oqbjhjkg==",cdn-downstream-fbl;dur=565
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 ac502c9dd4c6e702a01d1a66342b3c84.cloudfront.net (CloudFront)
+      - 1.1 ab2ca50a4aee152540d26a6342b7542e.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - 0VVH_qiYN2XiO8gLGXxdla16h0rsBfpjPpdHLL3eJ5N9op9lg8RFwA==
+      - VYpEiNUvBFyHAi1lQqVnnZnGHaAFjOaGbUe8YfIseLBGR_oqbjhjkg==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -77,7 +74,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '289'
+      - '391'
       x-frame-options:
       - DENY
       x-xss-protection:
