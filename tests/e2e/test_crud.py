@@ -7,13 +7,12 @@ live workspace.
 
 Live record::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest --record-mode=all tests/e2e/test_crud.py
+    ASANA_PYTEST_WORKSPACE=<gid> \\
+        uv run pytest --live --record tests/e2e/test_crud.py
 
 Replay::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest tests/e2e/test_crud.py
+    uv run pytest tests/e2e/test_crud.py
 """
 
 from __future__ import annotations

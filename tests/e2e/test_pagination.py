@@ -11,13 +11,12 @@ projects provisioned by ``tools/e2e_init.py``:
 
 Live record::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest --record-mode=all tests/e2e/test_pagination.py
+    ASANA_PYTEST_WORKSPACE=<gid> \\
+        uv run pytest --live --record tests/e2e/test_pagination.py
 
 Replay::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest tests/e2e/test_pagination.py
+    uv run pytest tests/e2e/test_pagination.py
 """
 
 from __future__ import annotations

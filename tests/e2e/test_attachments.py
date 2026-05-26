@@ -13,13 +13,12 @@ the Japanese-filename test cases below pass it explicitly.
 
 Live record::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest --record-mode=all tests/e2e/test_attachments.py
+    ASANA_PYTEST_WORKSPACE=<gid> \\
+        uv run pytest --live --record tests/e2e/test_attachments.py
 
 Replay::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest tests/e2e/test_attachments.py
+    uv run pytest tests/e2e/test_attachments.py
 """
 
 from __future__ import annotations

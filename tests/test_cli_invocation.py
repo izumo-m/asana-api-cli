@@ -507,9 +507,8 @@ class TestRetryStrategyReachesSession:
 
 class TestDebugRedactorLifecycle:
     """The http.client debug redactor must stay installed for the duration
-    of every paginated request, including the lazy per-page HTTP calls that
-    `--all-items` triggers when the formatter iterates the SDK's
-    PageIterator."""
+    of every paginated request, including the lazy per-page HTTP calls made
+    while the formatter iterates the SDK's PageIterator."""
 
     def test_all_items_with_debug_keeps_redactor_installed_during_iteration(
         self, monkeypatch: pytest.MonkeyPatch

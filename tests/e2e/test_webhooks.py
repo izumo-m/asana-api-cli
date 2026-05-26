@@ -57,8 +57,7 @@ Quick Tunnel publishes through Cloudflare's shared
 ``*.trycloudflare.com`` domain. Some networks block that hostname
 pattern (the same reason ngrok gets blocked) or have DNS resolvers
 that take a while to learn the freshly-minted hostname. If that
-happens, switch to a named tunnel — see
-``_local/notes/webhook-api/cloudflare-tunnel-setup.md``.
+happens, switch to a named tunnel.
 
 Asana webhook spec used by the assertions
 -----------------------------------------
@@ -70,8 +69,6 @@ whose ``resource`` is the new project; deleting it triggers a
 ``deleted`` event. Assertion is intentionally loose ("at least one
 matching event arrived") so we don't break on Asana's batching or
 on adjacent membership / story events that come alongside.
-
-Full spec notes: ``_local/notes/webhook-api/asana-webhook-spec.md``.
 """
 
 from __future__ import annotations
