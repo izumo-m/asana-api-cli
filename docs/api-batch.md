@@ -57,11 +57,10 @@ fail** ("parent 200 unless the request itself is malformed").
 
 ## CLI output modes
 
-| Flag                   | What stdout contains                                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| *(default)*            | The outer `data` array unwrapped to a JSON list of `<result>` objects. The SDK routes `/batch` through its page iterator, but `/batch` is single-page — there is no real pagination, and global flags like `--page-limit` / `--item-limit` are inert here. |
-| `--full-payload`       | Single dict `{"data": [<result>, ...]}` from one HTTP call, matching the Asana-documented shape one-to-one.                                |
-| `--output-errors json` | Used when the **parent** call fails (e.g. `400`): envelope `{exception, status, reason, body, headers}` on stdout, exit 3.                 |
+| Flag             | What stdout contains                                                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| *(default)*      | The outer `data` array unwrapped to a JSON list of `<result>` objects. The SDK routes `/batch` through its page iterator, but `/batch` is single-page — there is no real pagination, and global flags like `--page-limit` / `--item-limit` are inert here. |
+| `--full-payload` | Single dict `{"data": [<result>, ...]}` from one HTTP call, matching the Asana-documented shape one-to-one.                                |
 
 The default unwrap is convenient when piping into `jq` (`.[0].body.data.gid`),
 but `--full-payload` preserves the outer `data` wrapper. Prefer
@@ -209,45 +208,6 @@ asana-api batch-api create-batch-request --body @/tmp/req.json --full-payload \
   | jq -e 'all(.data[]; .status_code >= 200 and .status_code < 300)' >/dev/null \
   || echo "at least one sub-action failed" >&2
 ```
-
-### 4. Parent failure (empty `actions` → `400`)
-
-```bash
-asana-api batch-api create-batch-request \
-  --body '{"data": {"actions": []}}' \
-  --output-errors json
-```
-
-stdout (exit 3):
-
-```json
-{
-  "exception": "asana.rest.ApiException",
-  "status": 400,
-  "reason": "Bad Request",
-  "body": "{\"errors\":[{\"message\":\"Batch requests must contain at least one action\",\"help\":\"...\"}]}",
-  "headers": {"...": "..."}
-}
-```
-
-stderr (exit 3, the exception's `format_exception_only` output, four
-lines without a traceback):
-
-```
-asana.rest.ApiException: (400)
-Reason: Bad Request
-HTTP response headers: HTTPHeaderDict({...})
-HTTP response body: b'{"errors":[{"message":"Batch requests must contain at least one action", ...}]}'
-```
-
-`--output-errors` echoes this summary to stderr so a parent failure
-stays visible when stdout is being captured into a variable. Scripts
-that merge with `2>&1` will see these four lines after the envelope;
-scripts that read stderr separately can rely on it as the human-
-readable side channel.
-
-Same envelope shape applies when the actions array exceeds 10 entries
-— the message there is `"Batch requests must contain no more than 10 actions"`.
 
 ## Limits and restrictions
 

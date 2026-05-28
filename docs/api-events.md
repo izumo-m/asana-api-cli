@@ -13,10 +13,10 @@ RES=<task or project gid>
 
 # Bootstrap: the first call always returns 412 with a fresh sync token
 # in the response body. ``--output-errors text`` opts into an envelope
-# (default is ``none`` which would let the 412 ApiException propagate
-# uncaught). The envelope's ``body`` is the raw response string, so
-# ``fromjson`` parses it; ``text`` format makes the scalar print
-# without JSON quotes.
+# on **stdout** (default ``none`` puts the formatted exception on
+# stderr, which is fine for humans but not capturable by ``$(...)``).
+# The envelope's ``body`` is the raw response string, so ``fromjson``
+# parses it; ``text`` format makes the scalar print without JSON quotes.
 SYNC=$(asana-api events get-events --resource "$RES" \
   --full-payload \
   --output-errors text \
@@ -45,15 +45,12 @@ while true; do
 done
 ```
 
-`--output-errors` / `--query-errors` write to **stdout** (not stderr) so
-the variable assignment captures them cleanly. The exception is *also*
-echoed to **stderr** (Python's top-level format without the traceback)
-so that an unexpected error — e.g. a 500 instead of the expected 412 —
-stays visible to the user even though `--query-errors` would have
-stripped it from stdout. Add `2>/dev/null` to suppress the echo if the
-loop is noisy in your environment. See
-[`sdk-deviations.md`](sdk-deviations.md) for the envelope schema and
-the reason `--output-errors` mirrors `--output`.
+The script uses `--output-errors text` + `--query-errors` because
+every events call may return a 412 whose body carries the next sync
+token — extracting that body programmatically requires the envelope
+path on stdout. See [`exit-codes.md`](exit-codes.md) and
+[`sdk-deviations.md`](sdk-deviations.md) for the generic envelope
+contract.
 
 ## Why `--full-payload` is required
 
@@ -77,9 +74,8 @@ bootstrap.
 When a token expires, the next poll returns 412 with a fresh token in
 the body — same shape as bootstrap. A production loop should treat
 exit `3` from a steady-state poll as "re-run the bootstrap step"; the
-example above does not include that recovery path. Note that catching
-exit `3` requires `--output-errors` on the polling call too (default
-`none` would surface a Python traceback and exit 1 instead).
+example above does not include that recovery path. (`--output-errors`
+is therefore needed on the polling call too, not just on bootstrap.)
 
 See also: [`exit-codes.md`](exit-codes.md),
 [`sdk-deviations.md`](sdk-deviations.md).
