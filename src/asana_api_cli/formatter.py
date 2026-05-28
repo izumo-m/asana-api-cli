@@ -73,12 +73,15 @@ def formatted(f: Any) -> Any:
             # prompts) is not an "API call exception" — let Click handle it.
             raise
         except Exception as e:
+            # Always echo the exception (no traceback frames) to stderr.
+            # For ApiException this includes status / reason / headers /
+            # body — the useful payload (e.g. the 412 sync-token body
+            # in events polling) stays visible without traceback noise.
+            _echo_exception_only(e)
             if runtime.output_errors == "none":
-                # SDK-parity default: let the exception propagate. Python's
-                # default handler prints the traceback on stderr and exits 1.
-                raise
-            # Otherwise render as a ``{exception, ...}`` envelope on stdout
-            # and exit 3.
+                sys.exit(1)
+            # Otherwise also render a ``{exception, ...}`` envelope on
+            # stdout and exit 3.
             _handle_exception(e)
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
@@ -98,14 +101,42 @@ def _qualified_exception_name(e: BaseException) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
+def _echo_exception_only(e: BaseException) -> None:
+    """Write ``traceback.format_exception_only`` output to stderr.
+
+    Format: qualified class name + the exception's ``__str__``, no
+    traceback frames. ``ApiException.__str__`` is multi-line, so the
+    full stderr block looks like::
+
+        asana.rest.ApiException: (412)
+        Reason: Precondition Failed
+        HTTP response headers: {...}
+        HTTP response body: b'{...}'
+
+    — i.e. the full HTTP response is visible without re-deriving it
+    from the envelope.
+
+    Always written from :func:`formatted` (both
+    ``--output-errors=none`` and the envelope formats), so the raw
+    exception stays visible even when ``--query-errors`` would
+    otherwise strip it from stdout.
+    """
+    click.echo(
+        "".join(traceback.format_exception_only(type(e), e)),
+        err=True,
+        nl=False,
+    )
+
+
 def _handle_exception(e: Exception) -> NoReturn:
-    """Render an exception envelope on stdout and exit.
+    """Render an exception envelope on stdout and exit 3.
 
     Only called when ``runtime.output_errors`` is one of
     ``json|text|csv|table`` (an envelope format was explicitly
-    requested). When it is the default ``none``, the caller re-raises
-    instead so Python's default handler prints the traceback on
-    stderr and exits 1 — SDK-parity behavior.
+    requested). The stderr echo of the exception is done upstream in
+    :func:`formatted` (via :func:`_echo_exception_only`) before this
+    function runs, so both the ``none`` and envelope branches share
+    the same stderr format.
 
     ApiException carries full HTTP context: 5-field envelope
     ``{exception, status, reason, body, headers}`` where ``body`` is
@@ -124,25 +155,7 @@ def _handle_exception(e: Exception) -> NoReturn:
     expression short-circuits with exit ``2`` from inside
     :func:`_format_output` (user-input error, per
     ``docs/exit-codes.md``).
-
-    A human-readable echo of the exception (Python's top-level format
-    without the traceback) is also written to **stderr**. This is the
-    raw exception — pre-``--query-errors`` — so an unexpected error
-    shape (e.g. a 500 when the script only expected 412) stays
-    diagnosable even when the user's jq filter strips it from
-    stdout. Stderr is separate from the stdout envelope channel, so
-    a ``$(cmd)`` capture still gets the clean machine-readable value.
     """
-    # ApiException.__str__ formats as "(status)\nReason: ...\nHTTP
-    # response headers: ...\nHTTP response body: ...\n" so the
-    # status / reason / body all surface here without us reaching
-    # into the envelope first.
-    click.echo(
-        "".join(traceback.format_exception_only(type(e), e)),
-        err=True,
-        nl=False,
-    )
-
     envelope: dict[str, Any]
     if isinstance(e, ApiException):
         raw_body = e.body

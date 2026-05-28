@@ -997,12 +997,12 @@ def _retry_strategy_option(f: Any) -> Any:
     default="none",
     show_default=True,
     help=(
-        "How to surface exceptions from the SDK call. 'none' (default) lets "
-        "the exception propagate uncaught (Python traceback on stderr, "
-        "exit 1). json/text/csv/table render an envelope "
-        "(exception/status/reason/body/headers) on stdout and exit 3; the "
-        "exception is also echoed to stderr (without traceback) so "
-        "unexpected errors stay visible "
+        "How to surface exceptions from the SDK call. The exception is "
+        "always echoed to stderr without traceback frames (for "
+        "ApiException this includes status/reason/headers/body). 'none' "
+        "(default) then exits 1 with no envelope. json/text/csv/table "
+        "additionally render an envelope "
+        "(exception/status/reason/body/headers) on stdout and exit 3 "
         "[asana-api extension]"
     ),
 )

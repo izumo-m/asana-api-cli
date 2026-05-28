@@ -683,7 +683,8 @@ class TestWorkspaceResolution:
         )
         result = make_runner().invoke(cmd, [])
         # exit 2 = user-input error (workspace missing). docs/exit-codes.md
-        # — CLI never sets exit 1; reserved for Python uncaught.
+        # — CLI does not set exit 1 for user-input errors; exit 1 is
+        # reserved for the SDK call exception path (``--output-errors=none``).
         assert result.exit_code == 2
         assert mock.call_count == 0
 
@@ -704,14 +705,17 @@ def _api_exception(status: int, body: str) -> Exception:
 class TestErrorPathExitCodes:
     """End-to-end verification of the v3.1 exit code policy.
 
-    Reference: docs/exit-codes.md. Default ``--output-errors=none`` lets
-    Python's uncaught-exception handler print the traceback (exit 1, the
-    SDK-parity baseline). Opting into an envelope format produces a
-    machine-readable envelope on stdout (exit 3). User-input errors
-    (bad jq, query-without-format) are exit 2.
+    Reference: docs/exit-codes.md. Default ``--output-errors=none``
+    catches the SDK exception, writes ``format_exception_only``
+    (qualified class + ``__str__``, no traceback) to stderr, and exits
+    1. Opting into an envelope format produces a machine-readable
+    envelope on stdout (exit 3). User-input errors (bad jq,
+    query-without-format) are exit 2.
     """
 
-    def test_api_error_default_is_none_propagation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_api_error_default_none_renders_without_traceback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(
             monkeypatch,
@@ -719,15 +723,18 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"new-token","errors":[]}')],
         )
-        # Default --output-errors=none: exception propagates uncaught.
-        # CliRunner captures it and exits 1.
+        # Default --output-errors=none: catch + stderr echo + exit 1,
+        # no traceback. The 412 sync-token body is reachable through
+        # ApiException.__str__ on stderr — no need to opt into an
+        # envelope format just to see it.
         result = make_runner().invoke(cmd, ["--task", "T1"])
-        from asana.rest import ApiException
-
         assert result.exit_code == 1
-        assert isinstance(result.exception, ApiException)
         # No envelope on stdout.
         assert result.stdout == ""
+        assert "asana.rest.ApiException" in result.stderr
+        assert "(412)" in result.stderr
+        assert '"sync":"new-token"' in result.stderr
+        assert "Traceback (most recent call last)" not in result.stderr
 
     def test_api_error_explicit_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
@@ -820,17 +827,16 @@ class TestErrorPathExitCodes:
         # --query-errors paired with the default --output-errors=none
         # warns to stderr — the warning informs the user that the
         # filter is being ignored, but the underlying SDK call
-        # behavior is preserved (``none`` mode lets the ApiException
-        # propagate, CliRunner reports exit 1). Warning (not error)
-        # avoids masking the actual exception with a usage error.
-        from asana.rest import ApiException
-
+        # behavior is preserved (``none`` mode catches the
+        # ApiException and exits 1 with the formatted exception on
+        # stderr). Warning (not error) avoids masking the actual
+        # exception with a usage error.
         result = make_runner().invoke(
             cmd,
             ["--query-errors", ".exception", "--task", "T1"],
         )
         assert result.exit_code == 1
-        assert isinstance(result.exception, ApiException)
+        assert "asana.rest.ApiException" in result.stderr
         assert "--query-errors is ignored when --output-errors is 'none'" in result.stderr
 
     def test_query_errors_group_level_warns_exactly_once(

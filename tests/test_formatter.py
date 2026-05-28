@@ -11,6 +11,7 @@ from _cli_runner import full_output, make_runner
 from asana.rest import ApiException
 
 from asana_api_cli.formatter import (
+    _echo_exception_only,
     _format_output,
     _handle_exception,
     _scalar_text,
@@ -328,8 +329,8 @@ class TestCsvFieldnamesUnion:
 class TestHandleApiException:
     """Cover the JSON envelope path with ``--output-errors json``.
 
-    The default of ``--output-errors`` is ``none`` (let the exception
-    propagate); these tests opt into the envelope by pre-setting
+    The default of ``--output-errors`` is ``none`` (stderr echo + exit
+    1, no envelope); these tests opt into the envelope by pre-setting
     ``runtime.output_errors`` via the autouse fixture below.
 
     Schema: ``{exception, status, reason, body, headers}`` where ``body``
@@ -606,41 +607,40 @@ class TestHandleNonApiException:
         assert set(env.keys()) == {"exception", "reason"}
 
 
-class TestHandleExceptionStderrEcho:
-    """``--output-errors {json|text|csv|table}`` also writes a
-    human-readable echo of the exception to **stderr** so unexpected
-    error shapes stay diagnosable even when ``--query-errors`` strips
-    them from the stdout envelope.
+class TestEchoExceptionOnly:
+    """``_echo_exception_only`` writes the exception to **stderr**
+    without traceback frames.
 
     Format: ``traceback.format_exception_only(type(e), e)`` — the
     qualified class name followed by the exception's ``__str__``,
     matching what Python's default top-level handler prints, but
-    without the traceback frames.
+    without the traceback frames. The output is multi-line whenever
+    the exception's ``__str__`` is (notably ``ApiException``, which
+    embeds status / reason / headers / body across separate lines).
+
+    Called by the ``formatted`` decorator before either branch
+    (``--output-errors=none`` exit-1 or the envelope formats exit-3),
+    so the stderr format is identical regardless of ``output_errors``.
     """
 
-    @pytest.fixture(autouse=True)
-    def _opt_into_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(runtime, "output_errors", "json")
-
-    def test_api_exception_echoed_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_api_exception_includes_full_http_context(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         exc = ApiException(status=412, reason="Precondition Failed")
         exc.body = '{"sync":"new-token"}'  # type: ignore[assignment]
         exc.headers = {"X-Asana-Request-Id": "r1"}  # type: ignore[assignment]
-        with pytest.raises(SystemExit):
-            _handle_exception(exc)
+        _echo_exception_only(exc)
         captured = capsys.readouterr()
         # ApiException.__str__ embeds status / reason / headers / body.
         assert "ApiException" in captured.err
         assert "(412)" in captured.err
         assert "Precondition Failed" in captured.err
         assert '{"sync":"new-token"}' in captured.err
-        # Stdout envelope is unaffected.
-        env = json.loads(captured.out)
-        assert env["status"] == 412
+        # Function writes only to stderr.
+        assert captured.out == ""
 
-    def test_generic_exception_echoed_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with pytest.raises(SystemExit):
-            _handle_exception(RuntimeError("boom"))
+    def test_generic_exception_no_traceback(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _echo_exception_only(RuntimeError("boom"))
         err = capsys.readouterr().err
         # ``format_exception_only`` for a builtin yields "RuntimeError:
         # boom\n" (no module prefix on the short form). The exact line
@@ -651,24 +651,32 @@ class TestHandleExceptionStderrEcho:
         assert "Traceback" not in err
         assert ".py" not in err  # no source-line references
 
-    def test_stderr_echo_ignores_query_errors(
-        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """``--query-errors`` filters the stdout envelope but the stderr
-        echo carries the *raw* exception so a filter that drops info
-        cannot hide unexpected error shapes."""
+
+class TestFormattedDecoratorStderrEcho:
+    """Integration: the ``formatted`` decorator runs ``_echo_exception_only``
+    before either exit path, so ``--query-errors`` cannot mask the raw
+    exception by stripping it from the stdout envelope."""
+
+    def test_query_errors_cannot_hide_raw_exception(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "output_errors", "json")
         monkeypatch.setattr(runtime, "query_errors", ".status")
-        exc = ApiException(status=500, reason="Internal Server Error")
-        exc.body = "<html>oops</html>"  # type: ignore[assignment]
-        with pytest.raises(SystemExit):
-            _handle_exception(exc)
-        captured = capsys.readouterr()
+
+        @click.command()
+        @formatted
+        def cmd() -> Any:
+            exc = ApiException(status=500, reason="Internal Server Error")
+            exc.body = "<html>oops</html>"  # type: ignore[assignment]
+            raise exc
+
+        result = make_runner().invoke(cmd)
+        assert result.exit_code == 3
         # Stdout: only ``.status`` after the jq filter.
-        assert captured.out.strip() == "500"
-        # Stderr: full Python-style exception including body / reason.
-        assert "500" in captured.err
-        assert "Internal Server Error" in captured.err
-        assert "<html>oops</html>" in captured.err
+        assert result.stdout.strip() == "500"
+        # Stderr: full Python-style exception including body / reason —
+        # the raw exception survived the jq filter applied to stdout.
+        assert "500" in result.stderr
+        assert "Internal Server Error" in result.stderr
+        assert "<html>oops</html>" in result.stderr
 
 
 class TestFormattedDecoratorReraisesClickExceptions:
@@ -769,7 +777,10 @@ class TestFormattedDecorator:
 
     def test_api_exception_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """With --output-errors json, ApiException is rendered as an
-        envelope on stdout (exit 3)."""
+        envelope on stdout (exit 3) and *also* echoed to stderr via
+        ``_echo_exception_only`` — the same stderr format used by the
+        ``none`` branch. Regression guard against the echo being lost
+        from the envelope path."""
         monkeypatch.setattr(runtime, "output_errors", "json")
 
         @click.command()
@@ -784,14 +795,22 @@ class TestFormattedDecorator:
         env = json.loads(result.stdout)
         assert env["exception"] == "asana.rest.ApiException"
         assert env["reason"] == "Forbidden"
+        # Stderr echo also runs on the envelope branch — same format
+        # as the ``none`` branch.
+        assert "asana.rest.ApiException" in result.stderr
+        assert "Forbidden" in result.stderr
+        assert "Traceback (most recent call last)" not in result.stderr
 
 
 class TestNoneDefault:
-    """``--output-errors none`` (the default) lets exceptions propagate
-    uncaught — Python's default handler prints the traceback on stderr
-    and exits 1. This is the SDK-parity baseline."""
+    """``--output-errors none`` (the default) catches the exception,
+    writes ``traceback.format_exception_only`` (qualified class name +
+    ``__str__``, *no* traceback frames) to stderr, and exits 1. For
+    ``ApiException`` the stderr output is multi-line (status, reason,
+    headers, body), so the response payload (e.g. the 412 sync-token
+    body in events polling) stays visible without traceback noise."""
 
-    def test_api_exception_propagates(self) -> None:
+    def test_api_exception_renders_without_traceback(self) -> None:
         @click.command()
         @formatted
         def cmd() -> Any:
@@ -799,13 +818,17 @@ class TestNoneDefault:
 
         runner = make_runner()
         result = runner.invoke(cmd)
-        # CliRunner catches the exception and exits 1 by default.
         assert result.exit_code == 1
-        assert isinstance(result.exception, ApiException)
         # Nothing rendered to stdout — no envelope.
         assert result.stdout == ""
+        # Stderr carries the qualified exception name + its __str__,
+        # not a traceback.
+        assert "asana.rest.ApiException" in result.stderr
+        assert "(403)" in result.stderr
+        assert "Forbidden" in result.stderr
+        assert "Traceback (most recent call last)" not in result.stderr
 
-    def test_generic_exception_propagates(self) -> None:
+    def test_generic_exception_renders_without_traceback(self) -> None:
         @click.command()
         @formatted
         def cmd() -> Any:
@@ -814,15 +837,18 @@ class TestNoneDefault:
         runner = make_runner()
         result = runner.invoke(cmd)
         assert result.exit_code == 1
-        assert isinstance(result.exception, RuntimeError)
         assert result.stdout == ""
+        assert "RuntimeError: boom" in result.stderr
+        assert "Traceback (most recent call last)" not in result.stderr
 
 
 class TestFormatOutputExitCodes:
-    """``--query`` invalid jq must exit 2 (user-input), not 1 (Python uncaught).
+    """``--query`` invalid jq must exit 2 (user-input), not 1 (the SDK
+    call exception path).
 
-    Anchors the new exit-code policy: CLI never sets ``sys.exit(1)`` itself
-    (see ``docs/exit-codes.md``).
+    Anchors the exit-code policy: ``_format_output`` never produces
+    exit 1 by itself — exit 1 is reserved for the ``--output-errors=none``
+    SDK exception path in :func:`formatted` (see ``docs/exit-codes.md``).
     """
 
     def test_invalid_jq_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
