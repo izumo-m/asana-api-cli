@@ -8,23 +8,21 @@ SDK version is installed in the same environment.
 
 ## Why asana-api-cli
 
-- **Complete SDK coverage.** Every method of every `*Api` class in
-  `python-asana` becomes a CLI command. Because the tree is introspected
-  from the installed `asana` package, new methods surface the moment
-  upstream ships them — no `asana-api-cli` release required.
-- **Tracks the SDK version you actually use.** Because commands are
-  introspected from whatever `asana` is installed in the same environment,
-  the CLI surface matches the SDK version pinned in your project. When using
-  `asana-api-cli` as a dev-dependency, `pip install -U asana` updates the
-  CLI's available commands in lockstep with your application code.
+- **Complete SDK coverage, locked to your SDK version.** Every method of
+  every `*Api` class in `python-asana` becomes a CLI command. Because the
+  tree is introspected at startup from whatever `asana` is installed in
+  the same environment, the CLI surface matches the SDK version pinned in
+  your project — new upstream methods surface the moment `pip install -U
+  asana` lands, with no `asana-api-cli` release required.
 - **SDK-compatible arguments and output.** Command arguments map to
-  `python-asana` method parameters (with minor naming adjustments — hyphens
-  become underscores, group names map back to PascalCase `*Api` class
-  names), and JSON output matches the SDK's response shape. The CLI makes
-  it easy to iterate: try different arguments, inspect the response, and
-  refine until you understand the endpoint's behavior. Once verified,
-  translate the call into the equivalent `python-asana` invocation in your
-  app — far fewer surprises on the first integration.
+  `python-asana` method parameters (hyphens become underscores, group
+  names map back to PascalCase `*Api` class names), and JSON output
+  matches the SDK's response shape.
+- **Prototype in the shell, ship in Python.** Iterate from the command
+  line — try different arguments, inspect the response, refine until you
+  understand the endpoint. Then translate the verified call into the
+  equivalent `python-asana` invocation in your application code, with
+  far fewer surprises when you wire it in.
 
 ## Installation
 
@@ -135,10 +133,12 @@ asana-api --help
 asana-api tasks --help
 asana-api tasks get-tasks --help
 
-# List workspaces and projects
+# List workspaces
 asana-api workspaces get-workspaces
-asana-api projects get-projects-for-workspace
-asana-api projects get-projects --workspace <WORKSPACE_GID>
+
+# List up to 50 projects
+asana-api projects get-projects-for-workspace --item-limit 50
+asana-api projects get-projects --workspace <WORKSPACE_GID> --item-limit 50
 
 # List every task in a project (walks every page by default)
 asana-api tasks get-tasks --project <PROJECT_GID>
@@ -173,18 +173,20 @@ asana-api tasks delete-task --task <GID> --output none
 See [Pagination](#pagination) for fetching across pages and
 [Global options](#global-options) for `--debug`, `--access-token`, etc.
 
-### Workspace resolution
+## Workspace resolution
 
-Many API endpoints require a workspace. For commands wrapping such
-endpoints (e.g. `get-projects-for-workspace`), the CLI resolves it in
-this order:
+A subset of endpoints — those whose SDK signature takes a positional
+`workspace_gid` (e.g. `projects get-projects-for-workspace`,
+`tags create-tag-for-workspace`) — require a workspace. For those
+commands, the CLI resolves it in this order:
 
 1. `--workspace <GID>` on the command
 2. `ASANA_DEFAULT_WORKSPACE` environment variable
 
-For commands where workspace is optional (e.g. `get-tasks`), the env-var
-fallback is **not** used — pass `--workspace` explicitly if needed. This
-avoids ambiguity with alternative scope parameters like `--project` that
+For commands where workspace is an optional filter (e.g.
+`tasks get-tasks`, `goals get-goals`), the env-var fallback is
+**not** used — pass `--workspace` explicitly if needed. This avoids
+ambiguity with alternative scope parameters like `--project` that
 the Asana API accepts in place of workspace.
 
 ## Pagination
@@ -235,42 +237,40 @@ together with `--limit`) is rejected with a usage error.
 
 ## Global options
 
-These options work at any level of the command tree, so the following are
-equivalent:
+Global options work at any level of the command tree, and the later
+one wins when the same option appears more than once:
 
 ```bash
 asana-api --debug tasks get-tasks --project <PID>
 asana-api tasks get-tasks --project <PID> --debug
 ```
 
-When the same option is given at multiple levels, the later one wins.
-
-Every non-extension flag below maps 1:1 to a property of
-`asana.Configuration` (or a per-call SDK kwarg) — see
+Run `asana-api --help` for the full list with defaults, or see
 [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md)
-for the exact destination of each.
+for the SDK `Configuration` property each flag maps to.
 
-| Option | Description |
-|--------|-------------|
-| `--access-token TOKEN` | Asana personal access token (default: `$ASANA_ACCESS_TOKEN`) |
-| `--host URL` | Override API base URL (default: `https://app.asana.com/api/1.0`) |
-| `--proxy URL` | HTTP/HTTPS proxy URL |
-| `--verify-ssl / --no-verify-ssl` | Toggle TLS certificate verification (default: True) |
-| `--ssl-ca-cert PATH` | Path to a PEM bundle of trusted CA certificates |
-| `--cert-file PATH` | Client TLS certificate for mTLS |
-| `--key-file PATH` | Client TLS private key for mTLS |
-| `--assert-hostname / --no-assert-hostname` | Toggle urllib3 hostname assertion (tri-state: unspecified → urllib3 default) |
-| `--retry-strategy VALUE` | Override `Configuration.retry_strategy` fields. `VALUE` accepts shorthand (`total=5,backoff_factor=1.5,raise_on_status=false`), a JSON object (`'{"total":5,"status_forcelist":[429,500]}'`), or `@path` to a JSON file. List-typed fields require the JSON form. See [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#structured-value-format) for the field list |
-| `--request-timeout SECONDS` | Per-request timeout in seconds |
-| `--connection-pool-maxsize N` | Max urllib3 connections cached per host (default: cpu_count × 5) |
-| `--temp-folder-path PATH` | Directory for temporary downloads |
-| `--safe-chars-for-path-param S` | Extra characters treated as safe when percent-encoding path parameters |
-| `--logger-format FMT` | Python logging format string for the SDK loggers |
-| `--logger-file PATH` | Path the SDK loggers write to when set |
-| `--multibyte-filenames` | Emit RFC 5987 `filename*=UTF-8''<percent-encoded>` on multipart uploads so Asana decodes non-ASCII attachment filenames correctly |
-| `--debug` | Print HTTP request/response traces to stderr for troubleshooting (`Authorization` values are masked) |
-| `--output-errors {none\|json\|text\|csv\|table}` | How to surface SDK call exceptions (default `none`). `none` lets Python's traceback print to stderr and exits `1` (SDK-parity baseline). Any other format catches the exception, renders an envelope on **stdout**, exits `3`, and *also* echoes the exception (Python's top-level format, no traceback) to **stderr** so unexpected error shapes stay visible. `ApiException`: 5-field `{exception, status, reason, body, headers}` where `exception` is the FQDN (`"asana.rest.ApiException"`) and `body` is the response *string* (use `.body \| fromjson` in jq to parse). Connection errors (`urllib3.exceptions.MaxRetryError` etc.): 2-field `{exception, reason}`. See [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md) |
-| `--query-errors EXPR` | Apply a `jq` filter to the error envelope (stdout); each yield is rendered per `--output-errors`. Symmetric counterpart of `--query` on the success path. Pairing with the default `none` emits a stderr warning (the filter would do nothing) but the call still runs |
+Coverage at a glance:
+
+- **Auth**: `--access-token` (defaults to `$ASANA_ACCESS_TOKEN`)
+- **Endpoint / network**: `--host`, `--proxy`, `--request-timeout`, `--connection-pool-maxsize`
+- **TLS / mTLS**: `--verify-ssl` / `--no-verify-ssl`, `--ssl-ca-cert`, `--cert-file`, `--key-file`, `--assert-hostname`
+- **Retry**: `--retry-strategy` (shorthand, JSON object, or `@file`)
+- **Logging / debug**: `--debug`, `--logger-format`, `--logger-file`
+- **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`, `--multibyte-filenames` (RFC 5987 for non-ASCII attachment filenames)
+- **Structured errors**: `--output-errors {json|text|csv|table}`, `--query-errors EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
+
+A few worth highlighting:
+
+```bash
+# Print HTTP request/response traces to stderr (Authorization masked)
+asana-api --debug tasks get-tasks --project <PID>
+
+# Tune the SDK retry policy from the shell
+asana-api --retry-strategy 'total=5,backoff_factor=1.5' tasks get-tasks --project <PID>
+
+# Catch SDK exceptions as a structured envelope on stdout (exit 3)
+asana-api --output-errors json tasks get-task --task <GID>
+```
 
 Asana only accepts Bearer-token authentication, so `--username`,
 `--password`, `--api-key`, and `--api-key-prefix` are also exposed for
