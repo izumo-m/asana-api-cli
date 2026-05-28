@@ -232,8 +232,9 @@ removed in a future release.
 | `--page-size N` | `--limit N` |
 | `--max-items N` | `--item-limit N` |
 
-Combining a deprecated alias with its v3 counterpart (e.g. `--page-size`
-together with `--limit`) is rejected with a usage error.
+If both a deprecated alias and its replacement are given (e.g.
+`--page-size 50 --limit 100`), the replacement takes precedence and
+the deprecated value is ignored.
 
 ## Global options
 

@@ -62,6 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documentation reorganization.
 
+- Deprecation aliases `--page-size` / `--max-items` no longer reject
+  the combination with their replacements (`--limit` / `--item-limit`).
+  When both are given, the replacement takes precedence and the
+  deprecated value is ignored; the deprecation warning still fires.
+
 ## [3.0.0] - 2026-05-23
 
 ### Breaking changes (v2 → v3)

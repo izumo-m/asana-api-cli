@@ -598,22 +598,18 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 "(will be removed in a future release)",
                 err=True,
             )
-            if kwargs.get("limit") is not None:
-                raise click.UsageError(
-                    "--page-size is the deprecated alias of --limit; specify only one"
-                )
-            kwargs["limit"] = page_size
+            # Canonical --limit wins when both are given.
+            if kwargs.get("limit") is None:
+                kwargs["limit"] = page_size
         if max_items is not None:
             click.echo(
                 "warning: --max-items is deprecated; use --item-limit "
                 "instead (will be removed in a future release)",
                 err=True,
             )
-            if effective_item_limit is not None:
-                raise click.UsageError(
-                    "--max-items is the deprecated alias of --item-limit; specify only one"
-                )
-            effective_item_limit = max_items
+            # Canonical --item-limit wins when both are given.
+            if effective_item_limit is None:
+                effective_item_limit = max_items
 
         if has_body:
             body_value = kwargs.pop("body")  # click marks --body as required

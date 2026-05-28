@@ -282,23 +282,27 @@ class TestDeprecationAliases:
         # Forwarded to the ``item_limit`` kwarg (the v3 --item-limit destination).
         assert mock.call_args_list[0].kwargs == {"item_limit": 100}
 
-    def test_page_size_with_limit_is_usage_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_page_size_with_limit_canonical_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=iter([]))
         result = make_runner().invoke(cmd, ["--page-size", "50", "--limit", "100"])
-        assert result.exit_code != 0
-        assert "alias of --limit" in full_output(result)
-        assert mock.call_count == 0
+        assert result.exit_code == 0, result.stdout + result.stderr
+        # Deprecation warning still fires.
+        assert "--page-size is deprecated" in result.stderr
+        # Canonical --limit (100) wins over deprecated --page-size (50).
+        assert mock.call_args_list[0].args[0]["limit"] == 100
 
-    def test_max_items_with_item_limit_is_usage_error(
+    def test_max_items_with_item_limit_canonical_wins(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         cmd = _build_command("TasksApi", "get_tasks")
-        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=iter([]))
         result = make_runner().invoke(cmd, ["--max-items", "100", "--item-limit", "200"])
-        assert result.exit_code != 0
-        assert "alias of --item-limit" in full_output(result)
-        assert mock.call_count == 0
+        assert result.exit_code == 0, result.stdout + result.stderr
+        # Deprecation warning still fires.
+        assert "--max-items is deprecated" in result.stderr
+        # Canonical --item-limit (200) wins over deprecated --max-items (100).
+        assert mock.call_args_list[0].kwargs == {"item_limit": 200}
 
 
 # ---------------------------------------------------------------------------
