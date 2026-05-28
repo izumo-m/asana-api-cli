@@ -165,8 +165,8 @@ class _Runtime:
     api_key: dict[str, str] | None = None
     api_key_prefix: dict[str, str] | None = None
     retry_strategy_overrides: dict[str, Any] | None = None
-    # Iterator / pagination control. Promoted from per-command (paginatable)
-    # to global in v3.1 — the SDK accepts these uniformly across all methods.
+    # Iterator / pagination control. Global because the SDK accepts these
+    # uniformly across all methods.
     return_page_iterator: bool | None = None
     page_limit: int | None = None
     full_payload: bool = False
@@ -196,8 +196,8 @@ class AsanaSession:
 
         # Apply runtime values to Configuration.
         # ``return_page_iterator`` / ``page_limit`` are read from runtime
-        # like the other Configuration knobs (promoted to globals in v3.1).
-        # Unspecified ⇒ leave the SDK default (True / 100) in place.
+        # like the other Configuration knobs. Unspecified ⇒ leave the SDK
+        # default (True / 100) in place.
         if runtime.return_page_iterator is not None:
             config.return_page_iterator = runtime.return_page_iterator
         if runtime.page_limit is not None:

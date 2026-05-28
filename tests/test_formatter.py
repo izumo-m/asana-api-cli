@@ -568,7 +568,7 @@ class TestScalarText:
 class TestHandleNonApiException:
     """Non-ApiException exceptions (urllib3 connection errors, generic
     Python errors) collapse to ``{exception, reason}`` — no HTTP context
-    fields, since none apply. Plan: docs/sdk-deviations.md (sub-phase 2)."""
+    fields, since none apply."""
 
     @pytest.fixture(autouse=True)
     def _opt_into_envelope(self, monkeypatch: pytest.MonkeyPatch) -> None:

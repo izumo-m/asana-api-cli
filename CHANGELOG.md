@@ -15,21 +15,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Not redacted in `--debug` output** — see [`SECURITY.md`](SECURITY.md)
   for the full caveat.
 - New global flags `--output-errors {none|json|text|csv|table}` and
-  `--query-errors EXPR`. API error responses (JSON) are processed the
-  same way `--output` handles success responses and written to
-  **stdout**; in envelope modes the exception is also echoed to
-  **stderr** (Python's top-level format, no traceback) so unexpected
-  errors stay visible even when `--query-errors` strips them from
-  stdout. Default `none` preserves SDK-native exception behavior.
-  See [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
+  `--query-errors EXPR`. The CLI catches SDK exceptions and always
+  echoes the exception to **stderr** in Python's top-level format
+  (no traceback frames; for `ApiException` this is multi-line and
+  already includes status / reason / headers / body via
+  `ApiException.__str__`). The default `none` then exits `1` with no
+  envelope — the response payload (e.g. the 412 sync-token body in
+  events polling) is readable from stderr without further flags. The
+  other formats additionally render an envelope
+  (`{exception, status, reason, body, headers}` for `ApiException`)
+  on **stdout** and exit `3`, processing the envelope the same way
+  `--output` handles success payloads. `--query-errors EXPR` filters
+  the envelope via `jq`, rendered per `--output-errors`. See
+  [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 - New `--output none` choice (success path). Suppresses the success
   payload for side-effect-only operations (delete, update) where only
   the exit code matters. Symmetric with `--output-errors none`.
   `--query` still runs under `--output none` so jq syntax / runtime
   errors keep surfacing as exit 2 regardless of the format flag.
 - New documentation [`docs/exit-codes.md`](docs/exit-codes.md): success
-  `0`, uncaught exception `1`, user-input error `2`, envelope-rendered
-  API / connection error `3`.
+  `0`, SDK exception with no envelope (default `--output-errors=none`,
+  no traceback) `1`, user-input error `2`, envelope-rendered API /
+  connection error `3`.
 
 ### Changed
 

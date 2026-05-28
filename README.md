@@ -257,7 +257,7 @@ Coverage at a glance:
 - **Retry**: `--retry-strategy` (shorthand, JSON object, or `@file`)
 - **Logging / debug**: `--debug`, `--logger-format`, `--logger-file`
 - **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`, `--multibyte-filenames` (RFC 5987 for non-ASCII attachment filenames)
-- **Structured errors**: `--output-errors {json|text|csv|table}`, `--query-errors EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
+- **Structured errors**: `--output-errors {none|json|text|csv|table}`, `--query-errors EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
 
 A few worth highlighting:
 

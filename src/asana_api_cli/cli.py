@@ -22,14 +22,14 @@ Translation rules:
   generated per-command from the SDK docstring — methods that declare
   them get the corresponding ``--`` flag, others do not. This is the
   natural per-method category.
-* SDK-uniform inputs are exposed globally (v3.1): the boilerplate kwargs
+* SDK-uniform inputs are exposed globally: the boilerplate kwargs
   ``--full-payload``, ``--item-limit``, ``--header-params``, and the
   ``Configuration`` knobs ``--return-page-iterator/--no-return-page-iterator``
   and ``--page-limit`` appear on every command, since the SDK accepts them
   uniformly across all methods.
-* v2.x flags ``--all-items``, ``--page-size``, and ``--max-items`` are
-  retained as per-command deprecation aliases (gated by ``paginatable``)
-  that warn and forward to their v3 replacements.
+* ``--all-items``, ``--page-size``, and ``--max-items`` are retained as
+  per-command deprecation aliases (gated by ``paginatable``) that warn
+  and forward to their replacements.
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
@@ -370,11 +370,11 @@ class _Operation:
     def paginatable(self) -> bool:
         """True iff the SDK method declares a ``limit`` query parameter.
 
-        Used as the gate for the deprecated v2.x alias flags
+        Used as the gate for the deprecated alias flags
         (``--all-items`` / ``--page-size`` / ``--max-items``) which only
         make sense on endpoints that page. The pagination/iterator control
-        flags themselves are global as of v3.1; this predicate stays only
-        until the v2 aliases are removed in a future version.
+        flags themselves are global; this predicate stays only until the
+        deprecated aliases are removed.
         """
         return any(p.name == "limit" for p in self.opts_params)
 
@@ -541,13 +541,13 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
 
     # Pagination/iterator control flags (--full-payload, --item-limit,
     # --return-page-iterator/--no-return-page-iterator, --page-limit) are
-    # global as of v3.1 — defined once on the root and inherited by every
-    # command via ``CommandWithGlobalOptions``. Per-command injection of
-    # those flags is no longer needed.
+    # global — defined once on the root and inherited by every command
+    # via ``CommandWithGlobalOptions``. Per-command injection of those
+    # flags is no longer needed.
     #
-    # Deprecated v2.x aliases remain per-command (gated by ``paginatable``)
+    # Deprecated aliases remain per-command (gated by ``paginatable``)
     # until they are removed. Each emits a stderr warning at runtime and
-    # forwards to the corresponding v3 flag. The option ``name``
+    # forwards to the corresponding replacement flag. The option ``name``
     # (``all_items``, ``page_size``, ``max_items``) is what
     # ``_DEPRECATED_OPTION_NAMES`` matches on.
     if paginatable:
@@ -577,7 +577,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # v2.x deprecated aliases: pop from kwargs (per-command) and warn.
+        # Deprecated aliases: pop from kwargs (per-command) and warn.
         # Effective values fold into local vars without mutating ``runtime``,
         # so the dispatch state stays scoped to this invocation.
         all_items = kwargs.pop("all_items", False) if paginatable else False

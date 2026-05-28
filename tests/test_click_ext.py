@@ -225,10 +225,11 @@ class TestGlobalOptionNamesInventory:
             "item_limit",
             "full_payload",
             "header_params",
-            # v3.1: error output controls. output_errors picks the envelope
-            # format on stderr (json default; text/csv/table mirror --output);
-            # query_errors filters via jq, rendered per output_errors.
-            # See docs/exit-codes.md / docs/sdk-deviations.md.
+            # v3.1: error output controls. output_errors picks how
+            # SDK exceptions surface (default 'none': stderr echo + exit
+            # 1; json/text/csv/table: same stderr echo + envelope on
+            # stdout + exit 3). query_errors filters the envelope via
+            # jq. See docs/exit-codes.md / docs/sdk-deviations.md.
             "output_errors",
             "query_errors",
         ]
