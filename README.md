@@ -1,28 +1,40 @@
 # asana-api-cli
 
-A CLI that exposes **every method of the official
-[`python-asana`](https://github.com/Asana/python-asana) SDK** as
-`asana-api <group> <command>`. The command tree is generated at runtime
-from the installed `asana` package, automatically tracking whatever
-SDK version is installed in the same environment.
+Call any Asana endpoint from your shell — no throwaway Python script
+needed. `asana-api <group> <command>` turns **every method of the official
+[`python-asana`](https://github.com/Asana/python-asana) SDK** into a
+command, so you can read, create, and inspect Asana data one line at a time.
+
+And because each command maps 1:1 to an SDK method, the call you work out in
+the shell is the call you write in Python:
+
+```bash
+# Work it out interactively...
+asana-api tasks get-tasks --project 123 --opt-fields name,assignee.name
+```
+
+```python
+# ...then drop the same call into your app:
+asana.TasksApi(client).get_tasks({"project": "123", "opt_fields": "name,assignee.name"})
+```
 
 ## Why asana-api-cli
 
-- **Complete SDK coverage, locked to your SDK version.** Every method of
-  every `*Api` class in `python-asana` becomes a CLI command. Because the
-  tree is introspected at startup from whatever `asana` is installed in
-  the same environment, the CLI surface matches the SDK version pinned in
-  your project — new upstream methods surface the moment `pip install -U
-  asana` lands, with no `asana-api-cli` release required.
-- **SDK-compatible arguments and output.** Command arguments map to
-  `python-asana` method parameters (hyphens become underscores, group
-  names map back to PascalCase `*Api` class names), and JSON output
-  matches the SDK's response shape.
-- **Prototype in the shell, ship in Python.** Iterate from the command
-  line — try different arguments, inspect the response, refine until you
-  understand the endpoint. Then translate the verified call into the
-  equivalent `python-asana` invocation in your application code, with
-  far fewer surprises when you wire it in.
+- **Explore the whole API from the shell.** Every method of every `*Api`
+  class is a command — list tasks, create a project, poll events — with no
+  script and no boilerplate.
+- **What you learn transfers to Python.** Flags map to SDK method
+  parameters, and JSON output matches the SDK's response shape — so a
+  working shell call becomes a working SDK call. Each option's `--help`
+  even names where its value lands in the SDK.
+- **Always matches your SDK version.** The command tree is built at startup
+  by introspecting the installed `asana` package. Install it beside your
+  project's SDK and the two stay in lock-step — new upstream methods appear
+  the moment `pip install -U asana` lands, with no `asana-api-cli` release
+  and no stale docs.
+- **Shell-native ergonomics.** JSON / table / CSV / text output, `jq`
+  filtering (`--query`), automatic pagination, structured error envelopes,
+  and `--debug` request tracing with the auth token masked.
 
 ## Installation
 
