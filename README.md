@@ -107,14 +107,14 @@ The token can be issued from the
 No token is needed for `--help` or argument validation errors.
 
 ```bash
-export ASANA_ACCESS_TOKEN="1/12345..."
+export ASANA_ACCESS_TOKEN="2/12345..."
 export ASANA_DEFAULT_WORKSPACE="12345678"   # optional
 ```
 
 On Windows PowerShell:
 
 ```powershell
-$env:ASANA_ACCESS_TOKEN = "1/12345..."
+$env:ASANA_ACCESS_TOKEN = "2/12345..."
 $env:ASANA_DEFAULT_WORKSPACE = "12345678"   # optional
 ```
 
