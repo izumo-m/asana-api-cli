@@ -9,94 +9,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `--header-params VALUE` option (available on every command) sends
-  arbitrary HTTP request headers on the call. Accepts shorthand
-  `'k1=v1,k2=v2,...'`, a JSON
-  object, or `@path/to/file.json` (same input format as `--retry-strategy`).
-  **Not redacted in `--debug` output** — see [`SECURITY.md`](SECURITY.md)
-  for the full caveat.
-- New global flags `--output-errors {none|json|text|csv|table}` and
-  `--query-errors EXPR`. The CLI catches SDK exceptions and always
-  echoes the exception to **stderr** in Python's top-level format
-  (no traceback frames; for `ApiException` this is multi-line and
-  already includes status / reason / headers / body via
-  `ApiException.__str__`). The default `none` then exits `1` with no
-  envelope — the response payload (e.g. the 412 sync-token body in
-  events polling) is readable from stderr without further flags. The
-  other formats additionally render an envelope
-  (`{exception, status, reason, body, headers}` for `ApiException`)
-  on **stdout** and exit `3`, processing the envelope the same way
-  `--output` handles success payloads. `--query-errors EXPR` filters
-  the envelope via `jq`, rendered per `--output-errors`. See
+- **Structured error handling** — new global flags `--output-errors
+  {none|json|text|csv|table}` and `--query-errors EXPR`. The SDK exception is
+  always echoed to **stderr** in Python's top-level format (no traceback; for
+  `ApiException` this already includes status / reason / headers / body). The
+  default `none` exits `1` with no envelope, so the response payload (e.g. the
+  412 sync-token body in events polling) is readable from stderr without extra
+  flags. The other formats also render a `{exception, status, reason, body,
+  headers}` envelope on **stdout** and exit `3`; `--query-errors` filters that
+  envelope through `jq`. See [`docs/exit-codes.md`](docs/exit-codes.md) and
   [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
-- New `--output none` choice (success path). Suppresses the success
-  payload for side-effect-only operations (delete, update) where only
-  the exit code matters. Symmetric with `--output-errors none`.
-  `--query` still runs under `--output none` so jq syntax / runtime
-  errors keep surfacing as exit 2 regardless of the format flag.
-- New documentation [`docs/exit-codes.md`](docs/exit-codes.md): success
-  `0`, SDK exception with no envelope (default `--output-errors=none`,
-  no traceback) `1`, user-input error `2`, envelope-rendered API /
-  connection error `3`.
+
+- **`--output none`** suppresses the success payload for side-effect-only
+  operations (delete, update) where only the exit code matters. `--query` still
+  runs, so a broken jq expression still surfaces as exit `2`. Symmetric with
+  `--output-errors none`.
+
+- **`--header-params VALUE`** (on every command) sends arbitrary HTTP request
+  headers. Accepts shorthand `'k1=v1,k2=v2,...'`, a JSON object, or
+  `@path/to/file.json` (same format as `--retry-strategy`). **Not redacted in
+  `--debug` output** — see [`SECURITY.md`](SECURITY.md).
 
 ### Changed
 
-- Every option's `--help` now ends with a label naming where its value
-  lands in the `python-asana` SDK, so you can map any CLI flag straight to
-  the API: `(Configuration: <name>)` for client config (the global flags),
-  `(SDK arg: <name>)` for positional arguments (`--body`, path GIDs, and
-  `--workspace` when it is a path parameter), `(opts: <name>)` for the
-  method's `opts` dict (query filters such as `--assignee` / `--opt-fields`),
-  `(kwarg: <name>)` for the boilerplate per-call kwargs (`--item-limit`,
-  `--full-payload`, `--header-params`, `--request-timeout`), and
-  `(asana-api extension)` for CLI-only flags. Path-GID options that 2.1.1
-  labeled `(SDK kwarg: task_gid)` are now labeled `(SDK arg: task_gid)` —
-  they are positional arguments, not kwargs.
+- **Option `--help` now names the SDK destination.** Every option ends with a
+  label showing where its value lands in `python-asana`: `(Configuration:
+  <name>)` for client config (global flags), `(SDK arg: <name>)` for positional
+  arguments (`--body`, path GIDs, `--workspace` when positional), `(opts:
+  <name>)` for the method's `opts` dict (`--assignee`, `--opt-fields`, ...),
+  `(kwarg: <name>)` for per-call kwargs, and `(asana-api extension)` for
+  CLI-only flags. (Path GIDs that 2.1.1 labeled `(SDK kwarg: ...)` are now
+  `(SDK arg: ...)` — they are positional arguments, not kwargs.)
 
-- Exit codes for failures changed: see
+- **Iteration / per-call controls grouped by SDK scope.** The `Configuration`
+  knobs `--page-limit` and `--return-page-iterator / --no-return-page-iterator`
+  stay **global**. The per-call kwargs `--item-limit`, `--full-payload`,
+  `--header-params`, and `--request-timeout` are now **options on every command**
+  (the SDK accepts them on every method). `--request-timeout` was previously a
+  global flag.
+
+- **`--multibyte-filenames` is now a per-command option on file-upload commands**
+  (e.g. `attachments create-attachment-for-object`), not a global flag — it only
+  ever affected multipart uploads. Still opt-in, off by default.
+
+- **Failure exit codes changed** — `1` / `2` / `3` by error class. See
   [`docs/exit-codes.md`](docs/exit-codes.md).
 
-- `--output text` / `--output csv` / `--output table` now render nested
-  dict / list cell values as JSON strings (`{"a":"b"}`) rather than
-  Python `repr` (`{'a': 'b'}`). The same applies to `--output-errors`.
+- **Nested values in `--output text` / `csv` / `table`** now render as JSON
+  (`{"a":"b"}`) rather than Python `repr` (`{'a': 'b'}`). Same for
+  `--output-errors`.
 
-- Iteration / per-call controls are organized by SDK scope. The
-  `Configuration` knobs `--page-limit` and
-  `--return-page-iterator / --no-return-page-iterator` are **global** flags
-  (client-wide). The per-call kwargs — `--item-limit`, `--full-payload`,
-  `--header-params`, and `--request-timeout` — are **common options on every
-  command** (the SDK accepts them on every method; no-op where they don't
-  apply). `--request-timeout`, previously a global flag, is now one of these
-  per-command options.
+- **Auto-iteration is driven by the SDK return type.** Paged responses are
+  walked when the SDK returns an iterator, rather than by a per-method
+  pre-judgement in the CLI. Behavior is unchanged for existing methods, and the
+  CLI no longer needs an update when an SDK release changes a method's
+  pagination shape.
 
-- `--multibyte-filenames` is now a **per-command option on file-upload
-  commands** (e.g. `attachments create-attachment-for-object`) rather than a
-  global flag. It only ever affected multipart uploads, so it no longer appears
-  on every command's `--help`; pass it among the upload command's own options.
-  Behavior is unchanged — still opt-in, off by default.
+- **Deprecation aliases now combine with their replacements.** `--page-size` /
+  `--max-items` no longer error when given alongside `--limit` / `--item-limit`;
+  the replacement wins and the deprecation warning still fires.
 
-- Auto-iteration of paged responses is now triggered by the SDK's actual
-  return value (an iterator) rather than by a per-method pre-judgement
-  in the CLI. Current behavior is unchanged for every existing SDK
-  method; the CLI no longer needs an update when an SDK release adds or
-  changes a method's pagination shape.
-
-- Documentation reorganization.
-
-- Deprecation aliases `--page-size` / `--max-items` no longer reject
-  the combination with their replacements (`--limit` / `--item-limit`).
-  When both are given, the replacement takes precedence and the
-  deprecated value is ignored; the deprecation warning still fires.
+- **Documentation reorganized.**
 
 ### Removed
 
-- Removed the inert auth flags `--username`, `--password`, `--api-key`, and
+- **Removed the inert auth flags** `--username`, `--password`, `--api-key`, and
   `--api-key-prefix`. Asana authenticates with Bearer tokens only (personal
-  access token / Service Account / OAuth); these four were swagger-codegen
-  `Configuration` fields for HTTP basic auth and deprecated API keys that
-  Asana's API never reads, so passing them did nothing. Use `--access-token`
-  (or `$ASANA_ACCESS_TOKEN`). See
-  [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
+  access token / Service Account / OAuth); these were swagger-codegen
+  `Configuration` fields (HTTP basic auth / deprecated API keys) that Asana
+  never reads, so passing them did nothing. Use `--access-token` (or
+  `$ASANA_ACCESS_TOKEN`). See [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 
 ## [3.0.0] - 2026-05-23
 
