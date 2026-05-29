@@ -13,7 +13,7 @@ flags switch to live API access; see [Running](#running) below.
 | `test_smoke.py` | Single-workspace `get-workspace`; list `get-workspaces` (account-shape tolerant). |
 | `test_pagination.py` | Every paginatable-command flag exposed by `tasks get-tasks` (`--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`) and the v2 deprecation aliases. |
 | `test_crud.py` | `project` and `task` create → get → update → delete. |
-| `test_attachments.py` | Attachment upload / get / delete across ASCII / Japanese text / binary content and Japanese filenames (the latter via the `--multibyte-filenames` flag). |
+| `test_attachments.py` | Attachment upload / get / delete across ASCII / Japanese text / binary content and Japanese filenames (the latter via the upload command's `--multibyte-filenames` option). |
 | `test_events.py` | `events get-events` sync-token cycle: 412 bootstrap (`--output-errors json` → envelope on stdout, exit 3) → trigger → poll (`--full-payload`). Exercises the v3.1 `--output-errors` + `--full-payload` combination needed to surface the fresh sync token. |
 | `test_webhooks.py` | `webhooks` group lifecycle: create (workspace subscribe with `project added`/`deleted` filters) → list → get → trigger events (create + delete a project) → assert events arrived at the receiver → delete → list again. **Live only, opt-in** — Asana's `X-Hook-Secret` handshake POST flows Asana → receiver, outside vcrpy's CLI → Asana hook, so cassettes cannot replay it. The fixture spawns a Cloudflare Quick Tunnel (`cloudflared tunnel --url`) and an in-process receiver. |
 
@@ -256,7 +256,8 @@ Asana's attachment endpoint requires the RFC 5987
 correctly decode non-ASCII filenames. The upstream `python-asana` SDK
 (via urllib3) does not emit it, so non-ASCII filenames get garbled by
 default. The CLI ships an opt-in workaround: pass
-`--multibyte-filenames` to the `asana-api` invocation, which installs a
+`--multibyte-filenames` to the upload command (a per-command option on
+file-upload commands, not a global flag), which installs a
 session-scoped patch on `urllib3.fields.RequestField.make_multipart`
 that adds `filename*=` when the filename has non-ASCII bytes.
 

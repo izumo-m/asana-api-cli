@@ -41,8 +41,9 @@ class MultibyteFilenameSupport:
     2022-12, unresolved as of 2026-05).
 
     Off by default to preserve strict SDK parity. The CLI enables it
-    when ``--multibyte-filenames`` is set; library callers can use it
-    standalone::
+    when ``--multibyte-filenames`` is passed to an upload command (e.g.
+    ``attachments create-attachment-for-object`` — the flag is exposed
+    only on upload commands); library callers can use it standalone::
 
         with MultibyteFilenameSupport():
             # urllib3-based uploads in this block emit filename*=
@@ -150,6 +151,10 @@ class _Runtime:
     ssl_ca_cert: str | None = None
     access_token: str | None = None
     temp_folder_path: str | None = None
+    # Set by the upload command's per-command ``--multibyte-filenames`` flag
+    # (``cli.py:_make_command``), not a global option. Kept here because the
+    # session reads it to decide whether to install ``MultibyteFilenameSupport``;
+    # non-upload commands leave it at this default.
     multibyte_filenames: bool = False
     logger_format: str | None = None
     logger_file: str | None = None

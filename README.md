@@ -269,12 +269,18 @@ Coverage at a glance:
 - **TLS / mTLS**: `--verify-ssl` / `--no-verify-ssl`, `--ssl-ca-cert`, `--cert-file`, `--key-file`, `--assert-hostname`
 - **Retry**: `--retry-strategy` (shorthand, JSON object, or `@file`)
 - **Logging / debug**: `--debug`, `--logger-format`, `--logger-file`
-- **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`, `--multibyte-filenames` (RFC 5987 for non-ASCII attachment filenames)
+- **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`
 - **Structured errors**: `--output-errors {none|json|text|csv|table}`, `--query-errors EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
 
 `--request-timeout`, `--header-params`, `--item-limit`, and `--full-payload`
 are **not** global: they are per-call SDK kwargs (the method `all_params`),
 exposed as options on every command and forwarded straight to the SDK call.
+
+`--multibyte-filenames` is likewise **not** global: it is an asana-api
+extension exposed only on file-upload commands (e.g. `attachments
+create-attachment-for-object`). Pass it when an attachment's filename
+contains non-ASCII characters so the upload sends the RFC 5987 `filename*=`
+parameter; off by default to match the SDK.
 
 A few worth highlighting:
 

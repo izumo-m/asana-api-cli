@@ -71,7 +71,6 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
         ["debug", "logger_format", "logger_file", "output_errors", "query_errors"],
     ),
     ("Advanced", ["temp_folder_path", "safe_chars_for_path_param"]),
-    ("CLI extension", ["multibyte_filenames"]),
 ]
 
 GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
@@ -220,17 +219,6 @@ def _make_global_option_params() -> list[click.Option]:
             ),
         ),
         click.Option(
-            ["--multibyte-filenames", "multibyte_filenames"],
-            is_flag=True,
-            default=False,
-            help=(
-                "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
-                "attachment uploads whose filename contains non-ASCII characters; "
-                "off by default to match the underlying SDK behavior. "
-                "(asana-api extension)"
-            ),
-        ),
-        click.Option(
             ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
             default=None,
             help=(
@@ -319,8 +307,6 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.logger_file = value
     elif name == "debug":
         runtime.debug = value
-    elif name == "multibyte_filenames":
-        runtime.multibyte_filenames = value
     elif name == "return_page_iterator":
         # No ``is not None`` guard needed here (cf. the symmetric guard in
         # ``cli.py:main`` for the root-level decorator): this function is

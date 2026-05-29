@@ -641,6 +641,72 @@ class TestArgumentForwarding:
         }
 
 
+class TestMultibyteFilenamesUploadFlag:
+    """``--multibyte-filenames`` is a per-command flag on upload commands only.
+
+    It sets ``runtime.multibyte_filenames``, which ``AsanaSession`` reads to
+    install ``MultibyteFilenameSupport`` (the multipart filename patch) for the
+    duration of the call. These tests observe the patch state *during* the SDK
+    call — not just the post-invocation ``runtime`` value — so an ordering bug
+    (the session reading the flag before the callback sets it) cannot pass.
+    Mirrors ``TestDebugRedactorLifecycle``. (Absence from the global flags /
+    non-upload commands is covered in test_cli.py.)
+    """
+
+    def _invoke_capturing_patch_state(
+        self, monkeypatch: pytest.MonkeyPatch, extra_args: list[str]
+    ) -> tuple[Any, bool, bool]:
+        """Invoke the upload command with a stubbed SDK method and report
+        ``(result, installed_during_call, cleaned_up_after)``.
+
+        ``MultibyteFilenameSupport.install`` swaps ``RequestField.make_multipart``
+        for a different function object, so identity against the pristine method
+        is a reliable installed/not-installed probe. The stub runs inside the
+        ``AsanaSession`` ``with`` block, so it samples the patch exactly when a
+        real upload would build its multipart body.
+        """
+        from urllib3.fields import RequestField
+
+        cmd = _build_command("AttachmentsApi", "create_attachment_for_object")
+        pristine = RequestField.make_multipart
+        installed_during_call: list[bool] = []
+
+        def stub(self_api: Any, *args: Any, **kwargs: Any) -> Any:
+            installed_during_call.append(RequestField.make_multipart is not pristine)
+            return {"data": {"gid": "A1"}}
+
+        monkeypatch.setattr(asana.AttachmentsApi, "create_attachment_for_object", stub)
+        try:
+            result = make_runner().invoke(cmd, ["--parent", "P", "--file", "x.png", *extra_args])
+            cleaned_up_after = RequestField.make_multipart is pristine
+        finally:
+            # Defensive: never leak the patch into a sibling test if the session
+            # failed to uninstall (cf. TestDebugRedactorLifecycle restoring
+            # http.client.print). Done after sampling cleaned_up_after so a real
+            # uninstall regression still surfaces.
+            RequestField.make_multipart = pristine  # pyright: ignore[reportAttributeAccessIssue]
+        assert len(installed_during_call) == 1, full_output(result)
+        return result, installed_during_call[0], cleaned_up_after
+
+    def test_flag_installs_patch_during_upload_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, installed_during, cleaned_after = self._invoke_capturing_patch_state(
+            monkeypatch, ["--multibyte-filenames"]
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert installed_during is True  # patch was active while the SDK call ran
+        assert cleaned_after is True  # session uninstalled it on exit (no leak)
+        assert runtime.multibyte_filenames is True
+
+    def test_absent_flag_does_not_install_patch(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, installed_during, cleaned_after = self._invoke_capturing_patch_state(
+            monkeypatch, []
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert installed_during is False  # no patch installed when the flag is absent
+        assert cleaned_after is True
+        assert runtime.multibyte_filenames is False
+
+
 # ---------------------------------------------------------------------------
 # Workspace resolution
 # ---------------------------------------------------------------------------

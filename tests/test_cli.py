@@ -614,7 +614,6 @@ class TestRootGroup:
             "--logger-format",
             "--logger-file",
             "--debug",
-            "--multibyte-filenames",
         ]
         if _SDK_HAS_RETRY_STRATEGY:
             expected_flags.append("--retry-strategy")
@@ -636,6 +635,26 @@ class TestRootGroup:
         for absent in ("--username", "--password", "--api-key", "--api-key-prefix"):
             assert absent not in flags, f"{absent} should be removed (inert auth)"
         assert "--access-token" in flags
+
+    def test_multibyte_filenames_scoped_to_upload_command(
+        self,
+        upload_attachment_cmd: click.Command,
+        get_tasks_cmd: click.Command,
+    ) -> None:
+        # --multibyte-filenames moved from a global flag to a per-command
+        # option present only on upload commands (those declaring a ``file``
+        # opt — i.e. the one multipart endpoint). It must be absent from the
+        # root globals and from non-upload commands, and present on the upload
+        # command labeled as an asana-api extension.
+        assert "--multibyte-filenames" not in _option_flags(main)
+        assert "--multibyte-filenames" not in _option_flags(get_tasks_cmd)
+        assert "--multibyte-filenames" in _option_flags(upload_attachment_cmd)
+        param = next(
+            p
+            for p in upload_attachment_cmd.params
+            if isinstance(p, click.Option) and "--multibyte-filenames" in p.opts
+        )
+        assert (param.help or "").rstrip().endswith("(asana-api extension)")
 
     def test_subgroup_help_resolves(self) -> None:
         # Resolving a subgroup must trigger lazy method introspection.

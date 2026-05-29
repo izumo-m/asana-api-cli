@@ -18,6 +18,14 @@ property would otherwise go unnoticed. These two tests pin both sets so such a
 bump fails loudly and forces a conscious classification — a global flag
 (Configuration) or a common per-command ``(kwarg: ...)`` option, with the
 matching SDK-destination label (see ``docs/cli-sdk-mapping.md``).
+
+A third guard pins which methods perform a multipart file upload. The CLI
+exposes the ``--multibyte-filenames`` extension flag only on upload commands,
+detected at runtime by a cheap proxy (an op declaring a ``file`` opt — see
+``_Operation.does_upload``). ``test_upload_detection_matches_multipart_population``
+proves that proxy equals the true signal (a source scan for assignment into
+``local_var_files``), so a future SDK that adds or renames an upload endpoint
+fails here rather than silently dropping the flag from a command that needs it.
 """
 
 from __future__ import annotations
@@ -29,6 +37,8 @@ from collections.abc import Iterator
 from typing import Any
 
 import asana
+
+from asana_api_cli.cli import _enumerate_api_classes, _operations_for
 
 # Identical across all ``*_with_http_info`` methods in python-asana 5.2.4.
 EXPECTED_ALL_PARAMS: frozenset[str] = frozenset(
@@ -80,6 +90,16 @@ EXPECTED_CONFIGURATION_ATTRS: frozenset[str] = frozenset(
     }
 )
 
+# The one python-asana method that performs a multipart file upload — i.e. it
+# assigns into ``local_var_files`` (every other method has only the empty
+# ``local_var_files = {}`` boilerplate). The CLI exposes ``--multibyte-filenames``
+# only on upload commands, detected at runtime by a cheap proxy (an op declaring
+# a ``file`` opt; see ``_Operation.does_upload``). This anchor plus the
+# proxy-equality check below pin that proxy to the true multipart signal.
+EXPECTED_MULTIPART_UPLOAD_METHODS: frozenset[tuple[str, str]] = frozenset(
+    {("AttachmentsApi", "create_attachment_for_object")}
+)
+
 
 def _all_params_for(func: Any) -> frozenset[str]:
     """Collect the ``all_params.append('x')`` string literals from a method body.
@@ -112,6 +132,46 @@ def _with_http_info_methods() -> Iterator[tuple[str, str, Any]]:
                 yield cls_name, method_name, vars(cls)[method_name]
 
 
+def _methods_populating_local_var_files() -> set[tuple[str, str]]:
+    """Methods whose ``*_with_http_info`` source writes into ``local_var_files``.
+
+    A subscript write — ``local_var_files['file'] = ...`` (assignment) or an
+    augmented assignment — is the true "this method sends multipart/form-data
+    with a file" signal, as opposed to the universal ``local_var_files = {}``
+    initializer (a plain ``Name`` target, not a subscript). Returns
+    ``(ApiClassName, public_method_name)`` pairs.
+    """
+    suffix = "_with_http_info"
+    out: set[tuple[str, str]] = set()
+    for cls_name, method_name, func in _with_http_info_methods():
+        tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+            elif isinstance(node, ast.AugAssign):
+                targets = [node.target]
+            else:
+                continue
+            for target in targets:
+                if (
+                    isinstance(target, ast.Subscript)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "local_var_files"
+                ):
+                    out.add((cls_name, method_name[: -len(suffix)]))
+    return out
+
+
+def _upload_ops_via_does_upload() -> set[tuple[str, str]]:
+    """Methods the runtime classifies as uploads via ``_Operation.does_upload``."""
+    out: set[tuple[str, str]] = set()
+    for cls in _enumerate_api_classes():
+        for op in _operations_for(cls):
+            if op.does_upload:
+                out.add((cls.__name__, op.method_name))
+    return out
+
+
 def test_all_methods_share_expected_all_params() -> None:
     offenders: dict[str, list[str]] = {}
     count = 0
@@ -140,4 +200,26 @@ def test_configuration_settable_attrs_match() -> None:
         "A newly settable property likely needs a global flag + "
         "(Configuration: <name>) label in cli.py / click_ext.py. "
         "See docs/cli-sdk-mapping.md."
+    )
+
+
+def test_upload_detection_matches_multipart_population() -> None:
+    multipart = _methods_populating_local_var_files()
+    assert multipart, "no method populates local_var_files — SDK introspection broke"
+    assert multipart == EXPECTED_MULTIPART_UPLOAD_METHODS, (
+        "the set of multipart-upload methods drifted:\n"
+        f"  added:   {sorted(multipart - EXPECTED_MULTIPART_UPLOAD_METHODS)}\n"
+        f"  removed: {sorted(EXPECTED_MULTIPART_UPLOAD_METHODS - multipart)}\n"
+        "A new/renamed upload endpoint must get the per-command "
+        "--multibyte-filenames flag (cli.py:_make_command, gated by "
+        "_Operation.does_upload). See docs/sdk-deviations.md."
+    )
+    via_proxy = _upload_ops_via_does_upload()
+    assert via_proxy == multipart, (
+        "_Operation.does_upload (the 'has a file opt' proxy) no longer matches "
+        "the methods that actually populate local_var_files:\n"
+        f"  proxy-only:     {sorted(via_proxy - multipart)}\n"
+        f"  multipart-only: {sorted(multipart - via_proxy)}\n"
+        "Update the does_upload predicate in cli.py so --multibyte-filenames "
+        "lands on exactly the upload commands."
     )

@@ -13,7 +13,8 @@ this one documents the parity points.
 - The `formatted` decorator's options in `formatter.py`.
 - Common per-command options injected by `_make_command` in `cli.py`: the
   boilerplate per-call kwargs (`_make_per_call_kwarg_options`) on **every**
-  command, and the pagination deprecation aliases on paginatable commands only.
+  command, the pagination deprecation aliases on paginatable commands only,
+  and the `--multibyte-filenames` extension on upload commands only.
 
 **Excluded** — options that are *generated at runtime* by introspecting
 each SDK method's docstring `:param` lines (`opt_fields`, `workspace`,
@@ -70,7 +71,6 @@ not only here. See [`architecture.md`](architecture.md#sdk-destination-labels).
 | `--logger-format FMT` | `Configuration.logger_format` | Direct property |
 | `--logger-file PATH` | `Configuration.logger_file` | Direct property |
 | `--debug` | `Configuration.debug = True` | Direct property. Also installs `HttpClientAuthRedactor` — a security override per [constitution #2](principles.md#constitution); see [`sdk-deviations.md`](sdk-deviations.md) "Personal access token in --debug output" |
-| `--multibyte-filenames` | *(none)* | CLI-only. Installs `MultibyteFilenameSupport` which patches `urllib3.fields.RequestField.make_multipart` to emit RFC 5987 `filename*=UTF-8''<percent-encoded>`. Cataloged in [`sdk-deviations.md`](sdk-deviations.md) |
 | `--output-errors {none\|json\|text\|csv\|table}` | *(none)* | CLI-only. The exception is always echoed to **stderr** in Python's top-level format (no traceback) — for `ApiException` this includes status / reason / headers / body. Default `none` then exits `1` with no envelope; any other format additionally renders on **stdout** and exits `3`, reusing the success-path `_format_output`. See [`sdk-deviations.md`](sdk-deviations.md) for the schema and [`exit-codes.md`](exit-codes.md) for exit codes |
 | `--query-errors EXPR` | *(none)* | CLI-only. Applies a `jq` filter to the error envelope; each yield is rendered per `--output-errors`. Pairing with the default `none` warns to stderr (the filter is a no-op) but does not block the call |
 
@@ -158,3 +158,16 @@ Scheduled for removal in a future release.
 | `--all-items` | *(no-op)* | *(none)* — walking every page is now the default; was a CLI-only feature in v2 with no SDK counterpart |
 | `--page-size N` | `--limit N` | SDK `opts["limit"]` (auto-generated from docstring) |
 | `--max-items N` | `--item-limit N` | per-call kwarg `item_limit` |
+
+## Upload-command extension (`_make_command`)
+
+Present only on commands that perform a multipart file upload — detected at
+runtime by `_Operation.does_upload` (an op declaring a `file` opt; the sole
+such command today is `attachments create-attachment-for-object`). Off by
+default to preserve strict SDK parity; the proxy is held exact by
+`tests/test_sdk_boilerplate.py` (a whole-SDK source scan for `local_var_files`
+population).
+
+| Flag | SDK destination | Mapping mechanism |
+|---|---|---|
+| `--multibyte-filenames` | *(none)* | CLI-only. *Patch*: installs `MultibyteFilenameSupport`, patching `urllib3.fields.RequestField.make_multipart` to emit RFC 5987 `filename*=UTF-8''<percent-encoded>` for non-ASCII basenames. Set via `runtime` in the upload command's callback; applied in `AsanaSession.__init__`. Cataloged in [`sdk-deviations.md`](sdk-deviations.md) |

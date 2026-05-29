@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   apply). `--request-timeout`, previously a global flag, is now one of these
   per-command options.
 
+- `--multibyte-filenames` is now a **per-command option on file-upload
+  commands** (e.g. `attachments create-attachment-for-object`) rather than a
+  global flag. It only ever affected multipart uploads, so it no longer appears
+  on every command's `--help`; pass it among the upload command's own options.
+  Behavior is unchanged — still opt-in, off by default.
+
 - Auto-iteration of paged responses is now triggered by the SDK's actual
   return value (an iterator) rather than by a per-method pre-judgement
   in the CLI. Current behavior is unchanged for every existing SDK

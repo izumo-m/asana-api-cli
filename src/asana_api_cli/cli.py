@@ -411,6 +411,23 @@ class _Operation:
         """
         return any(p.name == "limit" for p in self.opts_params)
 
+    @property
+    def does_upload(self) -> bool:
+        """True iff the SDK method performs a multipart file upload.
+
+        Detected by the presence of a ``file`` opt — a cheap proxy for "the
+        method populates ``local_var_files`` / sends ``multipart/form-data``".
+        The only such method in python-asana is
+        ``attachments create-attachment-for-object``. The proxy is held exact
+        by ``tests/test_sdk_boilerplate.py`` (a source scan of the whole SDK),
+        so a future SDK that adds or renames an upload endpoint trips that
+        guard rather than silently misclassifying the command.
+
+        Gates the per-command ``--multibyte-filenames`` extension flag, which
+        only affects multipart uploads whose filename is non-ASCII.
+        """
+        return any(p.name == "file" for p in self.opts_params)
+
 
 def _extract_operation(method_name: str, fn: object) -> _Operation | None:
     if method_name.startswith("_") or method_name.endswith("_with_http_info"):
@@ -535,6 +552,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     has_body = op.has_body
     opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
     paginatable = op.paginatable
+    does_upload = op.does_upload
 
     ws_opt = next((p for p in opts_params if _is_workspace_param(p.name)), None)
     ws_positional = next((n for n in path_positionals if _is_workspace_param(n)), None)
@@ -643,6 +661,26 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # are ``Configuration`` properties). See ``_make_per_call_kwarg_options``.
     options.extend(_make_per_call_kwarg_options())
 
+    # ``--multibyte-filenames`` is an asana-api extension that toggles the
+    # multipart filename patch (``MultibyteFilenameSupport`` in session.py). It
+    # only affects multipart uploads, so it is exposed solely on upload commands
+    # (``does_upload``) rather than as a global flag. Off by default to preserve
+    # strict SDK parity (the SDK emits ``filename=`` only); see sdk-deviations.md.
+    if does_upload:
+        options.append(
+            click.Option(
+                ["--multibyte-filenames", "multibyte_filenames"],
+                is_flag=True,
+                default=False,
+                help=(
+                    "Emit RFC 5987 filename*=UTF-8'' on this multipart upload. "
+                    "Required when the --file name contains non-ASCII characters; "
+                    "off by default to match the underlying SDK behavior. "
+                    f"{_sdk_dest('extension')}"
+                ),
+            )
+        )
+
     # Deprecated aliases remain per-command (gated by ``paginatable``) until
     # they are removed. Each emits a stderr warning at runtime and forwards to
     # its v3 replacement. The option ``name`` (``all_items`` / ``page_size`` /
@@ -681,6 +719,13 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         full_payload = kwargs.pop("full_payload", False)
         header_params = kwargs.pop("header_params", None)
         request_timeout = kwargs.pop("request_timeout", None)
+
+        # Per-command extension on upload commands only: pop the toggle (so it
+        # does not leak into the opts dict) and set the runtime flag the session
+        # reads when deciding whether to install MultibyteFilenameSupport. Other
+        # commands never expose it, so their runtime value stays the default.
+        if does_upload:
+            runtime.multibyte_filenames = kwargs.pop("multibyte_filenames", False)
 
         # Deprecated aliases: pop from kwargs (per-command) and warn. Effective
         # values fold into local vars without mutating ``runtime``, so the
@@ -1002,18 +1047,6 @@ def _retry_strategy_option(f: Any) -> Any:
     help="Print HTTP request/response to stderr for troubleshooting. (Configuration: debug)",
 )
 @click.option(
-    "--multibyte-filenames",
-    "multibyte_filenames",
-    is_flag=True,
-    default=False,
-    help=(
-        "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
-        "attachment uploads whose filename contains non-ASCII characters; "
-        "off by default to match the underlying SDK behavior. "
-        "(asana-api extension)"
-    ),
-)
-@click.option(
     "--return-page-iterator/--no-return-page-iterator",
     "return_page_iterator",
     default=None,
@@ -1083,7 +1116,6 @@ def main(
     logger_format: str | None = None,
     logger_file: str | None = None,
     debug: bool = False,
-    multibyte_filenames: bool = False,
     return_page_iterator: bool | None = None,
     page_limit: int | None = None,
     output_errors: str = "none",
@@ -1124,7 +1156,6 @@ def main(
     runtime.logger_format = logger_format
     runtime.logger_file = logger_file
     runtime.debug = debug
-    runtime.multibyte_filenames = multibyte_filenames
     if return_page_iterator is not None:
         runtime.return_page_iterator = return_page_iterator
     runtime.page_limit = page_limit
