@@ -172,6 +172,29 @@ class TestAsanaSessionRedactorCleanup:
         # http.client.print is exactly what it was before the failed init.
         assert http.client.__dict__.get("print") is pre_print
 
+    def test_init_failure_in_later_patch_uninstalls_earlier_patch(
+        self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If a *later* patch's ``install()`` raises after the redactor is
+        already installed, ``__init__`` must still uninstall the redactor
+        before re-raising — every install + the ApiClient construction share
+        one try/except. Guards against a global ``http.client.print`` leak
+        when, e.g., a urllib3 change breaks ``MultibyteFilenameSupport``.
+        """
+
+        def _boom(_self: MultibyteFilenameSupport) -> None:
+            raise RuntimeError("simulated multibyte patch failure")
+
+        monkeypatch.setattr(MultibyteFilenameSupport, "install", _boom)
+        monkeypatch.setattr(runtime, "debug", True)
+        monkeypatch.setattr(runtime, "multibyte_filenames", True)
+
+        pre_print = http.client.__dict__.get("print")
+        with pytest.raises(RuntimeError, match="simulated multibyte patch failure"):
+            AsanaSession(token="x" * 20)
+        # The redactor installed before the failing patch was rolled back.
+        assert http.client.__dict__.get("print") is pre_print
+
 
 # ---------------------------------------------------------------------------
 # MultibyteFilenameSupport

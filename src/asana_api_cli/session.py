@@ -232,31 +232,35 @@ class AsanaSession:
                 **runtime.retry_strategy_overrides
             )
 
+        # Install the global patches (debug redactor, multibyte multipart
+        # patch) and construct the ApiClient inside one try/except. If ANY step
+        # raises — including one ``install()`` after another already
+        # succeeded — every patch installed so far is uninstalled before
+        # re-raising. The caller never receives a session to ``close()``, so
+        # cleanup must happen here or a patch leaks for the rest of the process.
+        # Both handles are pre-initialized to ``None`` so the ``except`` can
+        # safely test which patches actually got installed.
         self._redactor: HttpClientAuthRedactor | None = None
-        if runtime.debug:
-            # The SDK debug setter enables http.client.HTTPConnection.debuglevel
-            # and bumps the urllib3/asana loggers to DEBUG. The only path that
-            # leaks the Authorization header is http.client's wire-level
-            # ``print()`` calls — the SDK's own loggers do not log headers.
-            # Install the redactor AFTER the SDK setup so we wrap whatever
-            # http.client.print is at that point.
-            config.debug = True
-            self._redactor = HttpClientAuthRedactor()
-            self._redactor.install()
-
         self._multibyte_filenames: MultibyteFilenameSupport | None = None
-        if runtime.multibyte_filenames:
-            self._multibyte_filenames = MultibyteFilenameSupport()
-            self._multibyte_filenames.install()
-
         try:
+            if runtime.debug:
+                # The SDK debug setter enables http.client.HTTPConnection.debuglevel
+                # and bumps the urllib3/asana loggers to DEBUG. The only path that
+                # leaks the Authorization header is http.client's wire-level
+                # ``print()`` calls — the SDK's own loggers do not log headers.
+                # Install the redactor AFTER the SDK setup so we wrap whatever
+                # http.client.print is at that point.
+                config.debug = True
+                self._redactor = HttpClientAuthRedactor()
+                self._redactor.install()
+
+            if runtime.multibyte_filenames:
+                self._multibyte_filenames = MultibyteFilenameSupport()
+                self._multibyte_filenames.install()
+
             self._config = config
             self._client = asana.ApiClient(config)
         except Exception:
-            # If construction fails after the patches were installed, the
-            # caller never gets a session to call close() on, so undo the
-            # global patches here rather than leaving them leaked for the
-            # rest of the process.
             if self._redactor is not None:
                 self._redactor.uninstall()
                 self._redactor = None
