@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import http.client
-import threading
 from collections.abc import Iterator
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from io import StringIO
 from pathlib import Path
 from typing import Any
 
-import asana
 import pytest
 from urllib3.fields import RequestField
 
@@ -326,70 +323,3 @@ class TestAsanaSessionPaginationKwargs:
     def test_constructor_defaults_match_sdk_defaults(self) -> None:
         with AsanaSession(token="x" * 20) as session:
             assert session.client.configuration.return_page_iterator is True
-
-
-# ---------------------------------------------------------------------------
-# No-op auth properties: --username / --password / --api-key / --api-key-prefix
-#
-# These four CLI flags exist for 1:1 parity with ``asana.Configuration`` but
-# are inert in the python-asana 5.2.4 request path (every ``*Api`` method
-# uses ``auth_settings = ['personalAccessToken']`` only). The disclosure in
-# their ``--help`` text and in ``docs/cli-sdk-mapping.md`` calls this out,
-# but the load-bearing security claim is broader: setting them must also
-# not leak through ``--debug``'s wire-level output. If a future SDK update
-# starts including the values in any header / log / repr, this test fails
-# loudly so the disclosure (and the redactor, if applicable) can catch up.
-# ---------------------------------------------------------------------------
-
-
-class TestNoopAuthPropertiesDoNotLeak:
-    def test_debug_output_contains_none_of_the_canary_values(
-        self,
-        _clean_http_client_print: None,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        # Local mock server: 200 OK for any path, returns a minimal JSON body.
-        class _H(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                body = b'{"data": {"gid": "X", "name": "stub"}}'
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def log_message(self, *_a: Any, **_k: Any) -> None:
-                return
-
-        srv = HTTPServer(("127.0.0.1", 0), _H)
-        port = srv.server_address[1]
-        threading.Thread(target=srv.handle_request, daemon=True).start()
-
-        # Distinctive canaries with no overlap to the access token, the
-        # server response body, or any header value the SDK emits.
-        canaries: dict[str, str] = {
-            "username": "LEAK_CANARY_USERNAME_8675309",
-            "password": "LEAK_CANARY_PASSWORD_8675309",
-            "api_key": "LEAK_CANARY_APIKEY_8675309",
-            "api_key_prefix": "LEAK_CANARY_PREFIX_8675309",
-        }
-
-        # Restoration of these ``runtime`` fields after the test is handled
-        # by the autouse ``_reset_runtime`` fixture in ``tests/conftest.py``.
-        runtime.debug = True
-        runtime.username = canaries["username"]
-        runtime.password = canaries["password"]
-        runtime.api_key = {"k1": canaries["api_key"]}
-        runtime.api_key_prefix = {"k1": canaries["api_key_prefix"]}
-        runtime.host = f"http://127.0.0.1:{port}"
-        with AsanaSession(token="x" * 20) as session:
-            asana.TasksApi(session.client).get_task("X", opts={})
-
-        captured = capsys.readouterr()
-        combined = captured.out + captured.err
-        for name, value in canaries.items():
-            assert value not in combined, (
-                f"--{name.replace('_', '-')} canary ({value!r}) leaked "
-                f"in --debug output; the no-op disclosure is no longer "
-                f"accurate for this python-asana version."
-            )

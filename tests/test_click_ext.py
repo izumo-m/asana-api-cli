@@ -26,11 +26,10 @@ from asana_api_cli.session import runtime
 def _count_option_appearances(output: str, flag: str) -> int:
     """Count distinct appearances of ``flag`` as a standalone token in ``output``.
 
-    Used by tests asserting an option is not duplicated in help. Word
-    boundaries (``\\b``) ensure ``--foo`` does not match inside ``--foo-bar``,
-    and the leading lookbehind for whitespace/start-of-string keeps us from
-    matching, e.g., ``--api-key-prefix`` inside the substring ``api-key``
-    when checking ``--api-key``.
+    Used by tests asserting an option is not duplicated in help. The leading
+    whitespace/start-of-string lookbehind plus the trailing word boundary
+    (``\\b``) match ``flag`` only as a standalone token, not as a substring of
+    a longer flag name or value.
     """
     pattern = r"(?:^|(?<=\s))" + re.escape(flag) + r"\b"
     return len(re.findall(pattern, output, re.MULTILINE))
@@ -128,7 +127,7 @@ class TestHelpRendering:
     def test_globals_appear_exactly_once_in_subcommand_help(self) -> None:
         result = make_runner().invoke(_build_cli(), ["tasks", "act", "--help"])
         assert result.exit_code == 0, full_output(result)
-        for flag in ("--debug", "--access-token", "--username"):
+        for flag in ("--debug", "--access-token", "--host"):
             count = _count_option_appearances(full_output(result), flag)
             assert count == 1, f"{flag} appears {count} times in:\n{full_output(result)}"
 
@@ -150,7 +149,7 @@ class TestHelpRendering:
             )
 
     def test_subcommand_help_uses_compact_global_options_table(self) -> None:
-        # All 21 globals are auto-injected on subcommands via
+        # Every global is auto-injected on subcommands via
         # _make_global_option_params(). The compact form renders them as a
         # one-row-per-category table under a "Global Options:" umbrella with
         # a pointer back to `asana-api --help` for descriptions.
@@ -169,20 +168,6 @@ class TestHelpRendering:
         # must NOT be repeated on the subcommand — the compact form is
         # supposed to skip exactly that.
         assert "Override urllib3 Retry fields" not in full_output(result)
-
-    def test_no_op_section_marks_python_asana_version_on_root(self) -> None:
-        # The long section heading appears on root help (full detail). On
-        # subcommands the compact form abbreviates it via
-        # _COMPACT_SECTION_LABELS, so checking the long form there is wrong.
-        # We exercise the long form by invoking the *real* CLI's root --help,
-        # which declares all 21 globals (the test fixture only declares 3).
-        from asana_api_cli.cli import main
-
-        result = make_runner().invoke(main, ["--help"])
-        assert result.exit_code == 0, full_output(result)
-        assert "No-op (SDK parity placeholders — inert in python-asana 5.2.4):" in full_output(
-            result
-        )
 
 
 class TestShellCompletion:
@@ -206,25 +191,18 @@ class TestGlobalOptionNamesInventory:
             "cert_file",
             "key_file",
             "assert_hostname",
-            "request_timeout",
             "connection_pool_maxsize",
             "access_token",
-            "username",
-            "password",
-            "api_key",
-            "api_key_prefix",
             "temp_folder_path",
             "safe_chars_for_path_param",
             "logger_format",
             "logger_file",
             "multibyte_filenames",
-            # v3.1: pagination / iterator control promoted from per-command
-            # to global, plus header_params for parity with the SDK kwarg.
+            # Configuration-backed iterator knobs stay global. The per-call
+            # kwargs (item_limit / full_payload / header_params /
+            # _request_timeout) are per-command options now, not globals.
             "return_page_iterator",
             "page_limit",
-            "item_limit",
-            "full_payload",
-            "header_params",
             # v3.1: error output controls. output_errors picks how
             # SDK exceptions surface (default 'none': stderr echo + exit
             # 1; json/text/csv/table: same stderr echo + envelope on

@@ -332,14 +332,26 @@ class TestBuiltCommands:
         # Path positional ``task_gid`` becomes ``--task`` (gid suffix stripped).
         assert "--task" in _option_flags(get_task_cmd)
 
-    def test_renamed_positional_help_shows_sdk_kwarg(self, get_task_cmd: click.Command) -> None:
-        # When ``task_gid`` is exposed as ``--task``, the original SDK kwarg
-        # name must appear in the help text so users can map the CLI flag back
-        # to the python-asana API.
+    def test_renamed_positional_help_shows_sdk_arg(self, get_task_cmd: click.Command) -> None:
+        # When ``task_gid`` is exposed as ``--task``, the original SDK
+        # positional-arg name must appear in the help — labeled
+        # ``(SDK arg: task_gid)`` — so users can map the CLI flag back to the
+        # python-asana API. ``task_gid`` is a positional method argument, not
+        # an ``opts`` entry or a kwarg, hence the ``SDK arg`` category.
         task_param = next(
             p for p in get_task_cmd.params if isinstance(p, click.Option) and "--task" in p.opts
         )
-        assert "task_gid" in (task_param.help or "")
+        assert "(SDK arg: task_gid)" in (task_param.help or "")
+
+    def test_opts_param_help_shows_opts_label(self, get_tasks_cmd: click.Command) -> None:
+        # Docstring ``opts`` entries are labeled ``(opts: <name>)`` so users
+        # know the value lands in the SDK method's ``opts`` dict.
+        opt_fields = next(
+            p
+            for p in get_tasks_cmd.params
+            if isinstance(p, click.Option) and "--opt-fields" in p.opts
+        )
+        assert "(opts: opt_fields)" in (opt_fields.help or "")
 
     def test_gid_positional_uses_gid_metavar_and_example(self, get_task_cmd: click.Command) -> None:
         # Per issue #15: the SDK descriptions for ``*_gid`` params are
@@ -367,7 +379,7 @@ class TestBuiltCommands:
         )
         assert body_param.metavar == "JSON"
         help_text = body_param.help or ""
-        for needle in ("inline JSON", "@path", "stdin", '"data"'):
+        for needle in ("inline JSON", "@path", "stdin", '"data"', "(SDK arg: body)"):
             assert needle in help_text, f"--body help missing {needle!r}; got: {help_text!r}"
 
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
@@ -376,8 +388,10 @@ class TestBuiltCommands:
         # SDK method's docstring entries.
         for expected in ("--limit", "--offset"):
             assert expected in flags, f"missing {expected}"
-        # v3.1 global iterator-control flags appear on every command via
-        # CommandWithGlobalOptions; verify they are present here too.
+        # Per-call kwargs (--item-limit / --full-payload) are per-command
+        # options on every command; --page-limit / --no-return-page-iterator
+        # are Configuration-backed globals injected by CommandWithGlobalOptions.
+        # All four appear here.
         for expected in (
             "--page-limit",
             "--item-limit",
@@ -413,15 +427,29 @@ class TestBuiltCommands:
             "--max-items",
         ):
             assert unexpected not in flags, f"{unexpected} should not be on non-paginatable cmd"
-        # v3.1 global flags ARE present on every command (incl. non-paginatable);
-        # the SDK accepts them uniformly via boilerplate kwargs / Configuration.
+        # Per-call kwargs (--item-limit / --full-payload, per-command) and the
+        # Configuration globals (--page-limit / --no-return-page-iterator) are
+        # present on every command incl. non-paginatable ones — the SDK accepts
+        # the kwargs uniformly (all_params) and the Configuration knobs apply
+        # client-wide.
         for expected in (
             "--page-limit",
             "--item-limit",
             "--no-return-page-iterator",
             "--full-payload",
         ):
-            assert expected in flags, f"{expected} should be global on every cmd"
+            assert expected in flags, f"{expected} should be present on every cmd"
+
+    def test_per_call_kwargs_are_per_command_not_global(self, get_tasks_cmd: click.Command) -> None:
+        # The boilerplate per-call kwargs (all_params) are method inputs, so
+        # they render as per-command options — present on a command, absent
+        # from the root. (Configuration-backed --page-limit /
+        # --return-page-iterator stay global; asserted above.)
+        cmd_flags = _option_flags(get_tasks_cmd)
+        root_flags = _option_flags(main)
+        for flag in ("--item-limit", "--full-payload", "--header-params", "--request-timeout"):
+            assert flag in cmd_flags, f"{flag} should be a per-command option"
+            assert flag not in root_flags, f"{flag} should not be a root/global option"
 
     def test_output_query_options_present(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
@@ -579,13 +607,8 @@ class TestRootGroup:
             "--key-file",
             "--assert-hostname",
             "--no-assert-hostname",
-            "--request-timeout",
             "--connection-pool-maxsize",
             "--access-token",
-            "--username",
-            "--password",
-            "--api-key",
-            "--api-key-prefix",
             "--temp-folder-path",
             "--safe-chars-for-path-param",
             "--logger-format",
@@ -603,6 +626,16 @@ class TestRootGroup:
         flags = _option_flags(main)
         for absent in ("--retries", "--timeout", "--ca-cert", "--temp-dir"):
             assert absent not in flags, f"{absent} should be removed"
+
+    def test_inert_auth_options_removed(self) -> None:
+        # --username / --password / --api-key / --api-key-prefix were dropped:
+        # they are inert swagger-codegen Configuration fields with no Asana auth
+        # counterpart (basic auth is unsupported; API keys are deprecated and
+        # being shut off). Only token auth (--access-token) remains.
+        flags = _option_flags(main)
+        for absent in ("--username", "--password", "--api-key", "--api-key-prefix"):
+            assert absent not in flags, f"{absent} should be removed (inert auth)"
+        assert "--access-token" in flags
 
     def test_subgroup_help_resolves(self) -> None:
         # Resolving a subgroup must trigger lazy method introspection.

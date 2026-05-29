@@ -52,7 +52,7 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
     ("Authentication", ["access_token"]),
     (
         "Connection",
-        ["host", "proxy", "request_timeout", "connection_pool_maxsize", "header_params"],
+        ["host", "proxy", "connection_pool_maxsize"],
     ),
     (
         "TLS",
@@ -64,8 +64,6 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
         [
             "return_page_iterator",
             "page_limit",
-            "item_limit",
-            "full_payload",
         ],
     ),
     (
@@ -74,10 +72,6 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
     ),
     ("Advanced", ["temp_folder_path", "safe_chars_for_path_param"]),
     ("CLI extension", ["multibyte_filenames"]),
-    (
-        "No-op (SDK parity placeholders — inert in python-asana 5.2.4)",
-        ["username", "password", "api_key", "api_key_prefix"],
-    ),
 ]
 
 GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
@@ -88,7 +82,6 @@ GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
 # The first column's width is driven by the longest label, so trimming the
 # few longest ones widens the right-hand option column on narrow terminals.
 _COMPACT_SECTION_LABELS: dict[str, str] = {
-    "No-op (SDK parity placeholders — inert in python-asana 5.2.4)": "No-op (inert)",
     "Pagination / iteration": "Pagination",
 }
 
@@ -111,35 +104,42 @@ def _make_global_option_params() -> list[click.Option]:
         click.Option(
             ["--host"],
             default=None,
-            help="Override API base URL (default: https://app.asana.com/api/1.0)",
+            help=(
+                "Override API base URL (default: https://app.asana.com/api/1.0). "
+                "(Configuration: host)"
+            ),
         ),
-        click.Option(["--proxy"], default=None, help="HTTP/HTTPS proxy URL"),
+        click.Option(
+            ["--proxy"],
+            default=None,
+            help="HTTP/HTTPS proxy URL. (Configuration: proxy)",
+        ),
         click.Option(
             ["--verify-ssl/--no-verify-ssl", "verify_ssl"],
             default=None,
             help=(
                 "Verify TLS certificates (default: True). Pass "
                 "--no-verify-ssl to disable (insecure). "
-                "(Configuration.verify_ssl)"
+                "(Configuration: verify_ssl)"
             ),
         ),
         click.Option(
             ["--ssl-ca-cert", "ssl_ca_cert"],
             default=None,
             type=click.Path(exists=True, dir_okay=False),
-            help="Path to a PEM bundle of trusted CA certs. (Configuration.ssl_ca_cert)",
+            help="Path to a PEM bundle of trusted CA certs. (Configuration: ssl_ca_cert)",
         ),
         click.Option(
             ["--cert-file", "cert_file"],
             default=None,
             type=click.Path(exists=True, dir_okay=False),
-            help="Client TLS certificate for mTLS. (Configuration.cert_file)",
+            help="Client TLS certificate for mTLS. (Configuration: cert_file)",
         ),
         click.Option(
             ["--key-file", "key_file"],
             default=None,
             type=click.Path(exists=True, dir_okay=False),
-            help="Client TLS private key for mTLS. (Configuration.key_file)",
+            help="Client TLS private key for mTLS. (Configuration: key_file)",
         ),
         click.Option(
             ["--assert-hostname/--no-assert-hostname", "assert_hostname"],
@@ -147,7 +147,7 @@ def _make_global_option_params() -> list[click.Option]:
             help=(
                 "Verify the server certificate's hostname matches the "
                 "request URL host. Tri-state: unspecified → urllib3 "
-                "default. (Configuration.assert_hostname)"
+                "default. (Configuration: assert_hostname)"
             ),
         ),
         *(
@@ -162,7 +162,7 @@ def _make_global_option_params() -> list[click.Option]:
                         "urllib3 Retry docs. List-typed fields "
                         "(allowed_methods, status_forcelist, "
                         "remove_headers_on_redirect) require JSON. "
-                        "(Configuration.retry_strategy)"
+                        "(Configuration: retry_strategy)"
                     ),
                 ),
             ]
@@ -170,77 +170,54 @@ def _make_global_option_params() -> list[click.Option]:
             else []
         ),
         click.Option(
-            ["--request-timeout", "request_timeout"],
-            type=float,
-            default=None,
-            help="Per-request timeout in seconds. (SDK kwarg: _request_timeout)",
-        ),
-        click.Option(
             ["--connection-pool-maxsize", "connection_pool_maxsize"],
             type=click.IntRange(min=1),
             default=None,
             help=(
                 "Max urllib3 connections cached per host (default: "
-                "cpu_count * 5). (Configuration.connection_pool_maxsize)"
+                "cpu_count * 5). (Configuration: connection_pool_maxsize)"
             ),
         ),
         click.Option(
             ["--access-token", "access_token"],
             default=None,
-            help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)",
-        ),
-        click.Option(
-            ["--username", "username"],
-            default=None,
-            help="Use --access-token. (Configuration.username)",
-        ),
-        click.Option(
-            ["--password", "password"],
-            default=None,
-            help="Use --access-token. (Configuration.password)",
-        ),
-        click.Option(
-            ["--api-key", "api_key"],
-            default=None,
-            callback=click_callback(),
-            help="Use --access-token. (Configuration.api_key)",
-        ),
-        click.Option(
-            ["--api-key-prefix", "api_key_prefix"],
-            default=None,
-            callback=click_callback(),
-            help="Use --access-token. (Configuration.api_key_prefix)",
+            help=(
+                "Asana personal access token (default: $ASANA_ACCESS_TOKEN). "
+                "(Configuration: access_token)"
+            ),
         ),
         click.Option(
             ["--temp-folder-path", "temp_folder_path"],
             default=None,
             type=click.Path(file_okay=False),
-            help="Directory for temporary downloads. (Configuration.temp_folder_path)",
+            help="Directory for temporary downloads. (Configuration: temp_folder_path)",
         ),
         click.Option(
             ["--safe-chars-for-path-param", "safe_chars_for_path_param"],
             default=None,
             help=(
                 "Extra chars treated as safe when percent-encoding path "
-                "parameters. (Configuration.safe_chars_for_path_param)"
+                "parameters. (Configuration: safe_chars_for_path_param)"
             ),
         ),
         click.Option(
             ["--logger-format", "logger_format"],
             default=None,
-            help="Python logging format string. (Configuration.logger_format)",
+            help="Python logging format string. (Configuration: logger_format)",
         ),
         click.Option(
             ["--logger-file", "logger_file"],
             default=None,
             type=click.Path(dir_okay=False),
-            help="Path SDK loggers write to. (Configuration.logger_file)",
+            help="Path SDK loggers write to. (Configuration: logger_file)",
         ),
         click.Option(
             ["--debug"],
             is_flag=True,
             default=False,
-            help="Print HTTP request/response to stderr for troubleshooting",
+            help=(
+                "Print HTTP request/response to stderr for troubleshooting. (Configuration: debug)"
+            ),
         ),
         click.Option(
             ["--multibyte-filenames", "multibyte_filenames"],
@@ -250,7 +227,7 @@ def _make_global_option_params() -> list[click.Option]:
                 "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
                 "attachment uploads whose filename contains non-ASCII characters; "
                 "off by default to match the underlying SDK behavior. "
-                "[asana-api extension]"
+                "(asana-api extension)"
             ),
         ),
         click.Option(
@@ -260,7 +237,7 @@ def _make_global_option_params() -> list[click.Option]:
                 "Toggle the SDK page iterator (default: enabled). With "
                 "--no-return-page-iterator, paginatable endpoints return a "
                 "single {data, next_page} dict from one HTTP call instead of "
-                "auto-walking every page. (Configuration.return_page_iterator)"
+                "auto-walking every page. (Configuration: return_page_iterator)"
             ),
         ),
         click.Option(
@@ -271,40 +248,7 @@ def _make_global_option_params() -> list[click.Option]:
                 "Per-page size when the iterator falls back to Configuration "
                 "(default: 100). Equivalent to --limit on paginatable endpoints; "
                 '--limit (per-call opts["limit"]) takes precedence when both '
-                "are set. (Configuration.page_limit)"
-            ),
-        ),
-        click.Option(
-            ["--item-limit", "item_limit"],
-            type=int,
-            default=None,
-            help=(
-                "Stop after this many items total in iterator mode (kwarg "
-                "item_limit). Silently ignored in --full-payload / "
-                "--no-return-page-iterator modes."
-            ),
-        ),
-        click.Option(
-            ["--full-payload", "full_payload"],
-            is_flag=True,
-            default=False,
-            help=(
-                "Return a single raw payload dict from one HTTP call "
-                "(kwarg full_payload=True). Equivalent to "
-                "--no-return-page-iterator. For events get-events this yields "
-                "{data, sync, has_more} so sync tokens stay reachable from "
-                "shell scripts."
-            ),
-        ),
-        click.Option(
-            ["--header-params", "header_params"],
-            default=None,
-            callback=click_callback(),
-            help=(
-                "Custom HTTP request headers merged into the request "
-                "(kwarg header_params). VALUE: 'k1=v1,k2=v2,...', JSON object, "
-                "or @path. Use cases include Asana-Enable/-Disable deprecation "
-                "opt-in. Not redacted in --debug output — see SECURITY.md."
+                "are set. (Configuration: page_limit)"
             ),
         ),
         click.Option(
@@ -319,7 +263,7 @@ def _make_global_option_params() -> list[click.Option]:
                 "(default) then exits 1 with no envelope. json/text/csv/table "
                 "additionally render an envelope "
                 "(exception/status/reason/body/headers) on stdout and exit 3 "
-                "[asana-api extension]"
+                "(asana-api extension)"
             ),
         ),
         click.Option(
@@ -329,7 +273,7 @@ def _make_global_option_params() -> list[click.Option]:
                 "Apply a jq filter to the error envelope; result is rendered via "
                 "--output-errors. Pairing with the default 'none' emits a stderr "
                 "warning (the filter would be a no-op) but does not block the call "
-                "[asana-api extension]"
+                "(asana-api extension)"
             ),
         ),
     ]
@@ -360,21 +304,11 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.assert_hostname = value
     elif name == "retry_strategy_overrides":
         runtime.retry_strategy_overrides = value
-    elif name == "request_timeout":
-        runtime.request_timeout = value
     elif name == "connection_pool_maxsize":
         runtime.connection_pool_maxsize = value
     elif name == "access_token":
         if value:
             runtime.access_token = value
-    elif name == "username":
-        runtime.username = value
-    elif name == "password":
-        runtime.password = value
-    elif name == "api_key":
-        runtime.api_key = value
-    elif name == "api_key_prefix":
-        runtime.api_key_prefix = value
     elif name == "temp_folder_path":
         runtime.temp_folder_path = value
     elif name == "safe_chars_for_path_param":
@@ -396,12 +330,6 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.return_page_iterator = value
     elif name == "page_limit":
         runtime.page_limit = value
-    elif name == "item_limit":
-        runtime.item_limit = value
-    elif name == "full_payload":
-        runtime.full_payload = value
-    elif name == "header_params":
-        runtime.header_params = value
     elif name == "output_errors":
         runtime.output_errors = value
     elif name == "query_errors":

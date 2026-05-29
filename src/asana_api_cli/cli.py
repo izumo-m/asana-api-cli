@@ -22,11 +22,13 @@ Translation rules:
   generated per-command from the SDK docstring — methods that declare
   them get the corresponding ``--`` flag, others do not. This is the
   natural per-method category.
-* SDK-uniform inputs are exposed globally: the boilerplate kwargs
-  ``--full-payload``, ``--item-limit``, ``--header-params``, and the
-  ``Configuration`` knobs ``--return-page-iterator/--no-return-page-iterator``
-  and ``--page-limit`` appear on every command, since the SDK accepts them
-  uniformly across all methods.
+* The boilerplate per-call kwargs ``--item-limit`` / ``--full-payload`` /
+  ``--header-params`` / ``--request-timeout`` (the SDK's ``all_params``) are
+  common per-command options present on every command — they are method
+  inputs, labeled ``(kwarg: ...)``. The ``Configuration`` knobs
+  ``--return-page-iterator/--no-return-page-iterator`` and ``--page-limit``
+  are global flags. Each option's ``--help`` carries an SDK-destination
+  label; see ``_sdk_dest``.
 * ``--all-items``, ``--page-size``, and ``--max-items`` are retained as
   per-command deprecation aliases (gated by ``paginatable``) that warn
   and forward to their replacements.
@@ -246,6 +248,37 @@ def _escape_help(text: str) -> str:
     return t
 
 
+# SDK-destination labels. Every CLI option's --help ends with a uniform
+# ``(<kind>: <name>)`` suffix naming where its value lands in the python-asana
+# call, so a reader can map the flag back to the SDK. Square brackets are
+# reserved for click's own ``[required]`` / ``[default]`` metadata, so every
+# asana-api label uses parentheses. Five kinds cover the SDK input structure:
+#
+#   (Configuration: <name>)  set on asana.Configuration         (global flags)
+#   (SDK arg: <name>)        positional method argument          (body / path GID / workspace_gid)
+#   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
+#   (kwarg: <name>)          boilerplate **kwargs every method accepts (all_params)
+#   (asana-api extension)    no SDK counterpart                  (CLI-only)
+#
+# Configuration globals and CLI-only formatter flags are hand-written in
+# ``main`` / ``formatted`` / ``_make_global_option_params`` with the matching
+# literal (kept byte-identical between cli.py and click_ext.py by
+# ``test_click_ext.TestHelpTextSync``). This helper builds every label
+# ``_make_command`` derives at runtime: ``arg`` / ``opts`` for path / body /
+# docstring params, ``kwarg`` for the common per-call kwargs, and the
+# extension marker on the deprecated aliases.
+def _sdk_dest(category: str, name: str = "") -> str:
+    if category == "arg":
+        return f"(SDK arg: {name})"
+    if category == "opts":
+        return f"(opts: {name})"
+    if category == "kwarg":
+        return f"(kwarg: {name})"
+    if category == "extension":
+        return "(asana-api extension)"
+    raise ValueError(f"unknown SDK-destination category: {category!r}")
+
+
 # ---------------------------------------------------------------------------
 # Docstring parsing
 # ---------------------------------------------------------------------------
@@ -435,6 +468,60 @@ def _operations_for(api_cls: type) -> list[_Operation]:
 # ---------------------------------------------------------------------------
 
 
+def _make_per_call_kwarg_options() -> list[click.Option]:
+    """Fresh ``click.Option`` instances for the user-facing SDK ``all_params``
+    kwargs, common to every command.
+
+    These are method inputs (the boilerplate ``**kwargs`` every SDK method
+    accepts — see ``tests/test_sdk_boilerplate.py``), so they render as
+    per-command options labeled ``(kwarg: ...)`` rather than global flags.
+    ``--page-limit`` / ``--return-page-iterator`` stay global because they are
+    ``Configuration`` properties, not per-call kwargs. Fresh instances are
+    returned each call because click stores per-command state on Option objects
+    (same reason as ``click_ext._make_global_option_params``).
+    """
+    return [
+        click.Option(
+            ["--item-limit", "item_limit"],
+            type=int,
+            default=None,
+            help=(
+                "Stop after this many items total in iterator mode. Silently "
+                "ignored in --full-payload / --no-return-page-iterator modes. "
+                f"{_sdk_dest('kwarg', 'item_limit')}"
+            ),
+        ),
+        click.Option(
+            ["--full-payload", "full_payload"],
+            is_flag=True,
+            default=False,
+            help=(
+                "Return a single raw payload dict from one HTTP call. "
+                "Equivalent to --no-return-page-iterator. For events get-events "
+                "this yields {data, sync, has_more} so sync tokens stay "
+                f"reachable from shell scripts. {_sdk_dest('kwarg', 'full_payload')}"
+            ),
+        ),
+        click.Option(
+            ["--header-params", "header_params"],
+            default=None,
+            callback=click_callback(),
+            help=(
+                "Custom HTTP request headers merged into the request. VALUE: "
+                "'k1=v1,k2=v2,...', JSON object, or @path. Use cases include "
+                "Asana-Enable/-Disable deprecation opt-in. Not redacted in "
+                f"--debug output — see SECURITY.md. {_sdk_dest('kwarg', 'header_params')}"
+            ),
+        ),
+        click.Option(
+            ["--request-timeout", "request_timeout"],
+            type=float,
+            default=None,
+            help=f"Per-request timeout in seconds. {_sdk_dest('kwarg', '_request_timeout')}",
+        ),
+    ]
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method."""
     # If the SDK method has no ``opts`` parameter, docstring-derived named
@@ -472,10 +559,13 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         if name.endswith("_gid"):
             thing = opt_name.replace("_", " ")
             opt_kwargs["metavar"] = "GID"
-            opt_kwargs["help"] = f"{thing.capitalize()} GID, e.g. 1234567890. (SDK kwarg: {name})"
+            opt_kwargs["help"] = (
+                f"{thing.capitalize()} GID, e.g. 1234567890. {_sdk_dest('arg', name)}"
+            )
         else:
             dp = op.params.get(name)
-            opt_kwargs["help"] = _escape_help(dp.description) if dp else ""
+            desc = _escape_help(dp.description) if dp else ""
+            opt_kwargs["help"] = f"{desc} {_sdk_dest('arg', name)}".strip()
         options.append(click.Option([flag], **opt_kwargs))
 
     # Unified --workspace option. The env-var fallback only applies when the
@@ -483,6 +573,14 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # ``get-tasks``) the CLI deliberately does not auto-fill from the env var,
     # so the help text differs by case.
     if has_workspace:
+        # ``--workspace`` is polymorphic: a positional ``workspace_gid`` on some
+        # endpoints, an ``opts['workspace']`` on others. Label it for whichever
+        # shape this method declares so the SDK destination stays accurate.
+        if ws_positional is not None:
+            ws_label = _sdk_dest("arg", ws_positional)
+        else:
+            assert ws_opt is not None  # has_workspace ⇒ one of the two is set
+            ws_label = _sdk_dest("opts", ws_opt.name)
         ws_help = (
             "Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)"
             if ws_required
@@ -492,7 +590,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             click.Option(
                 ["--workspace"],
                 default=None,
-                help=ws_help,
+                help=f"{ws_help} {ws_label}",
             )
         )
 
@@ -507,7 +605,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
         bp = op.params.get("body")
         sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
-        body_help = f"{sdk_desc} {body_format}".strip()
+        body_help = f"{sdk_desc} {body_format} {_sdk_dest('arg', 'body')}".strip()
         options.append(click.Option(["--body"], required=True, metavar="JSON", help=body_help))
 
     # Remaining opts params (excluding workspace). The SDK-derived help is
@@ -529,6 +627,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             )
         if p.name == "limit":
             help_text = f"{help_text} Use --item-limit to cap the total."
+        help_text = f"{help_text} {_sdk_dest('opts', p.name)}".strip()
         kw: dict[str, Any] = {"help": help_text}
         click_type = _click_type(p.py_type)
         if click_type is not None:
@@ -539,24 +638,22 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             kw["default"] = None
         options.append(click.Option([flag], **kw))
 
-    # Pagination/iterator control flags (--full-payload, --item-limit,
-    # --return-page-iterator/--no-return-page-iterator, --page-limit) are
-    # global — defined once on the root and inherited by every command
-    # via ``CommandWithGlobalOptions``. Per-command injection of those
-    # flags is no longer needed.
-    #
-    # Deprecated aliases remain per-command (gated by ``paginatable``)
-    # until they are removed. Each emits a stderr warning at runtime and
-    # forwards to the corresponding replacement flag. The option ``name``
-    # (``all_items``, ``page_size``, ``max_items``) is what
-    # ``_DEPRECATED_OPTION_NAMES`` matches on.
+    # Boilerplate per-call kwargs (the SDK ``all_params``), common to every
+    # command. ``--page-limit`` / ``--return-page-iterator`` stay global (they
+    # are ``Configuration`` properties). See ``_make_per_call_kwarg_options``.
+    options.extend(_make_per_call_kwarg_options())
+
+    # Deprecated aliases remain per-command (gated by ``paginatable``) until
+    # they are removed. Each emits a stderr warning at runtime and forwards to
+    # its v3 replacement. The option ``name`` (``all_items`` / ``page_size`` /
+    # ``max_items``) is what ``_DEPRECATED_OPTION_NAMES`` matches on.
     if paginatable:
         options.append(
             click.Option(
                 ["--all-items", "all_items"],
                 is_flag=True,
                 default=False,
-                help="No-op; walking every page is now the default.",
+                help=f"No-op; walking every page is now the default. {_sdk_dest('extension')}",
             )
         )
         options.append(
@@ -564,7 +661,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 ["--page-size", "page_size"],
                 type=int,
                 default=None,
-                help="Alias for --limit.",
+                help=f"Alias for --limit. {_sdk_dest('extension')}",
             )
         )
         options.append(
@@ -572,19 +669,27 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 ["--max-items", "max_items"],
                 type=int,
                 default=None,
-                help="Alias for --item-limit.",
+                help=f"Alias for --item-limit. {_sdk_dest('extension')}",
             )
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Deprecated aliases: pop from kwargs (per-command) and warn.
-        # Effective values fold into local vars without mutating ``runtime``,
-        # so the dispatch state stays scoped to this invocation.
+        # Common per-call kwargs (rendered as per-command options above): pop
+        # them into locals so they do not fall through into the opts dict, then
+        # forward to the SDK call below.
+        item_limit = kwargs.pop("item_limit", None)
+        full_payload = kwargs.pop("full_payload", False)
+        header_params = kwargs.pop("header_params", None)
+        request_timeout = kwargs.pop("request_timeout", None)
+
+        # Deprecated aliases: pop from kwargs (per-command) and warn. Effective
+        # values fold into local vars without mutating ``runtime``, so the
+        # dispatch state stays scoped to this invocation.
         all_items = kwargs.pop("all_items", False) if paginatable else False
         page_size = kwargs.pop("page_size", None) if paginatable else None
         max_items = kwargs.pop("max_items", None) if paginatable else None
 
-        effective_item_limit = runtime.item_limit
+        effective_item_limit = item_limit
 
         if all_items:
             click.echo(
@@ -647,20 +752,30 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                     call_args.append(kwargs.pop(_option_name(name)))
 
             method = getattr(api, op.method_name)
-            # Forward global iterator / header kwargs uniformly. The SDK
-            # accepts ``full_payload`` / ``item_limit`` / ``header_params``
-            # on every method (boilerplate kwargs in every ``all_params``
-            # list), so we pass them without per-method gating. Methods
-            # that do not act on them simply ignore the kwarg.
+            # Forward the common per-call kwargs uniformly. The SDK accepts
+            # ``item_limit`` / ``full_payload`` / ``header_params`` /
+            # ``_request_timeout`` on every method (its ``all_params``), so we
+            # pass them without per-method gating; a method that does not act on
+            # a given kwarg simply ignores it. ``_request_timeout`` propagates
+            # to every page request through the SDK ``PageIterator``.
             method_kwargs: dict[str, Any] = {}
             if effective_item_limit is not None:
                 method_kwargs["item_limit"] = effective_item_limit
-            if runtime.full_payload:
+            if full_payload:
                 method_kwargs["full_payload"] = True
-            if runtime.header_params is not None:
-                method_kwargs["header_params"] = runtime.header_params
+            if header_params is not None:
+                method_kwargs["header_params"] = header_params
+            if request_timeout is not None:
+                method_kwargs["_request_timeout"] = request_timeout
+            # ``method_kwargs`` (the common per-call kwargs) is forwarded in
+            # both branches: methods without an ``opts`` parameter still accept
+            # the boilerplate ``**kwargs`` (their ``all_params``), so dropping
+            # them here would silently no-op --request-timeout / --header-params
+            # / --item-limit / --full-payload on every no-opts endpoint.
             result = (
-                method(*call_args, opts, **method_kwargs) if op.has_opts else method(*call_args)
+                method(*call_args, opts, **method_kwargs)
+                if op.has_opts
+                else method(*call_args, **method_kwargs)
             )
             # Lazy iterator consumption inside the session context.
             #
@@ -775,7 +890,7 @@ def _retry_strategy_option(f: Any) -> Any:
             "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', JSON "
             "object, or @path. See urllib3 Retry docs. List-typed fields "
             "(allowed_methods, status_forcelist, remove_headers_on_redirect) "
-            "require JSON. (Configuration.retry_strategy)"
+            "require JSON. (Configuration: retry_strategy)"
         ),
     )(f)
 
@@ -789,16 +904,16 @@ def _retry_strategy_option(f: Any) -> Any:
 @click.option(
     "--host",
     default=None,
-    help="Override API base URL (default: https://app.asana.com/api/1.0)",
+    help="Override API base URL (default: https://app.asana.com/api/1.0). (Configuration: host)",
 )
-@click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")
+@click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL. (Configuration: proxy)")
 @click.option(
     "--verify-ssl/--no-verify-ssl",
     "verify_ssl",
     default=None,
     help=(
         "Verify TLS certificates (default: True). Pass --no-verify-ssl "
-        "to disable (insecure). (Configuration.verify_ssl)"
+        "to disable (insecure). (Configuration: verify_ssl)"
     ),
 )
 @click.option(
@@ -806,21 +921,21 @@ def _retry_strategy_option(f: Any) -> Any:
     "ssl_ca_cert",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Path to a PEM bundle of trusted CA certs. (Configuration.ssl_ca_cert)",
+    help="Path to a PEM bundle of trusted CA certs. (Configuration: ssl_ca_cert)",
 )
 @click.option(
     "--cert-file",
     "cert_file",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS certificate for mTLS. (Configuration.cert_file)",
+    help="Client TLS certificate for mTLS. (Configuration: cert_file)",
 )
 @click.option(
     "--key-file",
     "key_file",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS private key for mTLS. (Configuration.key_file)",
+    help="Client TLS private key for mTLS. (Configuration: key_file)",
 )
 @click.option(
     "--assert-hostname/--no-assert-hostname",
@@ -829,17 +944,10 @@ def _retry_strategy_option(f: Any) -> Any:
     help=(
         "Verify the server certificate's hostname matches the request URL "
         "host. Tri-state: unspecified → urllib3 default. "
-        "(Configuration.assert_hostname)"
+        "(Configuration: assert_hostname)"
     ),
 )
 @_retry_strategy_option
-@click.option(
-    "--request-timeout",
-    "request_timeout",
-    type=float,
-    default=None,
-    help="Per-request timeout in seconds. (SDK kwarg: _request_timeout)",
-)
 @click.option(
     "--connection-pool-maxsize",
     "connection_pool_maxsize",
@@ -847,47 +955,23 @@ def _retry_strategy_option(f: Any) -> Any:
     default=None,
     help=(
         "Max urllib3 connections cached per host (default: cpu_count "
-        "* 5). (Configuration.connection_pool_maxsize)"
+        "* 5). (Configuration: connection_pool_maxsize)"
     ),
 )
 @click.option(
     "--access-token",
     "access_token",
     default=None,
-    help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)",
-)
-@click.option(
-    "--username",
-    "username",
-    default=None,
-    help="Use --access-token. (Configuration.username)",
-)
-@click.option(
-    "--password",
-    "password",
-    default=None,
-    help="Use --access-token. (Configuration.password)",
-)
-@click.option(
-    "--api-key",
-    "api_key",
-    default=None,
-    callback=click_callback(),
-    help="Use --access-token. (Configuration.api_key)",
-)
-@click.option(
-    "--api-key-prefix",
-    "api_key_prefix",
-    default=None,
-    callback=click_callback(),
-    help="Use --access-token. (Configuration.api_key_prefix)",
+    help=(
+        "Asana personal access token (default: $ASANA_ACCESS_TOKEN). (Configuration: access_token)"
+    ),
 )
 @click.option(
     "--temp-folder-path",
     "temp_folder_path",
     default=None,
     type=click.Path(file_okay=False),
-    help="Directory for temporary downloads. (Configuration.temp_folder_path)",
+    help="Directory for temporary downloads. (Configuration: temp_folder_path)",
 )
 @click.option(
     "--safe-chars-for-path-param",
@@ -895,27 +979,27 @@ def _retry_strategy_option(f: Any) -> Any:
     default=None,
     help=(
         "Extra chars treated as safe when percent-encoding path "
-        "parameters. (Configuration.safe_chars_for_path_param)"
+        "parameters. (Configuration: safe_chars_for_path_param)"
     ),
 )
 @click.option(
     "--logger-format",
     "logger_format",
     default=None,
-    help="Python logging format string. (Configuration.logger_format)",
+    help="Python logging format string. (Configuration: logger_format)",
 )
 @click.option(
     "--logger-file",
     "logger_file",
     default=None,
     type=click.Path(dir_okay=False),
-    help="Path SDK loggers write to. (Configuration.logger_file)",
+    help="Path SDK loggers write to. (Configuration: logger_file)",
 )
 @click.option(
     "--debug",
     is_flag=True,
     default=False,
-    help="Print HTTP request/response to stderr for troubleshooting",
+    help="Print HTTP request/response to stderr for troubleshooting. (Configuration: debug)",
 )
 @click.option(
     "--multibyte-filenames",
@@ -926,7 +1010,7 @@ def _retry_strategy_option(f: Any) -> Any:
         "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
         "attachment uploads whose filename contains non-ASCII characters; "
         "off by default to match the underlying SDK behavior. "
-        "[asana-api extension]"
+        "(asana-api extension)"
     ),
 )
 @click.option(
@@ -937,7 +1021,7 @@ def _retry_strategy_option(f: Any) -> Any:
         "Toggle the SDK page iterator (default: enabled). With "
         "--no-return-page-iterator, paginatable endpoints return a "
         "single {data, next_page} dict from one HTTP call instead of "
-        "auto-walking every page. (Configuration.return_page_iterator)"
+        "auto-walking every page. (Configuration: return_page_iterator)"
     ),
 )
 @click.option(
@@ -949,41 +1033,7 @@ def _retry_strategy_option(f: Any) -> Any:
         "Per-page size when the iterator falls back to Configuration "
         "(default: 100). Equivalent to --limit on paginatable endpoints; "
         '--limit (per-call opts["limit"]) takes precedence when both '
-        "are set. (Configuration.page_limit)"
-    ),
-)
-@click.option(
-    "--item-limit",
-    "item_limit",
-    type=int,
-    default=None,
-    help=(
-        "Stop after this many items total in iterator mode (kwarg item_limit). "
-        "Silently ignored in --full-payload / --no-return-page-iterator modes."
-    ),
-)
-@click.option(
-    "--full-payload",
-    "full_payload",
-    is_flag=True,
-    default=False,
-    help=(
-        "Return a single raw payload dict from one HTTP call "
-        "(kwarg full_payload=True). Equivalent to --no-return-page-iterator. "
-        "For events get-events this yields {data, sync, has_more} so sync "
-        "tokens stay reachable from shell scripts."
-    ),
-)
-@click.option(
-    "--header-params",
-    "header_params",
-    default=None,
-    callback=click_callback(),
-    help=(
-        "Custom HTTP request headers merged into the request "
-        "(kwarg header_params). VALUE: 'k1=v1,k2=v2,...', JSON object, "
-        "or @path. Use cases include Asana-Enable/-Disable deprecation "
-        "opt-in. Not redacted in --debug output — see SECURITY.md."
+        "are set. (Configuration: page_limit)"
     ),
 )
 @click.option(
@@ -999,7 +1049,7 @@ def _retry_strategy_option(f: Any) -> Any:
         "(default) then exits 1 with no envelope. json/text/csv/table "
         "additionally render an envelope "
         "(exception/status/reason/body/headers) on stdout and exit 3 "
-        "[asana-api extension]"
+        "(asana-api extension)"
     ),
 )
 @click.option(
@@ -1010,7 +1060,7 @@ def _retry_strategy_option(f: Any) -> Any:
         "Apply a jq filter to the error envelope; result is rendered via "
         "--output-errors. Pairing with the default 'none' emits a stderr "
         "warning (the filter would be a no-op) but does not block the call "
-        "[asana-api extension]"
+        "(asana-api extension)"
     ),
 )
 def main(
@@ -1026,13 +1076,8 @@ def main(
     # python-asana <5.1 without click then trying to call this function
     # without a value for that name.
     retry_strategy_overrides: dict[str, Any] | None = None,
-    request_timeout: float | None = None,
     connection_pool_maxsize: int | None = None,
     access_token: str | None = None,
-    username: str | None = None,
-    password: str | None = None,
-    api_key: dict[str, str] | None = None,
-    api_key_prefix: dict[str, str] | None = None,
     temp_folder_path: str | None = None,
     safe_chars_for_path_param: str | None = None,
     logger_format: str | None = None,
@@ -1041,9 +1086,6 @@ def main(
     multibyte_filenames: bool = False,
     return_page_iterator: bool | None = None,
     page_limit: int | None = None,
-    item_limit: int | None = None,
-    full_payload: bool = False,
-    header_params: dict[str, str] | None = None,
     output_errors: str = "none",
     query_errors: str | None = None,
 ) -> None:
@@ -1074,14 +1116,9 @@ def main(
     if assert_hostname is not None:
         runtime.assert_hostname = assert_hostname
     runtime.retry_strategy_overrides = retry_strategy_overrides
-    runtime.request_timeout = request_timeout
     runtime.connection_pool_maxsize = connection_pool_maxsize
     if access_token:
         runtime.access_token = access_token
-    runtime.username = username
-    runtime.password = password
-    runtime.api_key = api_key
-    runtime.api_key_prefix = api_key_prefix
     runtime.temp_folder_path = temp_folder_path
     runtime.safe_chars_for_path_param = safe_chars_for_path_param
     runtime.logger_format = logger_format
@@ -1091,9 +1128,6 @@ def main(
     if return_page_iterator is not None:
         runtime.return_page_iterator = return_page_iterator
     runtime.page_limit = page_limit
-    runtime.item_limit = item_limit
-    runtime.full_payload = full_payload
-    runtime.header_params = header_params
     runtime.output_errors = output_errors
     runtime.query_errors = query_errors
     # The warning for ``--query-errors`` paired with ``--output-errors=none``

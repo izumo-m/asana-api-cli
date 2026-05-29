@@ -7,7 +7,6 @@ applying the global configuration passed in from the CLI.
 
 from __future__ import annotations
 
-import functools
 import json
 import os
 import sys
@@ -149,12 +148,9 @@ class _Runtime:
     proxy: str | None = None
     verify_ssl: bool | None = None
     ssl_ca_cert: str | None = None
-    request_timeout: float | None = None
     access_token: str | None = None
     temp_folder_path: str | None = None
     multibyte_filenames: bool = False
-    username: str | None = None
-    password: str | None = None
     logger_format: str | None = None
     logger_file: str | None = None
     cert_file: str | None = None
@@ -162,16 +158,12 @@ class _Runtime:
     assert_hostname: bool | None = None
     connection_pool_maxsize: int | None = None
     safe_chars_for_path_param: str | None = None
-    api_key: dict[str, str] | None = None
-    api_key_prefix: dict[str, str] | None = None
     retry_strategy_overrides: dict[str, Any] | None = None
-    # Iterator / pagination control. Global because the SDK accepts these
-    # uniformly across all methods.
+    # Configuration-backed iterator knobs. The per-call kwargs
+    # (full_payload / item_limit / header_params / _request_timeout) are NOT
+    # here: they are per-command options forwarded by ``cli.py:_make_command``.
     return_page_iterator: bool | None = None
     page_limit: int | None = None
-    full_payload: bool = False
-    item_limit: int | None = None
-    header_params: dict[str, str] | None = None
     output_errors: str = "none"
     query_errors: str | None = None
 
@@ -215,10 +207,6 @@ class AsanaSession:
             config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.temp_folder_path:
             config.temp_folder_path = runtime.temp_folder_path  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.username is not None:
-            config.username = runtime.username  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.password is not None:
-            config.password = runtime.password  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.logger_format is not None:
             config.logger_format = runtime.logger_format  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.logger_file is not None:
@@ -233,10 +221,6 @@ class AsanaSession:
             config.connection_pool_maxsize = runtime.connection_pool_maxsize  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.safe_chars_for_path_param is not None:
             config.safe_chars_for_path_param = runtime.safe_chars_for_path_param  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.api_key is not None:
-            config.api_key = runtime.api_key  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.api_key_prefix is not None:
-            config.api_key_prefix = runtime.api_key_prefix  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.retry_strategy_overrides is not None:
             # Start from the SDK's default Retry instance so unspecified
             # fields keep their python-asana defaults (e.g. total=5,
@@ -268,10 +252,6 @@ class AsanaSession:
         try:
             self._config = config
             self._client = asana.ApiClient(config)
-            # Configuration has no per-request-timeout knob, so wrap
-            # call_api to inject it on every invocation.
-            if runtime.request_timeout is not None:
-                self._install_timeout(runtime.request_timeout)
         except Exception:
             # If construction fails after the patches were installed, the
             # caller never gets a session to call close() on, so undo the
@@ -284,17 +264,6 @@ class AsanaSession:
                 self._multibyte_filenames.uninstall()
                 self._multibyte_filenames = None
             raise
-
-    def _install_timeout(self, timeout: float) -> None:
-        """Wrap ApiClient.call_api to inject a default _request_timeout."""
-        original = self._client.call_api
-
-        @functools.wraps(original)
-        def call_api_with_timeout(*args: Any, **kwargs: Any) -> Any:
-            kwargs.setdefault("_request_timeout", timeout)
-            return original(*args, **kwargs)
-
-        self._client.call_api = call_api_with_timeout  # type: ignore[method-assign]
 
     @property
     def client(self) -> asana.ApiClient:

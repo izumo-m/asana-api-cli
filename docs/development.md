@@ -41,22 +41,22 @@ group/command/option churn introduced by an SDK bump. Procedure:
 3. `uv run pytest` — failures in `test_cli_surface.py` print the diff.
 4. Review the diff; describe user-visible changes in `CHANGELOG.md`.
 5. Regenerate the fixture (exact command in `tests/test_cli_surface.py`'s module docstring).
-6. Verify the no-op disclosure on `--username` / `--password` / `--api-key` /
-   `--api-key-prefix` still holds for the new SDK. These four flags are
-   exposed for `Configuration` parity but are inert in python-asana 5.2.4
-   because every `*Api` method passes
-   `auth_settings = ['personalAccessToken']` only. Re-check with:
+6. Verify Asana auth is still Bearer-token-only. The CLI deliberately does
+   **not** expose `username` / `password` / `api_key` / `api_key_prefix`
+   (inert swagger-codegen Configuration fields; see
+   [`sdk-deviations.md`](sdk-deviations.md)). Confirm the new SDK still wires
+   up only the token scheme:
 
    ```bash
    grep -rh "auth_settings = \[" .venv/lib/python*/site-packages/asana/api/ | sort -u
    ```
 
    If the output is anything other than the single
-   `auth_settings = ['personalAccessToken']` line, the disclosure in
-   the `--help` text (and `docs/cli-sdk-mapping.md` /
-   `docs/sdk-deviations.md`) needs to be updated to reflect what the
-   new SDK actually wires up. Bump the python-asana version pin in the
-   `--help` strings too.
+   `auth_settings = ['personalAccessToken']` line, the SDK has started
+   wiring up additional auth schemes — revisit whether those Configuration
+   fields should now be exposed, and update `docs/sdk-deviations.md`.
+   `tests/test_sdk_boilerplate.py` also pins the settable `Configuration`
+   set, so a new auth-related property fails that guard too.
 7. *(Optional, soft improvement)* Review the group descriptions when
    the SDK adds or removes resource groups:
    - [`docs/api-groups.md`](api-groups.md) is the authoritative table

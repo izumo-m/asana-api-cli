@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New global flag `--header-params VALUE` sends arbitrary HTTP request
-  headers on every call. Accepts shorthand `'k1=v1,k2=v2,...'`, a JSON
+- New `--header-params VALUE` option (available on every command) sends
+  arbitrary HTTP request headers on the call. Accepts shorthand
+  `'k1=v1,k2=v2,...'`, a JSON
   object, or `@path/to/file.json` (same input format as `--retry-strategy`).
   **Not redacted in `--debug` output** — see [`SECURITY.md`](SECURITY.md)
   for the full caveat.
@@ -40,6 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Every option's `--help` now ends with a label naming where its value
+  lands in the `python-asana` SDK, so you can map any CLI flag straight to
+  the API: `(Configuration: <name>)` for client config (the global flags),
+  `(SDK arg: <name>)` for positional arguments (`--body`, path GIDs, and
+  `--workspace` when it is a path parameter), `(opts: <name>)` for the
+  method's `opts` dict (query filters such as `--assignee` / `--opt-fields`),
+  `(kwarg: <name>)` for the boilerplate per-call kwargs (`--item-limit`,
+  `--full-payload`, `--header-params`, `--request-timeout`), and
+  `(asana-api extension)` for CLI-only flags. Path-GID options that 2.1.1
+  labeled `(SDK kwarg: task_gid)` are now labeled `(SDK arg: task_gid)` —
+  they are positional arguments, not kwargs.
+
 - Exit codes for failures changed: see
   [`docs/exit-codes.md`](docs/exit-codes.md).
 
@@ -47,12 +60,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dict / list cell values as JSON strings (`{"a":"b"}`) rather than
   Python `repr` (`{'a': 'b'}`). The same applies to `--output-errors`.
 
-- Four pagination / iterator flags promoted from per-command to global
-  for SDK parity (no-op on methods that don't support pagination):
-  - `--full-payload`
-  - `--item-limit N`
-  - `--page-limit N`
-  - `--return-page-iterator / --no-return-page-iterator`
+- Iteration / per-call controls are organized by SDK scope. The
+  `Configuration` knobs `--page-limit` and
+  `--return-page-iterator / --no-return-page-iterator` are **global** flags
+  (client-wide). The per-call kwargs — `--item-limit`, `--full-payload`,
+  `--header-params`, and `--request-timeout` — are **common options on every
+  command** (the SDK accepts them on every method; no-op where they don't
+  apply). `--request-timeout`, previously a global flag, is now one of these
+  per-command options.
 
 - Auto-iteration of paged responses is now triggered by the SDK's actual
   return value (an iterator) rather than by a per-method pre-judgement
@@ -66,6 +81,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the combination with their replacements (`--limit` / `--item-limit`).
   When both are given, the replacement takes precedence and the
   deprecated value is ignored; the deprecation warning still fires.
+
+### Removed
+
+- Removed the inert auth flags `--username`, `--password`, `--api-key`, and
+  `--api-key-prefix`. Asana authenticates with Bearer tokens only (personal
+  access token / Service Account / OAuth); these four were swagger-codegen
+  `Configuration` fields for HTTP basic auth and deprecated API keys that
+  Asana's API never reads, so passing them did nothing. Use `--access-token`
+  (or `$ASANA_ACCESS_TOKEN`). See
+  [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 
 ## [3.0.0] - 2026-05-23
 

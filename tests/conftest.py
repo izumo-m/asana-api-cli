@@ -23,12 +23,14 @@ from asana_api_cli.session import _Runtime, runtime
 def _reset_runtime() -> Iterator[None]:
     """Reset the module-level ``runtime`` singleton between tests.
 
-    Global flags promoted in v3.1 (``--page-limit``, ``--item-limit``,
-    ``--return-page-iterator``, ``--full-payload``, ``--header-params``)
-    are written into ``runtime`` by ``_consume_global_options`` whenever
-    a test invokes a CLI command with those flags. Without this fixture
-    the value persists into the next test, producing order-dependent
-    failures.
+    The Configuration-backed global flags (e.g. ``--page-limit`` /
+    ``--return-page-iterator``) are written into ``runtime`` by
+    ``_consume_global_options`` whenever a test invokes a CLI command with
+    those flags. Without this fixture the value persists into the next test,
+    producing order-dependent failures. (The per-call kwargs ``--item-limit``
+    / ``--full-payload`` / ``--header-params`` / ``--request-timeout`` are
+    per-command options forwarded directly to the SDK call, not ``runtime``
+    state, so they cannot leak this way.)
 
     Snapshots all ``_Runtime`` fields up-front and restores them after
     each test so any field — including ones added in the future — gets

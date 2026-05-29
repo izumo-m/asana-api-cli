@@ -11,8 +11,9 @@ this one documents the parity points.
 
 - Global options declared on `cli.py:main` (`@click.option(...)` decorators).
 - The `formatted` decorator's options in `formatter.py`.
-- Pagination control options injected by `_make_command` in `cli.py`
-  when the SDK method is paginatable.
+- Common per-command options injected by `_make_command` in `cli.py`: the
+  boilerplate per-call kwargs (`_make_per_call_kwarg_options`) on **every**
+  command, and the pagination deprecation aliases on paginatable commands only.
 
 **Excluded** — options that are *generated at runtime* by introspecting
 each SDK method's docstring `:param` lines (`opt_fields`, `workspace`,
@@ -29,9 +30,8 @@ In the **"SDK destination"** column:
 - *Struct member* — passed into a nested constructor that `Configuration`
   consumes (e.g. `Configuration.retry_strategy` is built from a
   `urllib3.util.retry.Retry` instance).
-- *Per-call kwarg* — injected on every SDK method call by wrapping
-  `ApiClient.call_api` (`session.py:_install_timeout`) or by being
-  forwarded through `_make_command` as a method kwarg.
+- *Per-call kwarg* — forwarded through `_make_command` as a method kwarg
+  on the SDK call (the common per-command `(kwarg: ...)` options).
 - *Patch* — a monkey-patch on an SDK-adjacent module
   (e.g. `urllib3.fields.RequestField.make_multipart`) installed for
   the lifetime of the session.
@@ -45,6 +45,12 @@ That parity is the active rule per
 flag must keep it isomorphic to the underlying `Configuration`
 property (or document the deviation in `sdk-deviations.md`).
 
+These destinations are also surfaced in each option's `--help` as a
+trailing `(<kind>: <name>)` label — `(Configuration: <name>)`,
+`(SDK arg: <name>)`, `(opts: <name>)`, `(kwarg: <name>)`, or
+`(asana-api extension)` — so the mapping is visible at the point of use,
+not only here. See [`architecture.md`](architecture.md#sdk-destination-labels).
+
 ## Global options (`cli.py:main`)
 
 | Flag | SDK destination | Mapping mechanism |
@@ -57,13 +63,8 @@ property (or document the deviation in `sdk-deviations.md`).
 | `--key-file PATH` | `Configuration.key_file` | Direct property (client TLS key for mTLS) |
 | `--assert-hostname / --no-assert-hostname` | `Configuration.assert_hostname` | Direct property. Tri-state toggle |
 | `--retry-strategy VALUE` | `Configuration.retry_strategy` | Struct member: parsed via `parse_structured_arg` with `RETRY_FIELD_SCHEMA`; applied with `Configuration.retry_strategy.new(**overrides)` so unspecified fields keep the SDK defaults |
-| `--request-timeout SECONDS` | per-call kwarg `_request_timeout` | Per-call kwarg: `ApiClient.call_api` is wrapped to inject `_request_timeout=N` on every invocation (`session.py:_install_timeout`) |
 | `--connection-pool-maxsize N` | `Configuration.connection_pool_maxsize` | Direct property |
 | `--access-token TOKEN` | `Configuration.access_token` | Direct property. Default source is `$ASANA_ACCESS_TOKEN` |
-| `--username USER` | `Configuration.username` | Direct property. **No-op as of python-asana 5.2.4** — see [no-op disclosure](#no-op-auth-properties) below |
-| `--password PASS` | `Configuration.password` | Direct property. **No-op as of python-asana 5.2.4** |
-| `--api-key VALUE` | `Configuration.api_key` | Direct property (dict). Value parsed by `parse_structured_arg`. **No-op as of python-asana 5.2.4** |
-| `--api-key-prefix VALUE` | `Configuration.api_key_prefix` | Direct property (dict). **No-op as of python-asana 5.2.4** |
 | `--temp-folder-path PATH` | `Configuration.temp_folder_path` | Direct property |
 | `--safe-chars-for-path-param S` | `Configuration.safe_chars_for_path_param` | Direct property |
 | `--logger-format FMT` | `Configuration.logger_format` | Direct property |
@@ -75,7 +76,7 @@ property (or document the deviation in `sdk-deviations.md`).
 
 ### Structured value format
 
-`--api-key`, `--api-key-prefix`, and `--retry-strategy` share a single
+`--retry-strategy` and `--header-params` share a single
 VALUE format dispatched by the first character:
 
 - `{...}` — parse as a JSON object.
@@ -93,27 +94,18 @@ they cannot be confused with int fields.
 
 Implementation lives in `src/asana_api_cli/structured_arg.py`.
 
-### No-op auth properties
-
-`--username`, `--password`, `--api-key`, and `--api-key-prefix` are
-exposed for parity with `asana.Configuration` but are **inert in the
-request path** as of python-asana 5.2.4: every generated `*Api` method
-calls `update_params_for_auth` with `auth_settings = ['personalAccessToken']`
-only, and `Configuration.auth_settings()` returns only the `token`
-entry. The four properties remain on the Configuration object but no
-header is ever emitted from them. The CLI surfaces them so future SDK
-versions that wire them up start working without a CLI release; the
-`--help` text pins the python-asana version so the disclosure is
-re-verified whenever the SDK is bumped (see [`development.md`](development.md#bumping-the-asana-sdk)).
+The inert auth fields `Configuration.username` / `password` / `api_key` /
+`api_key_prefix` are **not** exposed (Asana auth is Bearer-token only); see
+[`sdk-deviations.md`](sdk-deviations.md).
 
 ### stdin (`-`) restriction
 
 Only `--body` is wired to read JSON from stdin (`-`). The structured
-config options (`--api-key`, `--api-key-prefix`, `--retry-strategy`)
-intentionally do *not* accept `-` because multiple options requesting
-stdin from a single invocation produces evaluation-order-dependent
-silent bugs. To pipe a structured config value, use bash process
-substitution: `--api-key @<(echo '{"k":"v"}')`.
+options (`--retry-strategy`, `--header-params`) intentionally do *not*
+accept `-` because multiple options requesting stdin from a single
+invocation produces evaluation-order-dependent silent bugs. To pipe a
+structured value, use bash process substitution:
+`--retry-strategy @<(echo '{"total":3}')`.
 
 ## Output formatter options (`formatter.py:formatted`)
 
@@ -125,20 +117,32 @@ substitution: `--api-key @<(echo '{"k":"v"}')`.
 
 All three are also cataloged in [`sdk-deviations.md`](sdk-deviations.md).
 
-## Pagination / iteration globals (v3.1+)
+## Iteration controls
 
-As of v3.1 these are global flags (available on every command) — they map
-1:1 to ``Configuration`` properties or boilerplate ``**kwargs`` that the
-SDK accepts uniformly on every method. The CLI no longer pre-judges which
-endpoint they apply to.
+These divide by SDK scope. ``Configuration`` properties are **global flags**
+(client-wide, set once). The boilerplate per-call ``**kwargs`` — the SDK's
+``all_params``, accepted uniformly by every method — are **common
+per-command options** present on every command (labeled `(kwarg: ...)`),
+because they are method inputs, not client config.
+
+### Configuration globals (`cli.py:main`)
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
 | `--return-page-iterator / --no-return-page-iterator` | `Configuration.return_page_iterator` | Written to `runtime` and applied in `AsanaSession.__init__`. Tri-state toggle: unspecified leaves the SDK default (True) intact |
 | `--page-limit N` | `Configuration.page_limit` | Written to `runtime` and applied in `AsanaSession.__init__` |
-| `--item-limit N` | per-call kwarg `item_limit` | Forwarded from `runtime` as a method kwarg by `_make_command` |
-| `--full-payload` | per-call kwarg `full_payload=True` | Forwarded from `runtime` as a method kwarg by `_make_command` |
-| `--header-params VALUE` | per-call kwarg `header_params` | Parsed by `structured_arg` (`'k=v,...'` / JSON / `@path`), forwarded from `runtime`. **Not redacted in `--debug` — see SECURITY.md** |
+
+### Common per-command kwargs (`_make_command`)
+
+Present on every command (the SDK accepts them on every method) and forwarded
+straight to the SDK method call as a kwarg — no `runtime` round-trip.
+
+| Flag | SDK destination | Mapping mechanism |
+|---|---|---|
+| `--item-limit N` | per-call kwarg `item_limit` | Forwarded as a method kwarg by `_make_command` |
+| `--full-payload` | per-call kwarg `full_payload=True` | Forwarded as a method kwarg by `_make_command` |
+| `--header-params VALUE` | per-call kwarg `header_params` | Parsed by `structured_arg` (`'k=v,...'` / JSON / `@path`), forwarded as a method kwarg. **Not redacted in `--debug` — see SECURITY.md** |
+| `--request-timeout SECONDS` | per-call kwarg `_request_timeout` | Forwarded as a method kwarg by `_make_command`; the SDK `PageIterator` propagates it to every page request |
 
 The `--limit` / `--offset` flags themselves are docstring-derived (per-method)
 and appear only on commands whose SDK method declares them — same category

@@ -253,12 +253,16 @@ for the SDK `Configuration` property each flag maps to.
 Coverage at a glance:
 
 - **Auth**: `--access-token` (defaults to `$ASANA_ACCESS_TOKEN`)
-- **Endpoint / network**: `--host`, `--proxy`, `--request-timeout`, `--connection-pool-maxsize`
+- **Endpoint / network**: `--host`, `--proxy`, `--connection-pool-maxsize`
 - **TLS / mTLS**: `--verify-ssl` / `--no-verify-ssl`, `--ssl-ca-cert`, `--cert-file`, `--key-file`, `--assert-hostname`
 - **Retry**: `--retry-strategy` (shorthand, JSON object, or `@file`)
 - **Logging / debug**: `--debug`, `--logger-format`, `--logger-file`
 - **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`, `--multibyte-filenames` (RFC 5987 for non-ASCII attachment filenames)
 - **Structured errors**: `--output-errors {none|json|text|csv|table}`, `--query-errors EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
+
+`--request-timeout`, `--header-params`, `--item-limit`, and `--full-payload`
+are **not** global: they are per-call SDK kwargs (the method `all_params`),
+exposed as options on every command and forwarded straight to the SDK call.
 
 A few worth highlighting:
 
@@ -273,10 +277,12 @@ asana-api --retry-strategy 'total=5,backoff_factor=1.5' tasks get-tasks --projec
 asana-api --output-errors json tasks get-task --task <GID>
 ```
 
-Asana only accepts Bearer-token authentication, so `--username`,
-`--password`, `--api-key`, and `--api-key-prefix` are also exposed for
-1:1 parity with `Configuration` but are inert as of python-asana 5.2.4
-— see the disclosure in [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#no-op-auth-properties).
+Asana only accepts Bearer-token authentication (personal access token,
+Service Account, or OAuth), so authenticate with `--access-token` or
+`$ASANA_ACCESS_TOKEN`. The SDK's inert `username` / `password` / `api_key` /
+`api_key_prefix` Configuration fields (HTTP basic auth / deprecated API keys,
+which Asana does not use) are **not** exposed — see
+[`docs/sdk-deviations.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/sdk-deviations.md).
 
 ## Development
 

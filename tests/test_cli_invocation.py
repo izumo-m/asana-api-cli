@@ -615,6 +615,31 @@ class TestArgumentForwarding:
         assert result.exit_code == 0, full_output(result)
         assert mock.call_args_list[0].args == ("T",)
 
+    def test_no_opts_method_forwards_per_call_kwargs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A method without an ``opts`` parameter (e.g. delete_task) must still
+        forward the common per-call kwargs — they go into the SDK method's
+        ``**kwargs`` (its all_params), not the (absent) opts dict.
+
+        Regression: the call-site ternary's ``else`` branch used to call
+        ``method(*call_args)`` with no kwargs, silently dropping
+        --request-timeout / --header-params / --item-limit / --full-payload on
+        every no-opts endpoint. ``--request-timeout`` and ``--header-params``
+        apply to any method (not just paginatable ones), so both are passed
+        here and must reach the SDK call.
+        """
+        cmd = _build_command("TasksApi", "delete_task")
+        mock = _patch(monkeypatch, "TasksApi", "delete_task", return_value={"data": {}})
+        result = make_runner().invoke(
+            cmd,
+            ["--task", "T", "--request-timeout", "5.0", "--header-params", "X-Trace=abc"],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args == ("T",)
+        assert mock.call_args_list[0].kwargs == {
+            "_request_timeout": 5.0,
+            "header_params": {"X-Trace": "abc"},
+        }
+
 
 # ---------------------------------------------------------------------------
 # Workspace resolution

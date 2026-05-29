@@ -29,14 +29,14 @@ def formatted(f: Any) -> Any:
             "payload entirely — useful when only the exit code matters "
             "(e.g. side-effect-only operations like delete-task). "
             "Symmetric counterpart of --output-errors 'none' "
-            "[asana-api extension]"
+            "(asana-api extension)"
         ),
     )
     @click.option(
         "--query",
         "jq_query",
         default=None,
-        help="jq expression to filter output [asana-api extension]",
+        help="jq expression to filter output (asana-api extension)",
     )
     @click.option(
         "--csv-bom",
@@ -45,7 +45,7 @@ def formatted(f: Any) -> Any:
         default=False,
         help=(
             "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
-            "non-ASCII characters correctly [asana-api extension]"
+            "non-ASCII characters correctly (asana-api extension)"
         ),
     )
     @functools.wraps(f)

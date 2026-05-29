@@ -24,10 +24,24 @@ Runtime-introspection wrapper around `python-asana`. The CLI command tree is bui
 
 Method-level introspection is deferred per group so top-level `--help` cost stays flat as the SDK grows.
 
+## SDK-destination labels
+
+Every option's `--help` ends with a uniform `(<kind>: <name>)` label naming where its value lands in the `python-asana` call, so a reader can map the flag back to the SDK. Square brackets are left to click's own `[required]` / `[default]` metadata, so every asana-api label uses parentheses. The five kinds cover the SDK method's input structure:
+
+| Label | SDK destination |
+|---|---|
+| `(Configuration: <name>)` | property set on `asana.Configuration` (the global flags) |
+| `(SDK arg: <name>)` | positional method argument — `body`, a path GID, or `workspace_gid` |
+| `(opts: <name>)` | entry in the method's `opts` dict (a docstring `:param`) |
+| `(kwarg: <name>)` | boilerplate `**kwargs` every method accepts — its `all_params` (common per-command options) |
+| `(asana-api extension)` | no SDK counterpart (CLI-only; also in `sdk-deviations.md`) |
+
+`cli.py:_sdk_dest()` builds every label `_make_command` derives at runtime — `arg` / `opts` for path / body / docstring params, `kwarg` for the common per-call kwargs, and the extension marker on the deprecated aliases. The `Configuration` globals and formatter flags carry the matching literal by hand (kept byte-identical between `cli.py:main` and `click_ext.py:_make_global_option_params` by `test_click_ext.py:TestHelpTextSync`). `--workspace` is labeled per endpoint (`SDK arg` when positional, `opts` otherwise). The catalog of which built-in flag maps where lives in [`cli-sdk-mapping.md`](cli-sdk-mapping.md).
+
 ## Invocation flow
 
 1. `main` parses global options and writes them into the shared `runtime` singleton; `AsanaSession.__init__` reads them and applies the `Configuration` knobs (host, retry, page_limit, return_page_iterator, ...). Installs the auth redactor on `--debug`; optionally patches multipart filename encoding.
-2. The resolved command invokes the SDK `*Api` method via `_make_command()`, forwarding global per-call kwargs (`full_payload` / `item_limit` / `header_params`) from `runtime` and any docstring-derived `opts` from the per-command flags. If the SDK returns a lazy iterator (`isinstance(result, collections.abc.Iterator)` check), it is consumed into a list inside the session context so multi-page HTTP requests stay under the auth redactor.
+2. The resolved command invokes the SDK `*Api` method via `_make_command()`, passing the docstring-derived `opts` and the common per-call kwargs (`item_limit` / `full_payload` / `header_params` / `_request_timeout`) — both are per-command options read from the command's own flags. `_request_timeout` reaches every page request through the SDK `PageIterator`. If the SDK returns a lazy iterator (`isinstance(result, collections.abc.Iterator)` check), it is consumed into a list inside the session context so multi-page HTTP requests stay under the auth redactor.
 3. `@formatted` (in `formatter.py`) renders the response, optionally piped through `jq` via `--query`.
 
 ## Error handling
@@ -36,8 +50,10 @@ Method-level introspection is deferred per group so top-level `--help` cost stay
 
 ## Extension point
 
-All changes to how an SDK method becomes a CLI command go through `_make_command()` in `cli.py` — docstring-derived per-method opts, deprecation aliases, option renames. SDK-uniform inputs (boilerplate kwargs / `Configuration` knobs) are added as global flags in `cli.py:main()` + `click_ext.py:_make_global_option_params()` and consumed via `runtime`.
+All changes to how an SDK method becomes a CLI command go through `_make_command()` in `cli.py` — docstring-derived per-method opts, the common per-call kwargs (`all_params`), deprecation aliases, option renames. The `Configuration` knobs are the global flags, declared in `cli.py:main()` + `click_ext.py:_make_global_option_params()` and consumed via `runtime`.
 
 ## Surface snapshot guardrail
 
 `tests/test_cli_surface.py` deep-compares `introspect_to_manifest()` against `tests/fixtures/cli_surface.json`. An SDK bump that adds, removes, or renames a docstring-derived option fails this test. Synthetic options (global flags, deprecation aliases) are intentionally outside the manifest.
+
+`tests/test_sdk_boilerplate.py` is the companion guard for the two SDK-uniform input families that the manifest deliberately omits: every method's `all_params` (the boilerplate `**kwargs`) and the settable `asana.Configuration` attributes. An SDK bump that adds a new boilerplate kwarg or Configuration property fails it, forcing a conscious classification — a `Configuration` global flag, or a common per-command `(kwarg: ...)` option — rather than a silent miss.
