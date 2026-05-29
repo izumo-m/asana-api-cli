@@ -16,7 +16,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
   response:
     body:
-      string: '{"data":[{"gid":"8503325469700806","name":"pagination-test"},{"gid":"2750130645330941","name":"pagination-test-small"}],"next_page":null}'
+      string: '{"data":[{"gid":"${GID:8503325469700806}","name":"pagination-test"},{"gid":"${GID:2750130645330941}","name":"pagination-test-small"}],"next_page":null}'
     headers:
       Connection:
       - keep-alive
@@ -80,7 +80,7 @@ interactions:
       code: 200
       message: OK
 - request:
-    body: '{"data": {"name": "pytest-e2e-events-sync", "projects": ["8503325469700806"]}}'
+    body: '{"data": {"name": "pytest-e2e-events-sync", "projects": ["${GID:8503325469700806}"]}}'
     headers:
       Accept:
       - application/json; charset=utf-8
@@ -96,7 +96,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/tasks
   response:
     body:
-      string: "{\"data\":{\"gid\":\"4215484815535401\",\"resource_type\":\"task\",\"created_at\":\"2026-05-24T11:46:16.543Z\",\"modified_at\":\"2026-05-24T11:46:16.805Z\",\"name\":\"pytest-e2e-events-sync\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/8503325469700806/task/4215484815535401\",\"projects\":[{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"3991398924663590\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}]}}"
+      string: "{\"data\":{\"gid\":\"${GID:4215484815535401}\",\"resource_type\":\"task\",\"created_at\":\"2026-05-24T11:46:16.543Z\",\"modified_at\":\"2026-05-24T11:46:16.805Z\",\"name\":\"pytest-e2e-events-sync\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/${GID:8503325469700806}/task/${GID:4215484815535401}\",\"projects\":[{\"gid\":\"${GID:8503325469700806}\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"followers\":[{\"gid\":\"${GID:9210444840269866}\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"${GID:3991398924663590}\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"${GID:8503325469700806}\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}]}}"
     headers:
       Connection:
       - keep-alive
@@ -136,7 +136,7 @@ interactions:
       - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
         'none';frame-src 'none';frame-ancestors 'none'
       location:
-      - /api/1.0/tasks/4215484815535401
+      - /api/1.0/tasks/${GID:4215484815535401}
       pragma:
       - no-cache
       server:
@@ -170,7 +170,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: GET
-    uri: https://app.asana.com/api/1.0/events?resource=4215484815535401
+    uri: https://app.asana.com/api/1.0/events?resource=${GID:4215484815535401}
   response:
     body:
       string: '{"errors":[{"message":"Sync token invalid or too old. If you are attempting
@@ -245,10 +245,10 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: PUT
-    uri: https://app.asana.com/api/1.0/tasks/4215484815535401
+    uri: https://app.asana.com/api/1.0/tasks/${GID:4215484815535401}
   response:
     body:
-      string: "{\"data\":{\"gid\":\"4215484815535401\",\"resource_type\":\"task\",\"created_at\":\"2026-05-24T11:46:16.543Z\",\"modified_at\":\"2026-05-24T11:46:18.498Z\",\"name\":\"pytest-e2e-events-sync-renamed\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/8503325469700806/task/4215484815535401\",\"projects\":[{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"3991398924663590\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}}"
+      string: "{\"data\":{\"gid\":\"${GID:4215484815535401}\",\"resource_type\":\"task\",\"created_at\":\"2026-05-24T11:46:16.543Z\",\"modified_at\":\"2026-05-24T11:46:18.498Z\",\"name\":\"pytest-e2e-events-sync-renamed\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/${GID:8503325469700806}/task/${GID:4215484815535401}\",\"projects\":[{\"gid\":\"${GID:8503325469700806}\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"memberships\":[{\"section\":{\"gid\":\"${GID:3991398924663590}\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"${GID:8503325469700806}\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}],\"followers\":[{\"gid\":\"${GID:9210444840269866}\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}]}}"
     headers:
       Connection:
       - keep-alive
@@ -320,11 +320,11 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: GET
-    uri: https://app.asana.com/api/1.0/events?sync=ced34fbc0aa62ebc3c56bd3aad8e0b9e%3A0&resource=4215484815535401
+    uri: https://app.asana.com/api/1.0/events?sync=ced34fbc0aa62ebc3c56bd3aad8e0b9e%3A0&resource=${GID:4215484815535401}
   response:
     body:
-      string: "{\"data\":[{\"created_at\":\"2026-05-24T11:46:16.641Z\",\"type\":\"task\",\"action\":\"added\",\"parent\":{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"},\"user\":{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"},\"resource\":{\"gid\":\"4215484815535401\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}},{\"created_at\":\"2026-05-24T11:46:16.833Z\",\"type\":\"task\",\"action\":\"added\",\"parent\":{\"gid\":\"3991398924663590\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"user\":{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"},\"resource\":{\"gid\":\"4215484815535401\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}},{\"created_at\":\"2026-05-24T11:46:18.498Z\",\"type\":\"task\",\"action\":\"changed\",\"parent\":null,\"change\":{\"field\":\"name\",\"action\":\"changed\"},\"user\":{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"},\"resource\":{\"gid\":\"4215484815535401\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}},{\"created_at\":\"2026-05-24T11:46:17.474Z\",\"type\":\"story\",\"action\":\"added\",\"user\":null,\"resource\":{\"gid\":\"1044711111430436\",\"resource_type\":\"story\",\"created_at\":\"2026-05-24T11:46:16.640Z\",\"type\":\"system\",\"text\":\"${USER_NAME}
-        \u3055\u3093\u304C\u300Cpagination-test\u300D\u306B\u3053\u306E\u30BF\u30B9\u30AF\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\",\"created_by\":{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}},\"parent\":{\"gid\":\"4215484815535401\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}}],\"sync\":\"b0cc1ee8204e97e3109477668078c14b:0\",\"has_more\":false}"
+      string: "{\"data\":[{\"created_at\":\"2026-05-24T11:46:16.641Z\",\"type\":\"task\",\"action\":\"added\",\"parent\":{\"gid\":\"${GID:8503325469700806}\",\"resource_type\":\"project\",\"name\":\"pagination-test\"},\"user\":{\"gid\":\"${GID:9210444840269866}\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"},\"resource\":{\"gid\":\"${GID:4215484815535401}\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}},{\"created_at\":\"2026-05-24T11:46:16.833Z\",\"type\":\"task\",\"action\":\"added\",\"parent\":{\"gid\":\"${GID:3991398924663590}\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"user\":{\"gid\":\"${GID:9210444840269866}\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"},\"resource\":{\"gid\":\"${GID:4215484815535401}\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}},{\"created_at\":\"2026-05-24T11:46:18.498Z\",\"type\":\"task\",\"action\":\"changed\",\"parent\":null,\"change\":{\"field\":\"name\",\"action\":\"changed\"},\"user\":{\"gid\":\"${GID:9210444840269866}\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"},\"resource\":{\"gid\":\"${GID:4215484815535401}\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}},{\"created_at\":\"2026-05-24T11:46:17.474Z\",\"type\":\"story\",\"action\":\"added\",\"user\":null,\"resource\":{\"gid\":\"${GID:1044711111430436}\",\"resource_type\":\"story\",\"created_at\":\"2026-05-24T11:46:16.640Z\",\"type\":\"system\",\"text\":\"${USER_NAME}
+        \u3055\u3093\u304C\u300Cpagination-test\u300D\u306B\u3053\u306E\u30BF\u30B9\u30AF\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\",\"created_by\":{\"gid\":\"${GID:9210444840269866}\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}},\"parent\":{\"gid\":\"${GID:4215484815535401}\",\"resource_type\":\"task\",\"name\":\"pytest-e2e-events-sync-renamed\",\"resource_subtype\":\"default_task\"}}],\"sync\":\"b0cc1ee8204e97e3109477668078c14b:0\",\"has_more\":false}"
     headers:
       Connection:
       - keep-alive
@@ -396,7 +396,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: DELETE
-    uri: https://app.asana.com/api/1.0/tasks/4215484815535401
+    uri: https://app.asana.com/api/1.0/tasks/${GID:4215484815535401}
   response:
     body:
       string: '{"data":{}}'

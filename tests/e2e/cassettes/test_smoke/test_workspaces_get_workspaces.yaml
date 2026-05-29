@@ -16,7 +16,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/workspaces?limit=100
   response:
     body:
-      string: '{"data":[{"gid":"8057901430876657","resource_type":"workspace","name":"${WORKSPACE_NAME}"},{"gid":"${WORKSPACE_GID}","resource_type":"workspace","name":"${WORKSPACE_NAME}"}],"next_page":null}'
+      string: '{"data":[{"gid":"${GID:8057901430876657}","resource_type":"workspace","name":"${WORKSPACE_NAME}"},{"gid":"${WORKSPACE_GID}","resource_type":"workspace","name":"${WORKSPACE_NAME}"}],"next_page":null}'
     headers:
       Connection:
       - keep-alive

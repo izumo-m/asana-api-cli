@@ -97,14 +97,20 @@ Re-recording hits the real Asana API and writes the response straight
 into the cassette file. The masking layer covers the common cases,
 but a new field or shape can slip through silently.
 
-**After every `--record` invocation, run `git diff tests/e2e/cassettes/`
-and confirm none of the following from your account survived into the
-cassette:**
+`test_cassette_hygiene.py` runs on every `pytest` (no network) and fails
+if a bare gid, an un-redacted `Authorization`, a non-`.invalid` email, or
+a presigned-URL query string survives into a committed cassette — so a
+plain `uv run pytest tests/e2e/test_cassette_hygiene.py` is the first gate.
 
-- real email addresses
+**It still pays to eyeball `git diff tests/e2e/cassettes/` after every
+`--record`** and confirm none of the following from your account survived
+(the hygiene test catches the structural cases, but a real name buried in
+free text, say, needs human eyes):
+
+- real names / email addresses
 - `asanausercontent.com` presigned-URL signatures (`?e=...&t=...`)
-- real gids (any 16-digit number that exists as a real workspace,
-  project, task, user, etc. in your Asana account)
+- any **bare** 16-digit number — every gid must be wrapped as
+  `${GID:...}` (or be a named `${VAR}`); a naked digit run is a red flag
 
 Do not commit until the diff is clean.
 
@@ -142,14 +148,29 @@ A different developer can replay the same cassettes by setting their own
 `ASANA_PYTEST_WORKSPACE`; the cassette's request URL and response body
 adapt to their value at load time.
 
+The named `${VAR}` placeholders above are the *only* ones bound to a value
+(env var or fixed literal). Every other identifier uses the self-contained
+`${GID:<synthetic>}` marker described next, whose value lives inline rather
+than in this table.
+
 ### Auto-hashed gids
 
 Identifiers that don't have a semantic name (user gid, team gid, transient
 task / project / section gids, attachment asset ids) are replaced with a
 **deterministic synthetic gid** derived from `sha256(real_gid)` truncated
-into the `[10^15, 10^16)` decimal range. The shape matches a current Asana
-gid (`[1-9][0-9]{15}`) so the cassette stays drop-in compatible — there is
-no `${...}` wrapping at replay time.
+into the `[10^15, 10^16)` decimal range (shape `[1-9][0-9]{15}`, matching a
+current Asana gid). The synthetic is then wrapped in a **`${GID:<synthetic>}`
+marker**; the deserializer strips the wrapper back to the bare synthetic at
+load time, so vcrpy request-matching is unaffected and the replayed request
+still carries a real-looking gid.
+
+The marker exists for **auditability**: because a real (unmasked) gid is a
+bare number, requiring every gid to be wrapped turns "all gids are masked"
+into a checkable invariant — a leaked gid shows up as a bare 16-digit run
+instead of hiding as a look-alike. `test_cassette_hygiene.py` enforces it on
+every `pytest` run (no network needed). The marker carries its value inline,
+so there is no side table to keep in sync, and it is idempotent under
+re-serialization (a `${GID:...}` value is not re-collected as a raw gid).
 
 Discovery sources at record time (see `_collect_gids` in `conftest.py`):
 

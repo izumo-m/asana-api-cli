@@ -10,7 +10,7 @@ interactions:
       "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
       "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
       "/users/me", "method": "get", "options": {"fields": ["gid", "name"]}}, {"relative_path":
-      "/tasks/3354727812411525", "method": "get", "options": {"fields": ["gid", "name"]}}]}}'
+      "/tasks/${GID:3354727812411525}", "method": "get", "options": {"fields": ["gid", "name"]}}]}}'
     headers:
       Accept:
       - application/json; charset=utf-8
@@ -26,8 +26,8 @@ interactions:
     uri: https://app.asana.com/api/1.0/batch
   response:
     body:
-      string: '{"data":[{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"9210444840269866","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"errors":[{"message":"task:
-        Not a recognized ID: 3354727812411525","help":"For more information on API
+      string: '{"data":[{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"data":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}"}},"status_code":200,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}},{"body":{"errors":[{"message":"task:
+        Not a recognized ID: ${GID:3354727812411525}","help":"For more information on API
         status codes and how to handle them, read the docs on errors: https://developers.asana.com/docs/errors"}]},"status_code":404,"headers":{"headers":[],"keys":[],"as_tuples":[],"empty":true}}]}'
     headers:
       Connection:

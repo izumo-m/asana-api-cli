@@ -16,7 +16,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
   response:
     body:
-      string: '{"data":[{"gid":"8503325469700806","name":"pagination-test"},{"gid":"2750130645330941","name":"pagination-test-small"}],"next_page":null}'
+      string: '{"data":[{"gid":"${GID:8503325469700806}","name":"pagination-test"},{"gid":"${GID:2750130645330941}","name":"pagination-test-small"}],"next_page":null}'
     headers:
       Connection:
       - keep-alive
@@ -93,7 +93,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: GET
-    uri: https://app.asana.com/api/1.0/tasks?project=8503325469700806
+    uri: https://app.asana.com/api/1.0/tasks?project=${GID:8503325469700806}
   response:
     body:
       string: '{"errors":[{"message":"The result is too large. You should use pagination

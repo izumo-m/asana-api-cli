@@ -16,7 +16,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects
   response:
     body:
-      string: '{"data":{"gid":"2275468384275427","resource_type":"project","created_at":"2026-05-23T19:33:56.310Z","modified_at":"2026-05-23T19:33:56.310Z","due_date":null,"due_on":null,"notes":"","archived":false,"default_view":"list","default_access_level":"editor","minimum_access_level_for_customization":"editor","minimum_access_level_for_sharing":"editor","start_on":null,"color":null,"completed":false,"completed_at":null,"completed_by":null,"public":false,"privacy_setting":"private","current_status_update":null,"name":"pytest-e2e-test_project_crud","icon":"list","permalink_url":"https://app.asana.com/1/${WORKSPACE_GID}/project/2275468384275427","current_status":null,"workspace":{"gid":"${WORKSPACE_GID}","resource_type":"workspace","name":"${WORKSPACE_NAME}"},"owner":{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"},"team":{"gid":"2262018960161802","resource_type":"team","name":"${TEAM_NAME}"},"members":[{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"}],"followers":[{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"}]}}'
+      string: '{"data":{"gid":"${GID:2275468384275427}","resource_type":"project","created_at":"2026-05-23T19:33:56.310Z","modified_at":"2026-05-23T19:33:56.310Z","due_date":null,"due_on":null,"notes":"","archived":false,"default_view":"list","default_access_level":"editor","minimum_access_level_for_customization":"editor","minimum_access_level_for_sharing":"editor","start_on":null,"color":null,"completed":false,"completed_at":null,"completed_by":null,"public":false,"privacy_setting":"private","current_status_update":null,"name":"pytest-e2e-test_project_crud","icon":"list","permalink_url":"https://app.asana.com/1/${WORKSPACE_GID}/project/${GID:2275468384275427}","current_status":null,"workspace":{"gid":"${WORKSPACE_GID}","resource_type":"workspace","name":"${WORKSPACE_NAME}"},"owner":{"gid":"${GID:9210444840269866}","resource_type":"user","name":"${USER_NAME}"},"team":{"gid":"${GID:2262018960161802}","resource_type":"team","name":"${TEAM_NAME}"},"members":[{"gid":"${GID:9210444840269866}","resource_type":"user","name":"${USER_NAME}"}],"followers":[{"gid":"${GID:9210444840269866}","resource_type":"user","name":"${USER_NAME}"}]}}'
     headers:
       Connection:
       - keep-alive
@@ -56,7 +56,7 @@ interactions:
       - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
         'none';frame-src 'none';frame-ancestors 'none'
       location:
-      - /api/1.0/projects/2275468384275427
+      - /api/1.0/projects/${GID:2275468384275427}
       pragma:
       - no-cache
       server:
@@ -90,10 +90,10 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: GET
-    uri: https://app.asana.com/api/1.0/projects/2275468384275427
+    uri: https://app.asana.com/api/1.0/projects/${GID:2275468384275427}
   response:
     body:
-      string: '{"data":{"gid":"2275468384275427","archived":false,"color":"none","completed":false,"completed_at":null,"created_at":"2026-05-23T19:33:56.310Z","current_status":null,"current_status_update":null,"custom_fields":[],"default_access_level":"editor","default_view":"list","due_on":null,"due_date":null,"followers":[{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}],"members":[{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"}],"minimum_access_level_for_customization":"editor","minimum_access_level_for_sharing":"editor","modified_at":"2026-05-23T19:33:58.252Z","name":"pytest-e2e-test_project_crud","notes":"","owner":{"gid":"9210444840269866","name":"${USER_NAME}","resource_type":"user"},"permalink_url":"https://app.asana.com/1/${WORKSPACE_GID}/project/2275468384275427","privacy_setting":"private","public":false,"resource_type":"project","start_on":null,"team":{"gid":"2262018960161802","name":"${TEAM_NAME}","resource_type":"team"},"workspace":{"gid":"${WORKSPACE_GID}","name":"${WORKSPACE_NAME}","resource_type":"workspace"}}}'
+      string: '{"data":{"gid":"${GID:2275468384275427}","archived":false,"color":"none","completed":false,"completed_at":null,"created_at":"2026-05-23T19:33:56.310Z","current_status":null,"current_status_update":null,"custom_fields":[],"default_access_level":"editor","default_view":"list","due_on":null,"due_date":null,"followers":[{"gid":"${GID:9210444840269866}","name":"${USER_NAME}","resource_type":"user"}],"members":[{"gid":"${GID:9210444840269866}","name":"${USER_NAME}","resource_type":"user"}],"minimum_access_level_for_customization":"editor","minimum_access_level_for_sharing":"editor","modified_at":"2026-05-23T19:33:58.252Z","name":"pytest-e2e-test_project_crud","notes":"","owner":{"gid":"${GID:9210444840269866}","name":"${USER_NAME}","resource_type":"user"},"permalink_url":"https://app.asana.com/1/${WORKSPACE_GID}/project/${GID:2275468384275427}","privacy_setting":"private","public":false,"resource_type":"project","start_on":null,"team":{"gid":"${GID:2262018960161802}","name":"${TEAM_NAME}","resource_type":"team"},"workspace":{"gid":"${WORKSPACE_GID}","name":"${WORKSPACE_NAME}","resource_type":"workspace"}}}'
     headers:
       Connection:
       - keep-alive
@@ -170,10 +170,10 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: PUT
-    uri: https://app.asana.com/api/1.0/projects/2275468384275427
+    uri: https://app.asana.com/api/1.0/projects/${GID:2275468384275427}
   response:
     body:
-      string: '{"data":{"gid":"2275468384275427","resource_type":"project","created_at":"2026-05-23T19:33:56.310Z","modified_at":"2026-05-23T19:33:58.252Z","due_date":null,"due_on":null,"notes":"","archived":false,"default_view":"list","default_access_level":"editor","minimum_access_level_for_customization":"editor","minimum_access_level_for_sharing":"editor","start_on":null,"color":null,"completed":false,"completed_at":null,"completed_by":null,"public":false,"privacy_setting":"private","current_status_update":null,"name":"pytest-e2e-test_project_crud-updated","icon":"list","permalink_url":"https://app.asana.com/1/${WORKSPACE_GID}/project/2275468384275427","current_status":null,"workspace":{"gid":"${WORKSPACE_GID}","resource_type":"workspace","name":"${WORKSPACE_NAME}"},"owner":{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"},"members":[{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"}],"team":{"gid":"2262018960161802","resource_type":"team","name":"${TEAM_NAME}"},"followers":[{"gid":"9210444840269866","resource_type":"user","name":"${USER_NAME}"}]}}'
+      string: '{"data":{"gid":"${GID:2275468384275427}","resource_type":"project","created_at":"2026-05-23T19:33:56.310Z","modified_at":"2026-05-23T19:33:58.252Z","due_date":null,"due_on":null,"notes":"","archived":false,"default_view":"list","default_access_level":"editor","minimum_access_level_for_customization":"editor","minimum_access_level_for_sharing":"editor","start_on":null,"color":null,"completed":false,"completed_at":null,"completed_by":null,"public":false,"privacy_setting":"private","current_status_update":null,"name":"pytest-e2e-test_project_crud-updated","icon":"list","permalink_url":"https://app.asana.com/1/${WORKSPACE_GID}/project/${GID:2275468384275427}","current_status":null,"workspace":{"gid":"${WORKSPACE_GID}","resource_type":"workspace","name":"${WORKSPACE_NAME}"},"owner":{"gid":"${GID:9210444840269866}","resource_type":"user","name":"${USER_NAME}"},"members":[{"gid":"${GID:9210444840269866}","resource_type":"user","name":"${USER_NAME}"}],"team":{"gid":"${GID:2262018960161802}","resource_type":"team","name":"${TEAM_NAME}"},"followers":[{"gid":"${GID:9210444840269866}","resource_type":"user","name":"${USER_NAME}"}]}}'
     headers:
       Connection:
       - keep-alive
@@ -245,7 +245,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: DELETE
-    uri: https://app.asana.com/api/1.0/projects/2275468384275427
+    uri: https://app.asana.com/api/1.0/projects/${GID:2275468384275427}
   response:
     body:
       string: '{"data":{}}'

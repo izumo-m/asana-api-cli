@@ -16,7 +16,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
   response:
     body:
-      string: '{"data":[{"gid":"8503325469700806","name":"pagination-test"},{"gid":"2750130645330941","name":"pagination-test-small"}],"next_page":null}'
+      string: '{"data":[{"gid":"${GID:8503325469700806}","name":"pagination-test"},{"gid":"${GID:2750130645330941}","name":"pagination-test-small"}],"next_page":null}'
     headers:
       Connection:
       - keep-alive
@@ -80,7 +80,7 @@ interactions:
       code: 200
       message: OK
 - request:
-    body: '{"data": {"name": "pytest-e2e-attachment-parent", "projects": ["8503325469700806"]}}'
+    body: '{"data": {"name": "pytest-e2e-attachment-parent", "projects": ["${GID:8503325469700806}"]}}'
     headers:
       Accept:
       - application/json; charset=utf-8
@@ -96,7 +96,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/tasks
   response:
     body:
-      string: "{\"data\":{\"gid\":\"2740069959401897\",\"resource_type\":\"task\",\"created_at\":\"2026-05-23T19:33:41.940Z\",\"modified_at\":\"2026-05-23T19:33:42.138Z\",\"name\":\"pytest-e2e-attachment-parent\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/8503325469700806/task/2740069959401897\",\"projects\":[{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"followers\":[{\"gid\":\"9210444840269866\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"3991398924663590\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"8503325469700806\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}]}}"
+      string: "{\"data\":{\"gid\":\"${GID:2740069959401897}\",\"resource_type\":\"task\",\"created_at\":\"2026-05-23T19:33:41.940Z\",\"modified_at\":\"2026-05-23T19:33:42.138Z\",\"name\":\"pytest-e2e-attachment-parent\",\"notes\":\"\",\"actual_time_minutes\":0,\"completed\":false,\"completed_at\":null,\"due_on\":null,\"due_at\":null,\"start_on\":null,\"start_at\":null,\"resource_subtype\":\"default_task\",\"num_hearts\":0,\"num_likes\":0,\"assignee\":null,\"assignee_status\":\"upcoming\",\"workspace\":{\"gid\":\"${WORKSPACE_GID}\",\"resource_type\":\"workspace\",\"name\":\"${WORKSPACE_NAME}\"},\"parent\":null,\"hearted\":false,\"liked\":false,\"tags\":[],\"hearts\":[],\"likes\":[],\"permalink_url\":\"https://app.asana.com/1/${WORKSPACE_GID}/project/${GID:8503325469700806}/task/${GID:2740069959401897}\",\"projects\":[{\"gid\":\"${GID:8503325469700806}\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}],\"followers\":[{\"gid\":\"${GID:9210444840269866}\",\"resource_type\":\"user\",\"name\":\"${USER_NAME}\"}],\"memberships\":[{\"section\":{\"gid\":\"${GID:3991398924663590}\",\"resource_type\":\"section\",\"name\":\"\u7121\u984C\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\"},\"project\":{\"gid\":\"${GID:8503325469700806}\",\"resource_type\":\"project\",\"name\":\"pagination-test\"}}]}}"
     headers:
       Connection:
       - keep-alive
@@ -136,7 +136,7 @@ interactions:
       - report-uri https://app.asana.com/-/csp_report?report_only=false;default-src
         'none';frame-src 'none';frame-ancestors 'none'
       location:
-      - /api/1.0/tasks/2740069959401897
+      - /api/1.0/tasks/${GID:2740069959401897}
       pragma:
       - no-cache
       server:
@@ -180,7 +180,7 @@ interactions:
     uri: https://app.asana.com/api/1.0/attachments
   response:
     body:
-      string: '{"data":{"gid":"1290300884005970","resource_type":"attachment","name":"small.png","resource_subtype":"asana"}}'
+      string: '{"data":{"gid":"${GID:1290300884005970}","resource_type":"attachment","name":"small.png","resource_subtype":"asana"}}'
     headers:
       Connection:
       - keep-alive
@@ -252,10 +252,10 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: GET
-    uri: https://app.asana.com/api/1.0/attachments/1290300884005970
+    uri: https://app.asana.com/api/1.0/attachments/${GID:1290300884005970}
   response:
     body:
-      string: '{"data":{"gid":"1290300884005970","created_at":"2026-05-23T19:33:43.209Z","download_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/4843832534293391/704cd0c28c6d3c87aaf328a417a6592d","host":"asana","name":"small.png","parent":{"gid":"2740069959401897","name":"pytest-e2e-attachment-parent","resource_type":"task","resource_subtype":"default_task"},"permanent_url":"https://app.asana.com/app/asana/-/get_asset?asset_id=1290300884005970","resource_type":"attachment","resource_subtype":"asana","view_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/4843832534293391/704cd0c28c6d3c87aaf328a417a6592d"}}'
+      string: '{"data":{"gid":"${GID:1290300884005970}","created_at":"2026-05-23T19:33:43.209Z","download_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/${GID:4843832534293391}/704cd0c28c6d3c87aaf328a417a6592d","host":"asana","name":"small.png","parent":{"gid":"${GID:2740069959401897}","name":"pytest-e2e-attachment-parent","resource_type":"task","resource_subtype":"default_task"},"permanent_url":"https://app.asana.com/app/asana/-/get_asset?asset_id=${GID:1290300884005970}","resource_type":"attachment","resource_subtype":"asana","view_url":"https://asanausercontent.com/us1/assets/${WORKSPACE_GID}/${GID:4843832534293391}/704cd0c28c6d3c87aaf328a417a6592d"}}'
     headers:
       Connection:
       - keep-alive
@@ -332,7 +332,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: DELETE
-    uri: https://app.asana.com/api/1.0/attachments/1290300884005970
+    uri: https://app.asana.com/api/1.0/attachments/${GID:1290300884005970}
   response:
     body:
       string: '{"data":{}}'
@@ -407,7 +407,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: DELETE
-    uri: https://app.asana.com/api/1.0/tasks/2740069959401897
+    uri: https://app.asana.com/api/1.0/tasks/${GID:2740069959401897}
   response:
     body:
       string: '{"data":{}}'

@@ -24,7 +24,10 @@ placeholders by an in-place patch of vcrpy's YAML serializer (see
 ``_templated_yaml_serialize`` / ``_templated_yaml_deserialize`` below)
 and substituted back at load time. PII fields are first masked to the
 binding value by the ``resource_type``-aware response hook so the
-cassette never contains the real email / name / photo.
+cassette never contains the real email / name / photo. Identifiers
+without a named binding are auto-hashed to synthetic gids wrapped in
+``${GID:<synthetic>}`` markers (unwrapped at load time) so that no bare
+numeric gid survives into a committed cassette.
 
 See ``tests/e2e/README.md`` for the full workflow.
 """
@@ -51,6 +54,14 @@ WORKSPACE_ENV = "ASANA_PYTEST_WORKSPACE"
 
 _E2E_ROOT = Path(__file__).parent.resolve()
 _PLACEHOLDER_RE = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+# Self-describing marker wrapping every auto-hashed synthetic gid, e.g.
+# ``${GID:1234567890123456}``. It carries the synthetic value inline (no
+# side table), and the deserializer unwraps it back to the bare synthetic so
+# vcrpy request-matching is unaffected. Its purpose is auditability: a
+# committed cassette must contain *no* bare numeric gid, only ``${GID:...}``
+# markers and named ``${VAR}`` placeholders, which makes "every gid is masked"
+# a checkable invariant (see ``tests/e2e/test_cassette_hygiene.py``).
+_GID_MARK_RE = re.compile(r"\$\{GID:(\d+)\}")
 
 
 # ---------- mode detection (options registered in tests/conftest.py) --------
@@ -290,12 +301,13 @@ def _collect_gids(cassette_dict: Any) -> list[str]:
 
 
 def _synthetic_gid(real_gid: str) -> str:
-    """16-digit decimal placeholder derived from ``sha256(real_gid)``.
+    """16-digit decimal derived from ``sha256(real_gid)``.
 
-    Format ``[1-9][0-9]{15}`` matches a current Asana gid's shape so the
-    cassette stays drop-in compatible (no ``${...}`` wrapping). Same real
-    gid → same synthetic, so identifiers stay traceable by grep across
-    cassettes.
+    Format ``[1-9][0-9]{15}`` matches a current Asana gid's shape, so once
+    the deserializer unwraps the surrounding ``${GID:...}`` marker (see
+    ``_GID_MARK_RE``) the replayed request carries a real-looking gid. Same
+    real gid → same synthetic, so identifiers stay traceable by grep across
+    cassettes (grep either the synthetic or the ``${GID:`` marker).
     """
     digest = hashlib.sha256(real_gid.encode("ascii")).digest()
     n = int.from_bytes(digest[:8], "big")
@@ -334,13 +346,16 @@ def _mask_sync_tokens(obj: Any) -> Any:
 
 
 def _auto_hash_gids(cassette_dict: Any) -> Any:
-    """Replace each discovered identifier with a deterministic synthetic gid.
+    """Replace each discovered identifier with a marked synthetic gid.
 
     Runs AFTER the explicit binding pass so ``${WORKSPACE_GID}`` /
     ``${PAGINATION_PROJECT_GID}`` / ... take priority. The rest — user gid,
     team gid, transient task / project gids, asset ids, etc. — become
-    16-digit decimals that look like real gids but reveal nothing about
-    the recording account.
+    ``${GID:<16-digit synthetic>}`` markers: the synthetic reveals nothing
+    about the recording account, and the ``${GID:...}`` wrapper makes the
+    masking self-evident (no bare numeric gid survives into the cassette, so
+    an unmasked real gid stands out instead of hiding as a look-alike).
+    The deserializer strips the wrapper back to the bare synthetic at replay.
     """
     gids = _collect_gids(cassette_dict)
     if not gids:
@@ -360,7 +375,10 @@ def _auto_hash_gids(cassette_dict: Any) -> Any:
     # Longest-first so a gid that's a prefix of another can't half-match.
     alternation = "|".join(re.escape(g) for g in sorted(gids, key=len, reverse=True))
     pattern = re.compile(r"\b(?:" + alternation + r")\b")
-    return _walk(cassette_dict, lambda s: pattern.sub(lambda m: mapping[m.group(0)], s))
+    return _walk(
+        cassette_dict,
+        lambda s: pattern.sub(lambda m: "${GID:" + mapping[m.group(0)] + "}", s),
+    )
 
 
 # ---------- Per-test cassette mask hook (L3) --------------------------------
@@ -481,7 +499,16 @@ def _templated_yaml_serialize(cassette_dict):  # type: ignore[no-untyped-def]
 def _templated_yaml_deserialize(cassette_string):  # type: ignore[no-untyped-def]
     cassette_dict = _orig_yaml_deserialize(cassette_string)
     bindings = _bindings()
-    return _walk(cassette_dict, lambda s: _substitute_string(s, bindings))
+
+    def _restore(s: str) -> str:
+        # ${VAR} → bound value (or the bare VAR fallback); ${GID:N} → bare
+        # synthetic N. Independent syntaxes, so order is immaterial: the
+        # ${VAR} pattern requires an upper-case name and never matches
+        # ${GID:<digits>}.
+        s = _substitute_string(s, bindings)
+        return _GID_MARK_RE.sub(lambda m: m.group(1), s)
+
+    return _walk(cassette_dict, _restore)
 
 
 yamlserializer.serialize = _templated_yaml_serialize
