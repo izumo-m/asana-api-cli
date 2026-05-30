@@ -115,11 +115,11 @@ structured value, use bash process substitution:
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
-| `--output FORMAT` | *(none)* | CLI-only. `json` / `table` / `csv` / `text` rendering by `_format_output`; `none` suppresses output (use when only the exit code matters). Default `json` is canonical/lossless. Symmetric with `--output-errors none` |
+| `--output FORMAT` | *(none)* | CLI-only. `json` / `table` / `csv` / `text` rendering by `_format_output`; `none` suppresses output (use when only the exit code matters). Default `json` is canonical/lossless. Symmetric with `--exception-output none` |
 | `--query EXPR` | *(none)* | CLI-only. Pipes the response through `jq` (`jqlib.all`). Runs and validates even under `--output none` so jq errors stay observable (exit 2) regardless of the format flag |
 | `--csv-bom` | *(none)* | CLI-only. Prepends UTF-8 BOM in `_print_csv` |
-| `--output-errors {none\|json\|text\|csv\|table}` | *(none)* | CLI-only. The error-path twin of `--output`: catches an exception raised by the SDK call and echoes it to **stderr** in Python's top-level format (no traceback) — for `ApiException` this includes status / reason / headers / body. Default `none` then exits `1` with no envelope; any other format additionally renders the envelope on **stdout** and exits `3`, reusing the same `_format_output`. See [`sdk-deviations.md`](sdk-deviations.md) for the schema and [`exit-codes.md`](exit-codes.md) for exit codes |
-| `--query-errors EXPR` | *(none)* | CLI-only. The error-path twin of `--query`: applies a `jq` filter to the error envelope; each yield is rendered per `--output-errors`. Pairing with the default `none` warns to stderr (the filter is a no-op) but does not block the call |
+| `--exception-output {none\|json\|text\|csv\|table}` | *(none)* | CLI-only. The error-path twin of `--output`: catches an exception raised by the SDK call and echoes it to **stderr** in Python's top-level format (no traceback) — for `ApiException` this includes status / reason / headers / body. Default `none` then exits `1` with no envelope; any other format additionally renders the envelope on **stdout** and exits `3`, reusing the same `_format_output`. See [`sdk-deviations.md`](sdk-deviations.md) for the schema and [`exit-codes.md`](exit-codes.md) for exit codes |
+| `--exception-query EXPR` | *(none)* | CLI-only. The error-path twin of `--query`: applies a `jq` filter to the error envelope; each yield is rendered per `--exception-output`. Pairing with the default `none` warns to stderr (the filter is a no-op) but does not block the call |
 
 All five are also cataloged in [`sdk-deviations.md`](sdk-deviations.md). Because
 they bind to the single SDK method call (not the client `Configuration`), they

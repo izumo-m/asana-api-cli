@@ -270,7 +270,7 @@ Coverage at a glance:
 - **Retry**: `--retry-strategy` (shorthand, JSON object, or `@file`)
 - **Logging / debug**: `--debug`, `--logger-format`, `--logger-file`
 - **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`
-- **Structured errors**: `--output-errors {none|json|text|csv|table}`, `--query-errors EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
+- **Structured errors**: `--exception-output {none|json|text|csv|table}`, `--exception-query EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
 
 `--request-timeout`, `--header-params`, `--item-limit`, and `--full-payload`
 are **not** global: they are per-call SDK kwargs (the method `all_params`),
@@ -292,7 +292,7 @@ asana-api --debug tasks get-tasks --project <PID>
 asana-api --retry-strategy 'total=5,backoff_factor=1.5' tasks get-tasks --project <PID>
 
 # Catch SDK exceptions as a structured envelope on stdout (exit 3)
-asana-api --output-errors json tasks get-task --task <GID>
+asana-api tasks get-task --task <GID> --exception-output json
 ```
 
 Asana only accepts Bearer-token authentication (personal access token,

@@ -266,7 +266,7 @@ def _escape_help(text: str) -> str:
 # ``_make_global_option_params`` (kept byte-identical between cli.py and
 # click_ext.py by ``test_click_ext.TestHelpTextSync``); the CLI-only formatter
 # flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
-# ``--output-errors`` / ``--query-errors``) live only in ``formatted``. This
+# ``--exception-output`` / ``--exception-query``) live only in ``formatted``. This
 # helper builds every label
 # ``_make_command`` derives at runtime: ``arg`` / ``opts`` for path / body /
 # docstring params, ``kwarg`` for the common per-call kwargs, and the
@@ -959,7 +959,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     callback = formatted(inner_callback)
 
     # ``formatted`` adds the output-formatting options (--output / --query /
-    # --csv-bom and their error-path twins --output-errors / --query-errors)
+    # --csv-bom and their error-path twins --exception-output / --exception-query)
     # via click.option decorators; pull those Option instances out of the
     # wrapped callback (in natural order) and append them to our options list.
     fmt_params = list(reversed(getattr(callback, "__click_params__", [])))

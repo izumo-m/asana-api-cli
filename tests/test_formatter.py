@@ -326,11 +326,11 @@ class TestCsvFieldnamesUnion:
 
 
 class TestHandleApiException:
-    """Cover the JSON envelope path with ``--output-errors json``.
+    """Cover the JSON envelope path with ``--exception-output json``.
 
-    The default of ``--output-errors`` is ``none`` (stderr echo + exit
+    The default of ``--exception-output`` is ``none`` (stderr echo + exit
     1, no envelope); these tests opt into the envelope by passing
-    ``output_errors="json"`` explicitly to ``_handle_exception`` — these are
+    ``exception_output="json"`` explicitly to ``_handle_exception`` — these are
     now the leaf command's per-call option values, not global runtime state.
 
     Schema: ``{exception, status, reason, body, headers}`` where ``body``
@@ -357,7 +357,7 @@ class TestHandleApiException:
         body = json.dumps({"sync": "abc", "errors": [{"message": "Sync token invalid"}]})
         exc = self._make_exception(body=body, headers={"X-Asana-Request-Id": "r1"})
         with pytest.raises(SystemExit) as exc_info:
-            _handle_exception(exc, output_errors="json", query_errors=None)
+            _handle_exception(exc, exception_output="json", exception_query=None)
         assert exc_info.value.code == 3
         env = self._envelope(capsys)
         assert env["exception"] == "asana.rest.ApiException"
@@ -370,7 +370,7 @@ class TestHandleApiException:
         html = "<html><body>502</body></html>"
         exc = self._make_exception(status=502, reason="Bad Gateway", body=html)
         with pytest.raises(SystemExit):
-            _handle_exception(exc, output_errors="json", query_errors=None)
+            _handle_exception(exc, exception_output="json", exception_query=None)
         env = self._envelope(capsys)
         assert env["status"] == 502
         assert env["body"] == html
@@ -379,7 +379,7 @@ class TestHandleApiException:
         body_bytes = json.dumps({"errors": []}).encode("utf-8")
         exc = self._make_exception(body=body_bytes)
         with pytest.raises(SystemExit):
-            _handle_exception(exc, output_errors="json", query_errors=None)
+            _handle_exception(exc, exception_output="json", exception_query=None)
         env = self._envelope(capsys)
         assert env["body"] == body_bytes.decode("utf-8")
 
@@ -388,7 +388,7 @@ class TestHandleApiException:
         # so the envelope still emits a string rather than failing.
         exc = self._make_exception(body=b"\x80\x81\x82")
         with pytest.raises(SystemExit):
-            _handle_exception(exc, output_errors="json", query_errors=None)
+            _handle_exception(exc, exception_output="json", exception_query=None)
         env = self._envelope(capsys)
         assert isinstance(env["body"], str)
 
@@ -397,7 +397,7 @@ class TestHandleApiException:
         # reason=..., body=None, headers=None).
         exc = self._make_exception(status=0, reason="SSLError\n...", body=None, headers=None)
         with pytest.raises(SystemExit) as exc_info:
-            _handle_exception(exc, output_errors="json", query_errors=None)
+            _handle_exception(exc, exception_output="json", exception_query=None)
         assert exc_info.value.code == 3
         env = self._envelope(capsys)
         assert env["status"] == 0
@@ -413,7 +413,7 @@ class TestHandleApiException:
 
         exc = CustomApiException(status=500, reason="Boom")
         with pytest.raises(SystemExit):
-            _handle_exception(exc, output_errors="json", query_errors=None)
+            _handle_exception(exc, exception_output="json", exception_query=None)
         env = self._envelope(capsys)
         # Module is this test file; qualname includes the nested class
         # path. Asserting the suffix is robust to test-runner module
@@ -423,7 +423,7 @@ class TestHandleApiException:
 
 
 class TestHandleApiExceptionFormats:
-    """``--output-errors`` reuses ``_format_output``; cover the four formats."""
+    """``--exception-output`` reuses ``_format_output``; cover the four formats."""
 
     def _make_exception(self) -> ApiException:
         exc = ApiException(status=412, reason="Precondition Failed")
@@ -433,7 +433,7 @@ class TestHandleApiExceptionFormats:
 
     def test_text_format(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit):
-            _handle_exception(self._make_exception(), output_errors="text", query_errors=None)
+            _handle_exception(self._make_exception(), exception_output="text", exception_query=None)
         # _print_text for a dict joins values by tab.
         out = capsys.readouterr().out.rstrip("\n")
         cells = out.split("\t")
@@ -445,7 +445,7 @@ class TestHandleApiExceptionFormats:
 
     def test_csv_format(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit):
-            _handle_exception(self._make_exception(), output_errors="csv", query_errors=None)
+            _handle_exception(self._make_exception(), exception_output="csv", exception_query=None)
         out = capsys.readouterr().out.strip().splitlines()
         assert out[0] == "exception,status,reason,body,headers"
         # data row begins with FQDN exception + status etc.; headers cell is JSON
@@ -454,7 +454,9 @@ class TestHandleApiExceptionFormats:
 
     def test_table_format(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit):
-            _handle_exception(self._make_exception(), output_errors="table", query_errors=None)
+            _handle_exception(
+                self._make_exception(), exception_output="table", exception_query=None
+            )
         out = capsys.readouterr().out
         # tabulate's "simple" format puts column headers on line 0.
         assert "exception" in out and "status" in out and "headers" in out
@@ -462,15 +464,15 @@ class TestHandleApiExceptionFormats:
 
     def test_json_format(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit):
-            _handle_exception(self._make_exception(), output_errors="json", query_errors=None)
+            _handle_exception(self._make_exception(), exception_output="json", exception_query=None)
         env = json.loads(capsys.readouterr().out)
         assert env["exception"] == "asana.rest.ApiException"
         assert env["status"] == 412
 
 
 class TestHandleApiExceptionQuery:
-    """``--query-errors`` applies jq to the envelope; output format follows
-    ``--output-errors``. Both arrive as explicit ``_handle_exception`` kwargs
+    """``--exception-query`` applies jq to the envelope; output format follows
+    ``--exception-output``. Both arrive as explicit ``_handle_exception`` kwargs
     (the leaf command's per-call option values)."""
 
     def _make_exception(self) -> ApiException:
@@ -480,7 +482,9 @@ class TestHandleApiExceptionQuery:
 
     def test_query_filter_default_json(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            _handle_exception(self._make_exception(), output_errors="json", query_errors=".status")
+            _handle_exception(
+                self._make_exception(), exception_output="json", exception_query=".status"
+            )
         assert exc_info.value.code == 3
         assert capsys.readouterr().out.strip() == "412"
 
@@ -490,15 +494,17 @@ class TestHandleApiExceptionQuery:
         with pytest.raises(SystemExit):
             _handle_exception(
                 self._make_exception(),
-                output_errors="text",
-                query_errors=".body | fromjson | .sync",
+                exception_output="text",
+                exception_query=".body | fromjson | .sync",
             )
         # text format outputs the bare scalar (no JSON quotes)
         assert capsys.readouterr().out.strip() == "new-token"
 
     def test_query_invalid_jq_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            _handle_exception(self._make_exception(), output_errors="json", query_errors="bad((")
+            _handle_exception(
+                self._make_exception(), exception_output="json", exception_query="bad(("
+            )
         # exit 2 = user-input error (jq syntax). docs/exit-codes.md.
         assert exc_info.value.code == 2
         # The error message ("Invalid jq expression: ...") is the one
@@ -543,7 +549,7 @@ class TestScalarText:
 class TestHandleNonApiException:
     """Non-ApiException exceptions (urllib3 connection errors, generic
     Python errors) collapse to ``{exception, reason}`` — no HTTP context
-    fields, since none apply. ``output_errors="json"`` is passed explicitly
+    fields, since none apply. ``exception_output="json"`` is passed explicitly
     (the leaf command's per-call option value)."""
 
     def _envelope(self, capsys: pytest.CaptureFixture[str]) -> Any:
@@ -558,7 +564,7 @@ class TestHandleNonApiException:
             reason=Exception("connection refused"),
         )
         with pytest.raises(SystemExit) as exc_info:
-            _handle_exception(exc, output_errors="json", query_errors=None)
+            _handle_exception(exc, exception_output="json", exception_query=None)
         assert exc_info.value.code == 3
         env = self._envelope(capsys)
         assert env["exception"] == "urllib3.exceptions.MaxRetryError"
@@ -571,7 +577,7 @@ class TestHandleNonApiException:
 
     def test_builtin_exception(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            _handle_exception(RuntimeError("oops"), output_errors="json", query_errors=None)
+            _handle_exception(RuntimeError("oops"), exception_output="json", exception_query=None)
         assert exc_info.value.code == 3
         env = self._envelope(capsys)
         assert env["exception"] == "builtins.RuntimeError"
@@ -591,8 +597,8 @@ class TestEchoExceptionOnly:
     embeds status / reason / headers / body across separate lines).
 
     Called by the ``formatted`` decorator before either branch
-    (``--output-errors=none`` exit-1 or the envelope formats exit-3),
-    so the stderr format is identical regardless of ``output_errors``.
+    (``--exception-output=none`` exit-1 or the envelope formats exit-3),
+    so the stderr format is identical regardless of ``exception_output``.
     """
 
     def test_api_exception_includes_full_http_context(
@@ -626,10 +632,10 @@ class TestEchoExceptionOnly:
 
 class TestFormattedDecoratorStderrEcho:
     """Integration: the ``formatted`` decorator runs ``_echo_exception_only``
-    before either exit path, so ``--query-errors`` cannot mask the raw
+    before either exit path, so ``--exception-query`` cannot mask the raw
     exception by stripping it from the stdout envelope."""
 
-    def test_query_errors_cannot_hide_raw_exception(self) -> None:
+    def test_exception_query_cannot_hide_raw_exception(self) -> None:
         @click.command()
         @formatted
         def cmd() -> Any:
@@ -637,7 +643,9 @@ class TestFormattedDecoratorStderrEcho:
             exc.body = "<html>oops</html>"  # type: ignore[assignment]
             raise exc
 
-        result = make_runner().invoke(cmd, ["--output-errors", "json", "--query-errors", ".status"])
+        result = make_runner().invoke(
+            cmd, ["--exception-output", "json", "--exception-query", ".status"]
+        )
         assert result.exit_code == 3
         # Stdout: only ``.status`` after the jq filter.
         assert result.stdout.strip() == "500"
@@ -745,7 +753,7 @@ class TestFormattedDecorator:
     # to prevent. Test removed.
 
     def test_api_exception_envelope(self) -> None:
-        """With --output-errors json, ApiException is rendered as an
+        """With --exception-output json, ApiException is rendered as an
         envelope on stdout (exit 3) and *also* echoed to stderr via
         ``_echo_exception_only`` — the same stderr format used by the
         ``none`` branch. Regression guard against the echo being lost
@@ -758,7 +766,7 @@ class TestFormattedDecorator:
             raise ApiException(status=403, reason="Forbidden")
 
         runner = make_runner()
-        result = runner.invoke(cmd, ["--output-errors", "json"])
+        result = runner.invoke(cmd, ["--exception-output", "json"])
         assert result.exit_code == 3
         env = json.loads(result.stdout)
         assert env["exception"] == "asana.rest.ApiException"
@@ -771,7 +779,7 @@ class TestFormattedDecorator:
 
 
 class TestNoneDefault:
-    """``--output-errors none`` (the default) catches the exception,
+    """``--exception-output none`` (the default) catches the exception,
     writes ``traceback.format_exception_only`` (qualified class name +
     ``__str__``, *no* traceback frames) to stderr, and exits 1. For
     ``ApiException`` the stderr output is multi-line (status, reason,
@@ -815,7 +823,7 @@ class TestFormatOutputExitCodes:
     call exception path).
 
     Anchors the exit-code policy: ``_format_output`` never produces
-    exit 1 by itself — exit 1 is reserved for the ``--output-errors=none``
+    exit 1 by itself — exit 1 is reserved for the ``--exception-output=none``
     SDK exception path in :func:`formatted` (see ``docs/exit-codes.md``).
     """
 
@@ -829,7 +837,7 @@ class TestFormatOutputExitCodes:
 class TestFormatOutputNone:
     """``--output none`` suppresses the success payload but still runs the
     ``--query`` pass, so value-level validation is independent of the chosen
-    format. Symmetric with ``--output-errors none``."""
+    format. Symmetric with ``--exception-output none``."""
 
     def test_no_output(self, capsys: pytest.CaptureFixture[str]) -> None:
         _format_output({"gid": "1", "name": "T"}, output_format="none", jq_query=None)

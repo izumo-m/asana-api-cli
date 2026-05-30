@@ -779,13 +779,13 @@ class TestWorkspaceResolution:
         result = make_runner().invoke(cmd, [])
         # exit 2 = user-input error (workspace missing). docs/exit-codes.md
         # — CLI does not set exit 1 for user-input errors; exit 1 is
-        # reserved for the SDK call exception path (``--output-errors=none``).
+        # reserved for the SDK call exception path (``--exception-output=none``).
         assert result.exit_code == 2
         assert mock.call_count == 0
 
 
 # ---------------------------------------------------------------------------
-# Error path: --output-errors / --query-errors / exit code policy (v3.1)
+# Error path: --exception-output / --exception-query / exit code policy (v3.1)
 # ---------------------------------------------------------------------------
 
 
@@ -800,7 +800,7 @@ def _api_exception(status: int, body: str) -> Exception:
 class TestErrorPathExitCodes:
     """End-to-end verification of the v3.1 exit code policy.
 
-    Reference: docs/exit-codes.md. Default ``--output-errors=none``
+    Reference: docs/exit-codes.md. Default ``--exception-output=none``
     catches the SDK exception, writes ``format_exception_only``
     (qualified class + ``__str__``, no traceback) to stderr, and exits
     1. Opting into an envelope format produces a machine-readable
@@ -818,7 +818,7 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"new-token","errors":[]}')],
         )
-        # Default --output-errors=none: catch + stderr echo + exit 1,
+        # Default --exception-output=none: catch + stderr echo + exit 1,
         # no traceback. The 412 sync-token body is reachable through
         # ApiException.__str__ on stderr — no need to opt into an
         # envelope format just to see it.
@@ -839,7 +839,7 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"new-token","errors":[]}')],
         )
-        result = make_runner().invoke(cmd, ["--output-errors", "json", "--task", "T1"])
+        result = make_runner().invoke(cmd, ["--exception-output", "json", "--task", "T1"])
         assert result.exit_code == 3
         # Envelope lands on stdout (not stderr).
         env = json.loads(result.stdout)
@@ -847,7 +847,7 @@ class TestErrorPathExitCodes:
         assert env["status"] == 412
         assert env["body"] == '{"sync":"new-token","errors":[]}'
 
-    def test_query_errors_with_json_yield(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_exception_query_with_json_yield(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(
             monkeypatch,
@@ -855,14 +855,14 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"recovered","errors":[]}')],
         )
-        # --query-errors requires an explicit --output-errors format
+        # --exception-query requires an explicit --exception-output format
         # (the default 'none' would refuse it). json yields the quoted scalar.
         result = make_runner().invoke(
             cmd,
             [
-                "--output-errors",
+                "--exception-output",
                 "json",
-                "--query-errors",
+                "--exception-query",
                 ".body | fromjson | .sync",
                 "--task",
                 "T1",
@@ -871,7 +871,9 @@ class TestErrorPathExitCodes:
         assert result.exit_code == 3
         assert result.stdout.strip() == '"recovered"'
 
-    def test_query_errors_text_output_is_raw_scalar(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_exception_query_text_output_is_raw_scalar(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(
             monkeypatch,
@@ -879,14 +881,14 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"recovered","errors":[]}')],
         )
-        # --output-errors text turns the scalar into raw output (no quotes) —
+        # --exception-output text turns the scalar into raw output (no quotes) —
         # the events-polling idiom (see docs/api-events.md).
         result = make_runner().invoke(
             cmd,
             [
-                "--query-errors",
+                "--exception-query",
                 ".body | fromjson | .sync",
-                "--output-errors",
+                "--exception-output",
                 "text",
                 "--task",
                 "T1",
@@ -895,7 +897,7 @@ class TestErrorPathExitCodes:
         assert result.exit_code == 3
         assert result.stdout.strip() == "recovered"
 
-    def test_query_errors_invalid_jq_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_exception_query_invalid_jq_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(
             monkeypatch,
@@ -905,13 +907,13 @@ class TestErrorPathExitCodes:
         )
         result = make_runner().invoke(
             cmd,
-            ["--output-errors", "json", "--query-errors", "bad((", "--task", "T1"],
+            ["--exception-output", "json", "--exception-query", "bad((", "--task", "T1"],
         )
         # exit 2 = user-input error (bad jq syntax). docs/exit-codes.md
         assert result.exit_code == 2
         assert "Invalid jq expression" in full_output(result)
 
-    def test_query_errors_alone_warns(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_exception_query_alone_warns(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(
             monkeypatch,
@@ -919,7 +921,7 @@ class TestErrorPathExitCodes:
             "get_task",
             side_effect=[_api_exception(412, '{"sync":"x"}')],
         )
-        # --query-errors paired with the default --output-errors=none
+        # --exception-query paired with the default --exception-output=none
         # warns to stderr — the warning informs the user that the
         # filter is being ignored, but the underlying SDK call
         # behavior is preserved (``none`` mode catches the
@@ -928,14 +930,14 @@ class TestErrorPathExitCodes:
         # exception with a usage error.
         result = make_runner().invoke(
             cmd,
-            ["--query-errors", ".exception", "--task", "T1"],
+            ["--exception-query", ".exception", "--task", "T1"],
         )
         assert result.exit_code == 1
         assert "asana.rest.ApiException" in result.stderr
-        assert "--query-errors is ignored when --output-errors is 'none'" in result.stderr
+        assert "--exception-query is ignored when --exception-output is 'none'" in result.stderr
 
-    def test_query_errors_rejected_at_group_level(self) -> None:
-        """``--query-errors`` is a per-command formatter option (leaf-only),
+    def test_exception_query_rejected_at_group_level(self) -> None:
+        """``--exception-query`` is a per-command formatter option (leaf-only),
         symmetric with ``--query`` — no longer a global flag. Placing it at a
         non-leaf (group) level is therefore a Click usage error, not silent
         propagation. The ``none`` + filter warning now fires from the leaf
@@ -955,10 +957,10 @@ class TestErrorPathExitCodes:
 
         result = make_runner().invoke(
             group,
-            ["--query-errors", ".exception", "get-task", "--task", "T1"],
+            ["--exception-query", ".exception", "get-task", "--task", "T1"],
         )
         assert result.exit_code == 2, full_output(result)
-        assert "No such option: --query-errors" in full_output(result)
+        assert "No such option: --exception-query" in full_output(result)
 
     def test_query_invalid_jq_on_success_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")

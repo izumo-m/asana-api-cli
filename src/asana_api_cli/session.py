@@ -168,7 +168,7 @@ class _Runtime:
     # (full_payload / item_limit / header_params / _request_timeout) are NOT
     # here: they are per-command options forwarded by ``cli.py:_make_command``.
     # The CLI-only output-formatting options (--output / --query and their
-    # error-path twins --output-errors / --query-errors) are likewise not here:
+    # error-path twins --exception-output / --exception-query) are likewise not here:
     # they flow as kwargs through ``formatter.py:formatted``.
     return_page_iterator: bool | None = None
     page_limit: int | None = None

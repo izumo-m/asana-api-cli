@@ -4,7 +4,7 @@ Four scenarios cover the parts of ``/batch`` semantics that are unique
 to batching:
 
 * **E-1 / E-2**: ``actions`` outside the 1–10 range -> parent 400. The
-  test surfaces the parent failure via ``--output-errors json`` (envelope
+  test surfaces the parent failure via ``--exception-output json`` (envelope
   on stdout, exit 3) so the response shape is assertable.
 * **N-1**: 9 valid + 1 invalid GET -> parent 200 with one per-action
   4xx + ``body.errors[]``. Exercises the "parent always 200 even when
@@ -75,7 +75,7 @@ def test_batch_zero_actions_returns_400() -> None:
         "create-batch-request",
         "--body",
         _batch_body([]),
-        "--output-errors",
+        "--exception-output",
         "json",
     )
     assert code == 3, out
@@ -92,7 +92,7 @@ def test_batch_over_limit_returns_400() -> None:
         "create-batch-request",
         "--body",
         _batch_body([_me_action() for _ in range(11)]),
-        "--output-errors",
+        "--exception-output",
         "json",
     )
     assert code == 3, out

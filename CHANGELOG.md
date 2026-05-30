@@ -9,22 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Structured error handling** — new per-command options `--output-errors
-  {none|json|text|csv|table}` and `--query-errors EXPR` (the error-path twins of
+- **Structured error handling** — new per-command options `--exception-output
+  {none|json|text|csv|table}` and `--exception-query EXPR` (the error-path twins of
   `--output` / `--query`, on every command). The SDK exception is
   always echoed to **stderr** in Python's top-level format (no traceback; for
   `ApiException` this already includes status / reason / headers / body). The
   default `none` exits `1` with no envelope, so the response payload (e.g. the
   412 sync-token body in events polling) is readable from stderr without extra
   flags. The other formats also render a `{exception, status, reason, body,
-  headers}` envelope on **stdout** and exit `3`; `--query-errors` filters that
+  headers}` envelope on **stdout** and exit `3`; `--exception-query` filters that
   envelope through `jq`. See [`docs/exit-codes.md`](docs/exit-codes.md) and
   [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 
 - **`--output none`** suppresses the success payload for side-effect-only
   operations (delete, update) where only the exit code matters. `--query` still
   runs, so a broken jq expression still surfaces as exit `2`. Symmetric with
-  `--output-errors none`.
+  `--exception-output none`.
 
 - **`--header-params VALUE`** (on every command) sends arbitrary HTTP request
   headers. Accepts shorthand `'k1=v1,k2=v2,...'`, a JSON object, or
@@ -71,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Nested values in `--output text` / `csv` / `table`** now render as JSON
   (`{"a":"b"}`) rather than Python `repr` (`{'a': 'b'}`). Same for
-  `--output-errors`.
+  `--exception-output`.
 
 - **Auto-iteration is driven by the SDK return type.** Paged responses are
   walked when the SDK returns an iterator, rather than by a per-method

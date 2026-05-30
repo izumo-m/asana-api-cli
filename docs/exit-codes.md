@@ -3,9 +3,9 @@
 | Exit | Meaning |
 |---|---|
 | `0` | success |
-| `1` | SDK call exception, no envelope (default `--output-errors=none`: the exception is echoed to stderr without traceback frames) |
+| `1` | SDK call exception, no envelope (default `--exception-output=none`: the exception is echoed to stderr without traceback frames) |
 | `2` | user input invalid (e.g. Click usage error, invalid jq) |
-| `3` | SDK call exception rendered as an envelope on stdout (requires `--output-errors {json\|text\|csv\|table}`) |
+| `3` | SDK call exception rendered as an envelope on stdout (requires `--exception-output {json\|text\|csv\|table}`) |
 | anything else | unclassified (no contract) |
 
 ## Shell pattern
@@ -21,7 +21,7 @@ silence it with `2>/dev/null` if a pure stdout contract is preferred.
 
 ```bash
 out=$(asana-api events get-events --resource $rid --sync $sync \
-  --full-payload --output-errors json)
+  --full-payload --exception-output json)
 case $? in
   0) # success: $out is the payload
      echo "$out" | jq -c '.data[]'
@@ -34,11 +34,11 @@ case $? in
 esac
 ```
 
-Without `--output-errors`, the default `none` mode catches the exception
+Without `--exception-output`, the default `none` mode catches the exception
 and writes the formatted exception (no traceback frames) to stderr
 before exiting 1. For `ApiException`, that output is multi-line and
 already includes status, reason, response headers, and response body
 — so the 412 sync-token body in events polling is readable from
 stderr without opting into an envelope format. Scripts that need to
 parse the body into structured fields should still use
-`--output-errors {json|text|csv|table}` for the stdout envelope.
+`--exception-output {json|text|csv|table}` for the stdout envelope.

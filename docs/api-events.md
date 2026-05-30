@@ -12,15 +12,15 @@ for the resource-coverage details and the event payload shape.
 RES=<task or project gid>
 
 # Bootstrap: the first call always returns 412 with a fresh sync token
-# in the response body. ``--output-errors text`` opts into an envelope
+# in the response body. ``--exception-output text`` opts into an envelope
 # on **stdout** (default ``none`` puts the formatted exception on
 # stderr, which is fine for humans but not capturable by ``$(...)``).
 # The envelope's ``body`` is the raw response string, so ``fromjson``
 # parses it; ``text`` format makes the scalar print without JSON quotes.
 SYNC=$(asana-api events get-events --resource "$RES" \
   --full-payload \
-  --output-errors text \
-  --query-errors '.body | fromjson | .sync')
+  --exception-output text \
+  --exception-query '.body | fromjson | .sync')
 [ -z "$SYNC" ] && exit 1
 
 # Poll: send the token, print events, rotate, sleep, repeat.
@@ -28,8 +28,8 @@ SYNC=$(asana-api events get-events --resource "$RES" \
 while true; do
   RESP=$(asana-api events get-events --resource "$RES" --sync "$SYNC" \
     --full-payload \
-    --output-errors text \
-    --query-errors '.body | fromjson | .sync')
+    --exception-output text \
+    --exception-query '.body | fromjson | .sync')
   case $? in
     0) echo "$RESP"
        SYNC=$(echo "$RESP" | jq -r '.sync')
@@ -45,7 +45,7 @@ while true; do
 done
 ```
 
-The script uses `--output-errors text` + `--query-errors` because
+The script uses `--exception-output text` + `--exception-query` because
 every events call may return a 412 whose body carries the next sync
 token — extracting that body programmatically requires the envelope
 path on stdout. See [`exit-codes.md`](exit-codes.md) and
@@ -62,8 +62,8 @@ absorption happens on every subsequent rotation.
 
 `--full-payload` switches the SDK to non-iterator mode (returns the
 raw `{data, sync, has_more}` payload), which lets the 412 bubble up
-to the CLI's exception handler, where `--output-errors` /
-`--query-errors` then expose the envelope — including the rotated sync
+to the CLI's exception handler, where `--exception-output` /
+`--exception-query` then expose the envelope — including the rotated sync
 — on stdout.
 
 So `--full-payload` belongs on **every** events call, not just the
@@ -74,7 +74,7 @@ bootstrap.
 When a token expires, the next poll returns 412 with a fresh token in
 the body — same shape as bootstrap. A production loop should treat
 exit `3` from a steady-state poll as "re-run the bootstrap step"; the
-example above does not include that recovery path. (`--output-errors`
+example above does not include that recovery path. (`--exception-output`
 is therefore needed on the polling call too, not just on bootstrap.)
 
 See also: [`exit-codes.md`](exit-codes.md),

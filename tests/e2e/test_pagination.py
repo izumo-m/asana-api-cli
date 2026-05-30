@@ -113,7 +113,7 @@ def test_full_payload_without_limit_errors(pagination_project_gid: str) -> None:
     Pairs with ``test_full_payload_under_threshold`` which covers the
     success case.
     """
-    # --output-errors json opts into the envelope path so we can inspect
+    # --exception-output json opts into the envelope path so we can inspect
     # the API body programmatically on **stdout**. The default 'none'
     # would exit 1 with the body on **stderr** — readable for humans
     # but not what this test's ``out`` capture parses as JSON.
@@ -123,7 +123,7 @@ def test_full_payload_without_limit_errors(pagination_project_gid: str) -> None:
         "--project",
         pagination_project_gid,
         "--full-payload",
-        "--output-errors",
+        "--exception-output",
         "json",
     )
     assert code == 3

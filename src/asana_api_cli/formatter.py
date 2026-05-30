@@ -18,7 +18,7 @@ def formatted(f: Any) -> Any:
     """Decorator that adds the output-formatting options and renders the result.
 
     Success path: ``--output`` / ``--query`` / ``--csv-bom``. Error path:
-    ``--output-errors`` / ``--query-errors`` — the symmetric counterparts that
+    ``--exception-output`` / ``--exception-query`` — the symmetric counterparts that
     format an exception raised by the wrapped SDK call. Both pairs are
     per-command (leaf) options bound to the single method invocation, not
     global flags: a CLI run dispatches exactly one leaf command, so the error
@@ -34,7 +34,7 @@ def formatted(f: Any) -> Any:
             "Output format (default: json). 'none' suppresses the success "
             "payload entirely — useful when only the exit code matters "
             "(e.g. side-effect-only operations like delete-task). "
-            "Symmetric counterpart of --output-errors 'none' "
+            "Symmetric counterpart of --exception-output 'none' "
             "(asana-api extension)"
         ),
     )
@@ -55,8 +55,8 @@ def formatted(f: Any) -> Any:
         ),
     )
     @click.option(
-        "--output-errors",
-        "output_errors",
+        "--exception-output",
+        "exception_output",
         type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
         default="none",
         show_default=True,
@@ -71,12 +71,12 @@ def formatted(f: Any) -> Any:
         ),
     )
     @click.option(
-        "--query-errors",
-        "query_errors",
+        "--exception-query",
+        "exception_query",
         default=None,
         help=(
             "Apply a jq filter to the error envelope; result is rendered via "
-            "--output-errors. Pairing with the default 'none' emits a stderr "
+            "--exception-output. Pairing with the default 'none' emits a stderr "
             "warning (the filter would be a no-op) but does not block the call "
             "(asana-api extension)"
         ),
@@ -87,19 +87,19 @@ def formatted(f: Any) -> Any:
         output_format: str,
         jq_query: str | None,
         csv_bom: bool,
-        output_errors: str,
-        query_errors: str | None,
+        exception_output: str,
+        exception_query: str | None,
         **kwargs: Any,
     ) -> None:
-        # ``--query-errors`` paired with the default ``--output-errors none``
+        # ``--exception-query`` paired with the default ``--exception-output none``
         # has no envelope to filter — the expression would silently do nothing.
         # Warn (don't block) so the underlying call result / exception is
         # preserved rather than masked by a usage error. Fires on every
         # invocation regardless of outcome, mirroring the success path.
-        if output_errors == "none" and query_errors is not None:
+        if exception_output == "none" and exception_query is not None:
             click.echo(
-                "warning: --query-errors is ignored when --output-errors is "
-                "'none' (the default) — pass --output-errors {json,text,csv,table} "
+                "warning: --exception-query is ignored when --exception-output is "
+                "'none' (the default) — pass --exception-output {json,text,csv,table} "
                 "to enable error filtering.",
                 err=True,
             )
@@ -125,11 +125,11 @@ def formatted(f: Any) -> Any:
             # body — the useful payload (e.g. the 412 sync-token body
             # in events polling) stays visible without traceback noise.
             _echo_exception_only(e)
-            if output_errors == "none":
+            if exception_output == "none":
                 sys.exit(1)
             # Otherwise also render a ``{exception, ...}`` envelope on
             # stdout and exit 3.
-            _handle_exception(e, output_errors=output_errors, query_errors=query_errors)
+            _handle_exception(e, exception_output=exception_output, exception_query=exception_query)
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
     return wrapper
@@ -137,7 +137,7 @@ def formatted(f: Any) -> Any:
 
 def formatter_flag_names() -> frozenset[str]:
     """Flag strings declared by :func:`formatted` (``--output`` / ``--query`` /
-    ``--csv-bom`` / ``--output-errors`` / ``--query-errors``).
+    ``--csv-bom`` / ``--exception-output`` / ``--exception-query``).
 
     Derived from the decorator itself (not a hand-kept list) so it cannot drift
     from the actual options — including when those flags are later renamed.
@@ -182,8 +182,8 @@ def _echo_exception_only(e: BaseException) -> None:
     from the envelope.
 
     Always written from :func:`formatted` (both
-    ``--output-errors=none`` and the envelope formats), so the raw
-    exception stays visible even when ``--query-errors`` would
+    ``--exception-output=none`` and the envelope formats), so the raw
+    exception stays visible even when ``--exception-query`` would
     otherwise strip it from stdout.
     """
     click.echo(
@@ -193,12 +193,14 @@ def _echo_exception_only(e: BaseException) -> None:
     )
 
 
-def _handle_exception(e: Exception, *, output_errors: str, query_errors: str | None) -> NoReturn:
+def _handle_exception(
+    e: Exception, *, exception_output: str, exception_query: str | None
+) -> NoReturn:
     """Render an exception envelope on stdout and exit 3.
 
-    Only called when ``output_errors`` is one of ``json|text|csv|table``
-    (an envelope format was explicitly requested). ``output_errors`` /
-    ``query_errors`` arrive as the leaf command's per-call option values
+    Only called when ``exception_output`` is one of ``json|text|csv|table``
+    (an envelope format was explicitly requested). ``exception_output`` /
+    ``exception_query`` arrive as the leaf command's per-call option values
     (the error-path twins of ``--output`` / ``--query``), forwarded by
     :func:`formatted`. The stderr echo of the exception is done upstream in
     :func:`formatted` (via :func:`_echo_exception_only`) before this
@@ -218,7 +220,7 @@ def _handle_exception(e: Exception, *, output_errors: str, query_errors: str | N
     ``exit_code == 3`` paired with stdout-only consumption gives a
     clean machine-readable error channel — independent of whatever
     noise urllib3 or other libraries write to stderr. Exit code is
-    ``3`` for the rendered envelope; a malformed ``--query-errors``
+    ``3`` for the rendered envelope; a malformed ``--exception-query``
     expression short-circuits with exit ``2`` from inside
     :func:`_format_output` (user-input error, per
     ``docs/exit-codes.md``).
@@ -248,8 +250,8 @@ def _handle_exception(e: Exception, *, output_errors: str, query_errors: str | N
 
     _format_output(
         envelope,
-        output_format=output_errors,
-        jq_query=query_errors,
+        output_format=exception_output,
+        jq_query=exception_query,
     )
     sys.exit(3)
 
@@ -264,7 +266,7 @@ def _format_output(
     """Render *data* on stdout.
 
     The same renderer powers both the success path (``--output``) and
-    the error envelope path (``--output-errors``); both write to
+    the error envelope path (``--exception-output``); both write to
     stdout, so scripts can consume them uniformly. ``exit_code``
     (``0`` vs ``3``) is the discriminator.
     """

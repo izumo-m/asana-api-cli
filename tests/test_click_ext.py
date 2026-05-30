@@ -204,7 +204,7 @@ class TestGlobalOptionNamesInventory:
             # option on upload commands (see test_cli.py).
             "return_page_iterator",
             "page_limit",
-            # The error output controls (output_errors / query_errors) are NOT
+            # The error output controls (exception_output / exception_query) are NOT
             # global: they are per-command formatter options on every leaf
             # command, symmetric with --output / --query. See test_formatter.py
             # and docs/cli-sdk-mapping.md "Output formatter options".

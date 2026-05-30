@@ -2,7 +2,7 @@
 
 Asana's events endpoint returns HTTP 412 with a fresh sync token in the
 response body on the initial poll (no sync given). The CLI surfaces this
-via ``--output-errors json`` (envelope on stdout, exit 3) when
+via ``--exception-output json`` (envelope on stdout, exit 3) when
 ``--full-payload`` is also set; without ``--full-payload`` the SDK's
 ``EventIterator`` absorbs the 412 silently and the fresh token is lost
 inside the iterator. The test exercises the bootstrap → trigger → poll
@@ -82,7 +82,7 @@ def test_events_sync_cycle(
     # BOOTSTRAP — initial poll returns 412 with a fresh sync token.
     # --full-payload is load-bearing: without it the SDK's EventIterator
     # absorbs the 412 and the token is lost.
-    # --output-errors json is required: the default 'none' would exit 1
+    # --exception-output json is required: the default 'none' would exit 1
     # with the body on stderr (readable but not capturable as JSON),
     # instead of giving us an envelope on stdout to parse.
     code, out, err = _run(
@@ -91,7 +91,7 @@ def test_events_sync_cycle(
         "--resource",
         task_gid,
         "--full-payload",
-        "--output-errors",
+        "--exception-output",
         "json",
     )
     assert code == 3, f"bootstrap should exit 3 (412), got {code}: {err}"
