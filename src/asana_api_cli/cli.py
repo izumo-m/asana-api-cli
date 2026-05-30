@@ -41,6 +41,7 @@ pick up newly added SDK methods without releasing a new asana-api-cli.
 from __future__ import annotations
 
 import collections.abc
+import functools
 import inspect
 import re
 import sys
@@ -54,8 +55,9 @@ from asana_api_cli.click_ext import (
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
+    _make_global_option_params,
 )
-from asana_api_cli.formatter import formatted
+from asana_api_cli.formatter import formatted, formatter_flag_names
 from asana_api_cli.session import (
     AsanaSession,
     resolve_body,
@@ -566,7 +568,56 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
     ]
 
 
-def _path_arg_option(name: str, op: _Operation) -> click.Option:
+@functools.cache
+def _static_reserved_flags() -> frozenset[str]:
+    """Built-in CLI flag strings present on (essentially) every command.
+
+    An SDK arg/opt whose derived flag lands in this set is exposed with a
+    ``sdk-`` prefix (see :func:`_decls`) so the built-in keeps its bare name.
+    Derived from the actual option builders (not hand-kept) so it tracks
+    renames / additions automatically. Per-command conditional flags
+    (deprecated aliases, ``--multibyte-filenames``) are added in
+    :func:`_reserved_flags`.
+
+    ``--help`` is added by click at parse time (never in ``cmd.params``) and
+    ``--version`` is root-only, so neither is discoverable by scanning a leaf's
+    params — they are listed explicitly so a future SDK ``help`` / ``version``
+    param is still pushed to ``--sdk-help`` / ``--sdk-version``.
+    """
+    flags: set[str] = {"--help", "--version"}
+    flags |= formatter_flag_names()
+    for params in (_make_per_call_kwarg_options(), _make_global_option_params()):
+        for p in params:
+            flags.update(p.opts)
+            flags.update(getattr(p, "secondary_opts", []))
+    return frozenset(flags)
+
+
+def _reserved_flags(op: _Operation) -> frozenset[str]:
+    """Built-in flags this command occupies (static set + per-command extras)."""
+    flags = set(_static_reserved_flags())
+    if op.paginatable:
+        flags |= {"--all-items", "--page-size", "--max-items"}
+    if op.does_upload:
+        flags.add("--multibyte-filenames")
+    return frozenset(flags)
+
+
+def _decls(flag: str, dest: str, reserved: frozenset[str]) -> list[str]:
+    """Declaration list for an SDK-derived option, ``sdk-`` prefixed on collision.
+
+    If ``flag`` collides with a built-in CLI flag (in ``reserved``), the SDK
+    param yields: it is exposed as ``--sdk-<name>`` with an *explicit* ``dest``
+    equal to the SDK param name, so the call path (which pops by param name) is
+    unchanged and the ``(opts/arg: <name>)`` help label still shows the real
+    name. Otherwise the bare ``[flag]`` is used (dest auto-derives to ``dest``).
+    """
+    if flag in reserved:
+        return [f"--sdk-{flag.removeprefix('--')}", dest]
+    return [flag]
+
+
+def _path_arg_option(name: str, op: _Operation, reserved: frozenset[str]) -> click.Option:
     """Render a required path positional as ``--<name>`` (``_gid`` stripped).
 
     For ``*_gid`` params the SDK description is uninformative ("Globally unique
@@ -586,10 +637,10 @@ def _path_arg_option(name: str, op: _Operation) -> click.Option:
         dp = op.params.get(name)
         desc = _escape_help(dp.description) if dp else ""
         kw["help"] = f"{desc} {_sdk_dest('arg', name)}".strip()
-    return click.Option([flag], **kw)
+    return click.Option(_decls(flag, opt_name, reserved), **kw)
 
 
-def _body_option(op: _Operation) -> click.Option:
+def _body_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
     """Render the required ``--body`` option with the input-format hint.
 
     The SDK docstring usually has only a terse "The X to create." line; users
@@ -602,10 +653,12 @@ def _body_option(op: _Operation) -> click.Option:
     bp = op.params.get("body")
     sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
     help_text = f"{sdk_desc} {body_format} {_sdk_dest('arg', 'body')}".strip()
-    return click.Option(["--body"], required=True, metavar="JSON", help=help_text)
+    return click.Option(
+        _decls("--body", "body", reserved), required=True, metavar="JSON", help=help_text
+    )
 
 
-def _workspace_option(op: _Operation) -> click.Option:
+def _workspace_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
     """Render the unified ``--workspace`` option.
 
     ``--workspace`` is polymorphic: a positional ``workspace_gid`` on some
@@ -627,10 +680,14 @@ def _workspace_option(op: _Operation) -> click.Option:
         if op.workspace_required
         else "Workspace GID (optional; not auto-filled from ASANA_DEFAULT_WORKSPACE)"
     )
-    return click.Option(["--workspace"], default=None, help=f"{help_text} {label}")
+    return click.Option(
+        _decls("--workspace", "workspace", reserved), default=None, help=f"{help_text} {label}"
+    )
 
 
-def _plain_opt_option(p: _DocParam, api_cls: type, op: _Operation) -> click.Option:
+def _plain_opt_option(
+    p: _DocParam, api_cls: type, op: _Operation, reserved: frozenset[str]
+) -> click.Option:
     """Render a docstring ``opts`` param as ``--<name>`` (non-workspace).
 
     Two special cases: an empty SDK ``:param`` description falls back to
@@ -654,7 +711,7 @@ def _plain_opt_option(p: _DocParam, api_cls: type, op: _Operation) -> click.Opti
         kw["required"] = True
     else:
         kw["default"] = None
-    return click.Option([flag], **kw)
+    return click.Option(_decls(flag, p.name, reserved), **kw)
 
 
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
@@ -680,6 +737,10 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     )
     paginatable = op.paginatable
     does_upload = op.does_upload
+    # Built-in flags this command occupies. An SDK arg/opt whose flag collides
+    # with one of these is exposed as ``--sdk-<name>`` (see ``_decls``) so the
+    # built-in keeps its bare name; the SDK param stays reachable + labelled.
+    reserved = _reserved_flags(op)
 
     options: list[click.Option] = []
 
@@ -689,11 +750,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # (required); the optional workspace opt renders in the opts tier below.
     for name in op.positional:
         if name == "body":
-            options.append(_body_option(op))
+            options.append(_body_option(op, reserved))
         elif _is_workspace_param(name):
-            options.append(_workspace_option(op))
+            options.append(_workspace_option(op, reserved))
         else:
-            options.append(_path_arg_option(name, op))
+            options.append(_path_arg_option(name, op, reserved))
 
     # Tier 2 — opts in the SDK docstring's ``:param`` order (``op.opts_params``
     # preserves it). python-asana never marks an opt ``(required)``, so there is
@@ -701,9 +762,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # name-sorted canonical order instead — see the note there.
     for p in op.opts_params:
         if _is_workspace_param(p.name):
-            options.append(_workspace_option(op))
+            options.append(_workspace_option(op, reserved))
         else:
-            options.append(_plain_opt_option(p, api_cls, op))
+            options.append(_plain_opt_option(p, api_cls, op, reserved))
 
     # Tier 3 — boilerplate per-call kwargs (the SDK ``all_params``), common to
     # every command. ``--page-limit`` / ``--return-page-iterator`` stay global

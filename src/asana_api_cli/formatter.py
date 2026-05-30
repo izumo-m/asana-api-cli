@@ -135,6 +135,24 @@ def formatted(f: Any) -> Any:
     return wrapper
 
 
+def formatter_flag_names() -> frozenset[str]:
+    """Flag strings declared by :func:`formatted` (``--output`` / ``--query`` /
+    ``--csv-bom`` / ``--output-errors`` / ``--query-errors``).
+
+    Derived from the decorator itself (not a hand-kept list) so it cannot drift
+    from the actual options — including when those flags are later renamed.
+    ``cli.py`` uses it to detect when an SDK arg/opt name collides with one of
+    these built-in flags. The throwaway callable is never invoked; only its
+    attached ``__click_params__`` is read.
+    """
+    params = getattr(formatted(lambda **_: None), "__click_params__", [])
+    flags: set[str] = set()
+    for p in params:
+        flags.update(p.opts)
+        flags.update(getattr(p, "secondary_opts", []))
+    return frozenset(flags)
+
+
 def _qualified_exception_name(e: BaseException) -> str:
     """Return ``module.qualname`` so SDK users can import the same symbol.
 

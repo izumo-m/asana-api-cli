@@ -52,6 +52,12 @@ trailing `(<kind>: <name>)` label — `(Configuration: <name>)`,
 `(asana-api extension)` — so the mapping is visible at the point of use,
 not only here. See [`architecture.md`](architecture.md#sdk-destination-labels).
 
+When a runtime-derived SDK arg/opt name would collide with one of the
+built-in flags above, it is exposed as `--sdk-<name>` (the built-in keeps its
+bare name; the label still shows the real SDK name) — e.g.
+`typeahead-for-workspace --sdk-query`. See
+[`sdk-deviations.md`](sdk-deviations.md).
+
 ## Global options (`cli.py:main`)
 
 | Flag | SDK destination | Mapping mechanism |

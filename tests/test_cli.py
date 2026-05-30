@@ -8,6 +8,7 @@ handling for body / workspace / pagination.
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 import click
 import pytest
@@ -15,6 +16,7 @@ import pytest
 from asana_api_cli.cli import (
     _GROUP_DESCRIPTIONS,
     _api_class_to_group,
+    _decls,
     _enumerate_api_classes,
     _escape_help,
     _extract_operation,
@@ -27,6 +29,7 @@ from asana_api_cli.cli import (
     _parse_params,
     _parse_summary,
     _snake,
+    _static_reserved_flags,
     main,
 )
 
@@ -325,6 +328,78 @@ def _option_flags(cmd: click.Command) -> set[str]:
         for decl in getattr(p, "secondary_opts", []):
             flags.add(decl)
     return flags
+
+
+class TestFlagCollisions:
+    """An SDK arg/opt whose flag collides with a built-in CLI flag is exposed as
+    ``--sdk-<name>`` so the built-in keeps its bare name (``cli._decls`` /
+    ``_reserved_flags``). Real case: ``typeahead-for-workspace``'s ``query`` opt
+    vs the formatter's ``--query`` (jq filter)."""
+
+    def test_no_command_has_duplicate_flags(self) -> None:
+        """Whole-SDK sweep: collision resolution must leave no command with a
+        flag declared twice. Guards future SDK bumps that introduce a new
+        collision (sibling of ``test_sdk_boilerplate`` / ``test_cli_surface``)."""
+        offenders: dict[str, list[str]] = {}
+        for cls in _enumerate_api_classes():
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                flags: list[str] = [
+                    decl
+                    for p in cmd.params
+                    if isinstance(p, click.Option)
+                    for decl in (*p.opts, *p.secondary_opts)
+                ]
+                dups = [f for f, c in Counter(flags).items() if c > 1]
+                if dups:
+                    offenders[f"{cls.__name__}.{op.command_name}"] = dups
+        assert not offenders, f"commands with duplicate flags: {offenders}"
+
+    def test_typeahead_query_yields_to_sdk_prefix(self) -> None:
+        import asana
+
+        op = _extract_operation(
+            "typeahead_for_workspace", asana.TypeaheadApi.typeahead_for_workspace
+        )
+        assert op is not None
+        cmd = _make_command(asana.TypeaheadApi, op)
+        opts = [p for p in cmd.params if isinstance(p, click.Option)]
+
+        # The jq filter keeps the bare --query.
+        jq = next(p for p in opts if p.name == "jq_query")
+        assert "--query" in jq.opts
+
+        # The SDK search opt is exposed as --sdk-query, but its dest (call path
+        # / help label) stays the real SDK name ``query``.
+        sdk_query = next(p for p in opts if p.name == "query")
+        assert sdk_query.opts == ["--sdk-query"]
+        assert "--query" not in sdk_query.opts
+        assert "(opts: query)" in (sdk_query.help or "")
+
+
+class TestReservedFlags:
+    def test_decls_passes_through_when_no_collision(self) -> None:
+        assert _decls("--task", "task", frozenset()) == ["--task"]
+
+    def test_decls_prefixes_and_preserves_dest_on_collision(self) -> None:
+        assert _decls("--query", "query", frozenset({"--query"})) == ["--sdk-query", "query"]
+
+    def test_static_reserved_covers_each_builtin_family(self) -> None:
+        reserved = _static_reserved_flags()
+        # formatter / kwarg / global (+ a --no- toggle's negative form).
+        for flag in ("--query", "--output", "--item-limit", "--host", "--no-verify-ssl"):
+            assert flag in reserved, f"{flag} missing from reserved set"
+
+    def test_help_and_version_reserved_so_sdk_opts_yield(self) -> None:
+        # --help is click-added at parse time and --version is root-only, so
+        # neither shows up in a leaf's params. They are reserved explicitly so a
+        # future SDK opt named help/version is pushed to --sdk-help/--sdk-version
+        # instead of shadowing click's built-ins.
+        reserved = _static_reserved_flags()
+        assert "--help" in reserved
+        assert "--version" in reserved
+        assert _decls("--help", "help", reserved) == ["--sdk-help", "help"]
+        assert _decls("--version", "version", reserved) == ["--sdk-version", "version"]
 
 
 class TestBuiltCommands:

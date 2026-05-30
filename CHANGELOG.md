@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **SDK parameters that collide with a built-in flag are exposed as
+  `--sdk-<name>`.** `typeahead-for-workspace`'s SDK `query` (the search string)
+  was shadowed by the built-in `--query` (jq filter) and unreachable; it is now
+  `--sdk-query`, while `--query` keeps its jq meaning on every command. The SDK
+  param's `(opts: <name>)` help label still shows the real name.
+
 - **Per-command options now follow the SDK method, not alphabetical order.**
   Path / body positionals list in function-signature order (e.g. `update-task`
   shows `--body` then `--task`), and the remaining options follow the SDK
