@@ -531,6 +531,33 @@ class TestBuiltCommands:
         assert "--output" in flags
         assert "--query" in flags
 
+    def test_option_display_order_follows_sdk_signature(
+        self,
+        tasks_cls: type,
+        tasks_ops: list[_Operation],
+        get_tasks_cmd: click.Command,
+    ) -> None:
+        # The "order CLI options by SDK signature" refactor pins a three-tier
+        # display order in _make_command (see its docstring): path/body
+        # positionals in function-signature order → docstring opts in :param
+        # order → the boilerplate per-call kwargs. Every other test here checks
+        # only set membership (_option_flags returns a set) or the Deprecated
+        # section split, so nothing guarded the actual order; a future re-sort
+        # (the manifest path already name-sorts opts) would pass them all.
+        #
+        # Tier 1 + positionals-before-kwargs: add_dependencies_for_task(self,
+        # body, task_gid) → --body then --task, both before the per-call kwargs.
+        op = next(o for o in tasks_ops if o.method_name == "add_dependencies_for_task")
+        flags = [
+            p.opts[0] for p in _make_command(tasks_cls, op).params if isinstance(p, click.Option)
+        ]
+        assert flags.index("--body") < flags.index("--task") < flags.index("--item-limit")
+
+        # Tier 2 before Tier 3: a docstring opt (--limit) precedes the per-call
+        # kwargs (--item-limit) on get-tasks.
+        gt = [p.opts[0] for p in get_tasks_cmd.params if isinstance(p, click.Option)]
+        assert gt.index("--limit") < gt.index("--item-limit")
+
     def test_no_pagination_epilog_per_command(
         self, get_tasks_cmd: click.Command, get_task_cmd: click.Command
     ) -> None:

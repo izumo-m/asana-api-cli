@@ -8,6 +8,7 @@ that ``--debug`` / ``--host`` / ``--access-token`` etc. work at any level.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 import click
 from _cli_runner import full_output, make_runner
@@ -280,6 +281,58 @@ class TestHelpTextSync:
         }
         assert not mismatched, "\n".join(
             f"{name}: cli={cli!r} ext={ext!r}" for name, (cli, ext) in mismatched.items()
+        )
+
+    def test_cli_and_click_ext_full_signature_match(self) -> None:
+        """Help text alone is not enough: the two declaration sites must also
+        agree on flag spelling, default, flag-ness, and **type** — a
+        ``click.IntRange(min=1)`` or ``click.Path(exists=True, ...)`` that
+        drifts on only one side would make the same flag validate/coerce
+        differently at the root vs. on a subcommand, silently, while the
+        help-text check above still passes. This is what the "byte-identical"
+        claims in cli.py / click_ext.py / docs/architecture.md actually
+        promise, so enforce the whole signature.
+        """
+        from asana_api_cli.cli import main
+        from asana_api_cli.click_ext import _make_global_option_params
+
+        def _type_fingerprint(t: click.ParamType) -> tuple[Any, ...]:
+            parts: list[Any] = [type(t).__name__]
+            for attr in ("min", "max", "clamp", "exists", "dir_okay", "file_okay"):
+                if hasattr(t, attr):
+                    parts.append((attr, getattr(t, attr)))
+            if isinstance(t, click.Choice):
+                parts.append(("choices", tuple(t.choices)))
+            return tuple(parts)
+
+        def _sig(p: click.Option) -> tuple[Any, ...]:
+            return (
+                p.help,
+                tuple(p.opts),
+                tuple(p.secondary_opts),
+                p.default,
+                p.is_flag,
+                _type_fingerprint(p.type),
+            )
+
+        cli_sig = {
+            p.name: _sig(p)
+            for p in main.params
+            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
+        }
+        ext_sig = {
+            p.name: _sig(p)
+            for p in _make_global_option_params()
+            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
+        }
+        assert cli_sig.keys() == ext_sig.keys()
+        mismatched = {
+            name: (cli_sig[name], ext_sig[name])
+            for name in cli_sig
+            if cli_sig[name] != ext_sig[name]
+        }
+        assert not mismatched, "\n".join(
+            f"{name}:\n  cli={cli!r}\n  ext={ext!r}" for name, (cli, ext) in mismatched.items()
         )
 
 
