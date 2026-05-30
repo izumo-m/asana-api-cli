@@ -430,6 +430,31 @@ class _Operation:
         """
         return any(p.name == "file" for p in self.opts_params)
 
+    @property
+    def workspace_positional(self) -> str | None:
+        """The path positional that is a workspace GID, if any (``workspace_gid``)."""
+        return next((n for n in self.path_positionals if _is_workspace_param(n)), None)
+
+    @property
+    def workspace_opt(self) -> _DocParam | None:
+        """The ``opts`` param that is a workspace filter, if any (``workspace``)."""
+        return next((p for p in self.opts_params if _is_workspace_param(p.name)), None)
+
+    @property
+    def has_workspace(self) -> bool:
+        return self.workspace_positional is not None or self.workspace_opt is not None
+
+    @property
+    def workspace_required(self) -> bool:
+        """Workspace is required exactly when it is a path positional.
+
+        An ``opts`` workspace is always optional — no python-asana method marks
+        a query param ``(required)``. Drives the ``ASANA_DEFAULT_WORKSPACE``
+        env-var fallback: auto-fill only when required.
+        """
+        wo = self.workspace_opt
+        return self.workspace_positional is not None or (wo is not None and wo.required)
+
 
 def _extract_operation(method_name: str, fn: object) -> _Operation | None:
     if method_name.startswith("_") or method_name.endswith("_with_http_info"):
@@ -541,8 +566,111 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
     ]
 
 
+def _path_arg_option(name: str, op: _Operation) -> click.Option:
+    """Render a required path positional as ``--<name>`` (``_gid`` stripped).
+
+    For ``*_gid`` params the SDK description is uninformative ("Globally unique
+    identifier for the X", or "The task to operate on."), so we synthesize a
+    help line that says it's a GID, gives an example, and uses ``metavar=GID``
+    so the signature reads ``--task GID`` not ``--task TEXT``. Non-``_gid`` path
+    args (e.g. ``parent`` / ``target``) keep their docstring description.
+    """
+    opt_name = _option_name(name)
+    flag = f"--{opt_name.replace('_', '-')}"
+    kw: dict[str, Any] = {"required": True}
+    if name.endswith("_gid"):
+        thing = opt_name.replace("_", " ")
+        kw["metavar"] = "GID"
+        kw["help"] = f"{thing.capitalize()} GID, e.g. 1234567890. {_sdk_dest('arg', name)}"
+    else:
+        dp = op.params.get(name)
+        desc = _escape_help(dp.description) if dp else ""
+        kw["help"] = f"{desc} {_sdk_dest('arg', name)}".strip()
+    return click.Option([flag], **kw)
+
+
+def _body_option(op: _Operation) -> click.Option:
+    """Render the required ``--body`` option with the input-format hint.
+
+    The SDK docstring usually has only a terse "The X to create." line; users
+    also need the input *format* (inline JSON / @path / stdin) and Asana's
+    ``{"data": {...}}`` envelope, so the hint is always appended.
+    """
+    body_format = (
+        'Accepts inline JSON, @path/to/file, or - (stdin). Wrap payload in {"data": {...}}.'
+    )
+    bp = op.params.get("body")
+    sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
+    help_text = f"{sdk_desc} {body_format} {_sdk_dest('arg', 'body')}".strip()
+    return click.Option(["--body"], required=True, metavar="JSON", help=help_text)
+
+
+def _workspace_option(op: _Operation) -> click.Option:
+    """Render the unified ``--workspace`` option.
+
+    ``--workspace`` is polymorphic: a positional ``workspace_gid`` on some
+    endpoints, an ``opts['workspace']`` on others. It is labelled for whichever
+    shape this method declares so the SDK destination stays accurate. The
+    env-var fallback (``ASANA_DEFAULT_WORKSPACE``) applies only when the param
+    is required — i.e. a path positional; optional-workspace endpoints (e.g.
+    ``get-tasks``) are deliberately not auto-filled.
+    """
+    wp = op.workspace_positional
+    if wp is not None:
+        label = _sdk_dest("arg", wp)
+    else:
+        wo = op.workspace_opt
+        assert wo is not None  # caller invokes this only when a workspace param exists
+        label = _sdk_dest("opts", wo.name)
+    help_text = (
+        "Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)"
+        if op.workspace_required
+        else "Workspace GID (optional; not auto-filled from ASANA_DEFAULT_WORKSPACE)"
+    )
+    return click.Option(["--workspace"], default=None, help=f"{help_text} {label}")
+
+
+def _plain_opt_option(p: _DocParam, api_cls: type, op: _Operation) -> click.Option:
+    """Render a docstring ``opts`` param as ``--<name>`` (non-workspace).
+
+    Two special cases: an empty SDK ``:param`` description falls back to
+    ``_OPT_HELP_OVERRIDES`` (a few endpoints, notably the upload ``--file``);
+    and ``--limit`` gets the "per-request — use --item-limit to cap the total"
+    pointer appended on the option line itself (not only the epilog) so a
+    casual Options-table scan still catches the pitfall.
+    """
+    flag = f"--{p.name.replace('_', '-')}"
+    help_text = _escape_help(p.description)
+    if not help_text:
+        help_text = _OPT_HELP_OVERRIDES.get((api_cls.__name__[:-3], op.method_name, p.name), "")
+    if p.name == "limit":
+        help_text = f"{help_text} Use --item-limit to cap the total."
+    help_text = f"{help_text} {_sdk_dest('opts', p.name)}".strip()
+    kw: dict[str, Any] = {"help": help_text}
+    click_type = _click_type(p.py_type)
+    if click_type is not None:
+        kw["type"] = click_type
+    if p.required:
+        kw["required"] = True
+    else:
+        kw["default"] = None
+    return click.Option([flag], **kw)
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
-    """Build a :class:`CommandWithGlobalOptions` for a single SDK method."""
+    """Build a :class:`CommandWithGlobalOptions` for a single SDK method.
+
+    Option display order (mirrors the SDK call contract, then SDK docs):
+
+    1. **Path / body positionals**, in the function-signature order
+       (``op.positional``) — e.g. ``add_dependencies_for_task(self, body,
+       task_gid)`` renders ``--body`` then ``--task``.
+    2. **Opts**, in the SDK docstring's ``:param`` order. python-asana never
+       marks an opt ``(required)`` — required inputs are always positionals —
+       so there is no required/optional split to order by.
+    3. **Boilerplate per-call kwargs** (the SDK ``all_params``), plus the
+       upload / deprecation extensions where they apply.
+    """
     # If the SDK method has no ``opts`` parameter, docstring-derived named
     # arguments cannot be forwarded — they would be silently dropped at call
     # time. python-asana 5.x does not produce this combination today.
@@ -550,117 +678,36 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         f"{api_cls.__name__}.{op.method_name}: docstring declares params but "
         f"the method has no `opts` argument; CLI options would be dropped"
     )
-    path_positionals = op.path_positionals
-    has_body = op.has_body
-    opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
     paginatable = op.paginatable
     does_upload = op.does_upload
 
-    ws_opt = next((p for p in opts_params if _is_workspace_param(p.name)), None)
-    ws_positional = next((n for n in path_positionals if _is_workspace_param(n)), None)
-    has_workspace = ws_opt is not None or ws_positional is not None
-    ws_required = ws_positional is not None or (ws_opt is not None and ws_opt.required)
-
-    non_ws_positionals = [n for n in path_positionals if not _is_workspace_param(n)]
-    non_ws_opts = [p for p in opts_params if not _is_workspace_param(p.name)]
-
     options: list[click.Option] = []
 
-    # Path positionals → required --options (with ``_gid`` stripped). For
-    # ``*_gid`` params the SDK description is uninformative ("Globally unique
-    # identifier for the X" or worse, "The task to operate on."), so we
-    # synthesize a help line that says it's a GID, gives an example, and
-    # uses ``metavar=GID`` so the option signature itself reads naturally
-    # (``--task GID`` instead of ``--task TEXT``).
-    for name in non_ws_positionals:
-        opt_name = _option_name(name)
-        flag = f"--{opt_name.replace('_', '-')}"
-        opt_kwargs: dict[str, Any] = {"required": True}
-        if name.endswith("_gid"):
-            thing = opt_name.replace("_", " ")
-            opt_kwargs["metavar"] = "GID"
-            opt_kwargs["help"] = (
-                f"{thing.capitalize()} GID, e.g. 1234567890. {_sdk_dest('arg', name)}"
-            )
+    # Tier 1 — path / body positionals in function-signature order. Each
+    # positional renders by kind: body, the unified workspace, or a plain path
+    # arg. ``--workspace`` is rendered here only when workspace is positional
+    # (required); the optional workspace opt renders in the opts tier below.
+    for name in op.positional:
+        if name == "body":
+            options.append(_body_option(op))
+        elif _is_workspace_param(name):
+            options.append(_workspace_option(op))
         else:
-            dp = op.params.get(name)
-            desc = _escape_help(dp.description) if dp else ""
-            opt_kwargs["help"] = f"{desc} {_sdk_dest('arg', name)}".strip()
-        options.append(click.Option([flag], **opt_kwargs))
+            options.append(_path_arg_option(name, op))
 
-    # Unified --workspace option. The env-var fallback only applies when the
-    # endpoint requires a workspace; for optional-workspace endpoints (e.g.
-    # ``get-tasks``) the CLI deliberately does not auto-fill from the env var,
-    # so the help text differs by case.
-    if has_workspace:
-        # ``--workspace`` is polymorphic: a positional ``workspace_gid`` on some
-        # endpoints, an ``opts['workspace']`` on others. Label it for whichever
-        # shape this method declares so the SDK destination stays accurate.
-        if ws_positional is not None:
-            ws_label = _sdk_dest("arg", ws_positional)
+    # Tier 2 — opts in the SDK docstring's ``:param`` order (``op.opts_params``
+    # preserves it). python-asana never marks an opt ``(required)``, so there is
+    # no required/optional split to sort by. ``introspect_to_manifest`` keeps a
+    # name-sorted canonical order instead — see the note there.
+    for p in op.opts_params:
+        if _is_workspace_param(p.name):
+            options.append(_workspace_option(op))
         else:
-            assert ws_opt is not None  # has_workspace ⇒ one of the two is set
-            ws_label = _sdk_dest("opts", ws_opt.name)
-        ws_help = (
-            "Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)"
-            if ws_required
-            else "Workspace GID (optional; not auto-filled from ASANA_DEFAULT_WORKSPACE)"
-        )
-        options.append(
-            click.Option(
-                ["--workspace"],
-                default=None,
-                help=f"{ws_help} {ws_label}",
-            )
-        )
+            options.append(_plain_opt_option(p, api_cls, op))
 
-    # body → required --body option. The SDK docstring usually has a short
-    # "The X to create." line which is not enough — users also need to know
-    # the input *format* (inline JSON / @path / stdin) and Asana's
-    # ``{"data": {...}}`` envelope. Always append the format hint so help
-    # is self-contained even when the SDK description is generic.
-    if has_body:
-        body_format = (
-            'Accepts inline JSON, @path/to/file, or - (stdin). Wrap payload in {"data": {...}}.'
-        )
-        bp = op.params.get("body")
-        sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
-        body_help = f"{sdk_desc} {body_format} {_sdk_dest('arg', 'body')}".strip()
-        options.append(click.Option(["--body"], required=True, metavar="JSON", help=body_help))
-
-    # Remaining opts params (excluding workspace). The SDK-derived help is
-    # used as-is, with two exceptions:
-    #   - When the SDK provides no ``:param:`` docstring (a handful of
-    #     endpoints, notably ``attachments create-attachment-for-object``),
-    #     fall back to ``_OPT_HELP_OVERRIDES`` so the user isn't staring
-    #     at a bare ``--file TEXT``.
-    #   - ``--limit`` reads as if it caps the total but is per-HTTP-request;
-    #     append the pointer on the option line itself (not only in the
-    #     epilog) so a casual Options-table scan still catches the pitfall.
-    for p in non_ws_opts:
-        flag = f"--{p.name.replace('_', '-')}"
-        help_text = _escape_help(p.description)
-        if not help_text:
-            help_text = _OPT_HELP_OVERRIDES.get(
-                (api_cls.__name__[:-3], op.method_name, p.name),
-                "",
-            )
-        if p.name == "limit":
-            help_text = f"{help_text} Use --item-limit to cap the total."
-        help_text = f"{help_text} {_sdk_dest('opts', p.name)}".strip()
-        kw: dict[str, Any] = {"help": help_text}
-        click_type = _click_type(p.py_type)
-        if click_type is not None:
-            kw["type"] = click_type
-        if p.required:
-            kw["required"] = True
-        else:
-            kw["default"] = None
-        options.append(click.Option([flag], **kw))
-
-    # Boilerplate per-call kwargs (the SDK ``all_params``), common to every
-    # command. ``--page-limit`` / ``--return-page-iterator`` stay global (they
-    # are ``Configuration`` properties). See ``_make_per_call_kwarg_options``.
+    # Tier 3 — boilerplate per-call kwargs (the SDK ``all_params``), common to
+    # every command. ``--page-limit`` / ``--return-page-iterator`` stay global
+    # (they are ``Configuration`` properties). See ``_make_per_call_kwarg_options``.
     options.extend(_make_per_call_kwarg_options())
 
     # ``--multibyte-filenames`` is an asana-api extension that toggles the
@@ -763,36 +810,41 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             if effective_item_limit is None:
                 effective_item_limit = max_items
 
-        if has_body:
+        if op.has_body:
             body_value = kwargs.pop("body")  # click marks --body as required
             parsed_body = resolve_body(body_value)
         else:
             parsed_body = None
 
-        if has_workspace:
+        if op.has_workspace:
             workspace_value = kwargs.pop("workspace", None)
-            resolved_workspace = resolve_workspace(workspace_value, required=ws_required)
+            resolved_workspace = resolve_workspace(workspace_value, required=op.workspace_required)
         else:
             resolved_workspace = None
 
         with AsanaSession.from_env() as session:
             api = api_cls(session.client)
 
+            # Non-workspace opts pop straight into the opts dict; the workspace
+            # opt is resolved separately (env-var fallback) and added after.
             opts: dict[str, Any] = {}
-            for p in non_ws_opts:
+            for p in op.opts_params:
+                if _is_workspace_param(p.name):
+                    continue
                 value = kwargs.pop(p.name, None)
                 if p.required or value is not None:
                     opts[p.name] = value
-            if ws_opt is not None and resolved_workspace is not None:
-                opts[ws_opt.name] = resolved_workspace
+            workspace_opt = op.workspace_opt
+            if workspace_opt is not None and resolved_workspace is not None:
+                opts[workspace_opt.name] = resolved_workspace
 
-            # Build positional call args. Body comes first, mirroring the
-            # python-asana convention (e.g.
+            # Build positional call args in function-signature order. Body is
+            # always the first positional in python-asana (e.g.
             # ``add_followers_for_task(body, task_gid, opts)``).
             call_args: list[Any] = []
-            if has_body:
+            if op.has_body:
                 call_args.append(parsed_body)
-            for name in path_positionals:
+            for name in op.path_positionals:
                 if _is_workspace_param(name):
                     call_args.append(resolved_workspace)
                 else:
@@ -1167,7 +1219,13 @@ def introspect_to_manifest() -> dict[str, Any]:
             continue
         commands: list[dict[str, Any]] = []
         for op in ops:
-            opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
+            # Canonical (name-sorted) order for a stable drift snapshot. This
+            # intentionally differs from the help display order (docstring
+            # order, see ``_make_command``): the manifest's job is to detect
+            # added / removed / renamed / retyped params, so a canonical order
+            # keeps the fixture from churning when an SDK docstring merely
+            # reshuffles its ``:param`` lines.
+            opts_params = sorted(op.opts_params, key=lambda p: p.name)
             commands.append(
                 {
                     "command": op.command_name,

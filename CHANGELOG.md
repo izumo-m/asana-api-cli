@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Per-command options now follow the SDK method, not alphabetical order.**
+  Path / body positionals list in function-signature order (e.g. `update-task`
+  shows `--body` then `--task`), and the remaining options follow the SDK
+  docstring's `:param` order (e.g. `--limit` / `--offset`, then the filters,
+  then `--opt-fields`) instead of an alphabetical scatter — both mirror how the
+  API documents the method.
+
 - **Option `--help` now names the SDK destination.** Every option ends with a
   label showing where its value lands in `python-asana`: `(Configuration:
   <name>)` for client config (global flags), `(SDK arg: <name>)` for positional
