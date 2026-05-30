@@ -7,6 +7,7 @@ applying the global configuration passed in from the CLI.
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import sys
@@ -248,6 +249,10 @@ class AsanaSession:
         # safely test which patches actually got installed.
         self._redactor: HttpClientAuthRedactor | None = None
         self._multibyte_filenames: MultibyteFilenameSupport | None = None
+        # Prior ``http.client.HTTPConnection.debuglevel``, captured only when this
+        # session turns debug on (see below). ``None`` means "this session did not
+        # touch the global", so cleanup leaves it alone.
+        self._prev_debuglevel: int | None = None
         try:
             if runtime.debug:
                 # The SDK debug setter enables http.client.HTTPConnection.debuglevel
@@ -256,6 +261,17 @@ class AsanaSession:
                 # ``print()`` calls — the SDK's own loggers do not log headers.
                 # Install the redactor AFTER the SDK setup so we wrap whatever
                 # http.client.print is at that point.
+                #
+                # ``config.debug = True`` flips the process-global
+                # ``http.client.HTTPConnection.debuglevel`` to 1. That global
+                # outlives this session, so capture its prior value here and
+                # restore it in ``close()`` — otherwise debuglevel stays 1 after
+                # the redactor is uninstalled, and a later non-debug session in
+                # the same process (which installs no redactor) would print the
+                # raw ``Authorization`` header. The restore is paired with
+                # ``redactor.uninstall()`` so the masking and the wire-level
+                # tracing are always reversed together (constitution #2).
+                self._prev_debuglevel = http.client.HTTPConnection.debuglevel
                 config.debug = True
                 self._redactor = HttpClientAuthRedactor()
                 self._redactor.install()
@@ -267,12 +283,9 @@ class AsanaSession:
             self._config = config
             self._client = asana.ApiClient(config)
         except Exception:
-            if self._redactor is not None:
-                self._redactor.uninstall()
-                self._redactor = None
-            if self._multibyte_filenames is not None:
-                self._multibyte_filenames.uninstall()
-                self._multibyte_filenames = None
+            # Reverse every global side effect installed so far, including the
+            # debuglevel flip, via the same path used by ``close()``.
+            self.close()
             raise
 
     @property
@@ -280,8 +293,9 @@ class AsanaSession:
         return self._client
 
     def close(self) -> None:
-        """Uninstall any global patches installed for this session
-        (debug redactor, multibyte-filename multipart patch).
+        """Reverse every global side effect installed for this session: the
+        debug redactor, the multibyte-filename multipart patch, and the
+        ``http.client`` debuglevel flip the SDK's debug setter performed.
 
         Safe to call multiple times. Prefer using the session as a
         context manager (``with AsanaSession(...) as session: ...``)
@@ -290,6 +304,12 @@ class AsanaSession:
         if self._redactor is not None:
             self._redactor.uninstall()
             self._redactor = None
+        # Restore the wire-level debuglevel the SDK debug setter flipped to 1.
+        # Paired with the redactor uninstall above so tracing is never left on
+        # without the Authorization mask.
+        if self._prev_debuglevel is not None:
+            http.client.HTTPConnection.debuglevel = self._prev_debuglevel
+            self._prev_debuglevel = None
         if self._multibyte_filenames is not None:
             self._multibyte_filenames.uninstall()
             self._multibyte_filenames = None

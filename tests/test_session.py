@@ -148,15 +148,51 @@ def _clean_http_client_print() -> Iterator[None]:
 
 
 class TestAsanaSessionRedactorCleanup:
+    def test_debug_session_restores_debuglevel_on_close(
+        self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A ``--debug`` session flips the process-global
+        ``http.client.HTTPConnection.debuglevel`` to 1 (via the SDK's debug
+        setter). ``close()`` uninstalls the redactor that masks the
+        ``Authorization`` header, so it must restore the debuglevel too —
+        otherwise a later non-debug session in the same process (which
+        installs no redactor) would print the raw header with wire-level
+        tracing still on (constitution #2).
+        """
+        monkeypatch.setattr(runtime, "debug", True)
+        http.client.HTTPConnection.debuglevel = 0
+
+        session = AsanaSession(token="x" * 20)
+        # Inside the session: tracing on AND the masking patch installed.
+        assert http.client.HTTPConnection.debuglevel == 1
+        assert "print" in http.client.__dict__
+        session.close()
+        # After close: both reversed together — never tracing-on-without-mask.
+        assert http.client.HTTPConnection.debuglevel == 0
+        assert "print" not in http.client.__dict__
+
+    def test_non_debug_session_leaves_debuglevel_untouched(
+        self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A session that does not enable debug must not touch the global
+        debuglevel at all (the restore is scoped to sessions that set it)."""
+        monkeypatch.setattr(runtime, "debug", False)
+        http.client.HTTPConnection.debuglevel = 0
+
+        with AsanaSession(token="x" * 20):
+            assert http.client.HTTPConnection.debuglevel == 0
+        assert http.client.HTTPConnection.debuglevel == 0
+
     def test_init_failure_uninstalls_redactor(
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """If ``ApiClient`` construction raises after the redactor has
         been installed, ``AsanaSession.__init__`` must uninstall the
-        global ``http.client.print`` patch before re-raising. The
-        caller never receives a session object, so they cannot call
-        ``close()`` themselves — cleanup must happen here or the patch
-        leaks for the lifetime of the process.
+        global ``http.client.print`` patch — and restore the debuglevel
+        the SDK debug setter flipped — before re-raising. The caller never
+        receives a session object, so they cannot call ``close()``
+        themselves — cleanup must happen here or the global state leaks for
+        the lifetime of the process.
         """
 
         class _BoomClient:
@@ -165,12 +201,15 @@ class TestAsanaSessionRedactorCleanup:
 
         monkeypatch.setattr("asana_api_cli.session.asana.ApiClient", _BoomClient)
         monkeypatch.setattr(runtime, "debug", True)
+        http.client.HTTPConnection.debuglevel = 0
 
         pre_print = http.client.__dict__.get("print")
         with pytest.raises(RuntimeError, match="simulated SDK init failure"):
             AsanaSession(token="x" * 20)
-        # http.client.print is exactly what it was before the failed init.
+        # http.client.print is exactly what it was before the failed init,
+        # and the debuglevel flip was rolled back too.
         assert http.client.__dict__.get("print") is pre_print
+        assert http.client.HTTPConnection.debuglevel == 0
 
     def test_init_failure_in_later_patch_uninstalls_earlier_patch(
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch

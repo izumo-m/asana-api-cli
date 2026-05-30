@@ -94,6 +94,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never reads, so passing them did nothing. Use `--access-token` (or
   `$ASANA_ACCESS_TOKEN`). See [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 
+### Fixed
+
+- **`--debug` no longer leaves `http.client` wire-level tracing globally
+  enabled after the session closes.** The SDK's debug setter flips a process
+  global (`http.client.HTTPConnection.debuglevel`); the CLI uninstalled its
+  `Authorization`-masking redactor on exit but left that global on. Harmless
+  for the one-shot CLI (the process exits), but a library that reuses
+  `AsanaSession` across calls could print an unmasked `Authorization` header
+  in a later non-debug session. `AsanaSession.close()` now restores the
+  debuglevel together with the redactor.
+
 ## [3.0.0] - 2026-05-23
 
 ### Breaking changes (v2 → v3)
