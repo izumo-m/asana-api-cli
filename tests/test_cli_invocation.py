@@ -934,20 +934,18 @@ class TestErrorPathExitCodes:
         assert "asana.rest.ApiException" in result.stderr
         assert "--query-errors is ignored when --output-errors is 'none'" in result.stderr
 
-    def test_query_errors_group_level_warns_exactly_once(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Regression: the warning must fire exactly once even when the user
-        places ``--query-errors`` at a non-leaf level (sub-group), which
-        routes through both ``GroupWithGlobalOptions.invoke`` and
-        ``CommandWithGlobalOptions.invoke``. If ``_warn_global_combinations``
-        is ever moved back into ``_consume_global_options``, both layers
-        would emit and this test would fail with ``count == 2``.
+    def test_query_errors_rejected_at_group_level(self) -> None:
+        """``--query-errors`` is a per-command formatter option (leaf-only),
+        symmetric with ``--query`` — no longer a global flag. Placing it at a
+        non-leaf (group) level is therefore a Click usage error, not silent
+        propagation. The ``none`` + filter warning now fires from the leaf
+        ``formatted`` wrapper alone, so the old multi-layer double-emit path it
+        used to guard against no longer exists.
 
-        Built from primitives (real ``GroupWithGlobalOptions`` wrapping a
-        real ``_make_command`` leaf) rather than dispatching through
-        ``cli.main`` so the test does not depend on ``_ApiGroup``'s
-        first-use lazy loading reading the patched stub's signature.
+        Built from primitives (real ``GroupWithGlobalOptions`` wrapping a real
+        ``_make_command`` leaf) so the assertion exercises the actual option
+        scoping rather than ``cli.main`` dispatch. The SDK method is never
+        reached — parsing fails on the unknown group option first.
         """
         from asana_api_cli.click_ext import GroupWithGlobalOptions
 
@@ -955,20 +953,12 @@ class TestErrorPathExitCodes:
         group = GroupWithGlobalOptions(name="tasks")
         group.add_command(leaf, name="get-task")
 
-        _patch(
-            monkeypatch,
-            "TasksApi",
-            "get_task",
-            side_effect=[_api_exception(412, '{"sync":"x"}')],
-        )
         result = make_runner().invoke(
             group,
             ["--query-errors", ".exception", "get-task", "--task", "T1"],
         )
-        warning_text = "--query-errors is ignored when --output-errors is 'none'"
-        assert result.stderr.count(warning_text) == 1, (
-            f"Expected exactly 1 warning line, got:\n{result.stderr}"
-        )
+        assert result.exit_code == 2, full_output(result)
+        assert "No such option: --query-errors" in full_output(result)
 
     def test_query_invalid_jq_on_success_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")

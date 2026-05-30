@@ -71,8 +71,6 @@ not only here. See [`architecture.md`](architecture.md#sdk-destination-labels).
 | `--logger-format FMT` | `Configuration.logger_format` | Direct property |
 | `--logger-file PATH` | `Configuration.logger_file` | Direct property |
 | `--debug` | `Configuration.debug = True` | Direct property. Also installs `HttpClientAuthRedactor` — a security override per [constitution #2](principles.md#constitution); see [`sdk-deviations.md`](sdk-deviations.md) "Personal access token in --debug output" |
-| `--output-errors {none\|json\|text\|csv\|table}` | *(none)* | CLI-only. The exception is always echoed to **stderr** in Python's top-level format (no traceback) — for `ApiException` this includes status / reason / headers / body. Default `none` then exits `1` with no envelope; any other format additionally renders on **stdout** and exits `3`, reusing the success-path `_format_output`. See [`sdk-deviations.md`](sdk-deviations.md) for the schema and [`exit-codes.md`](exit-codes.md) for exit codes |
-| `--query-errors EXPR` | *(none)* | CLI-only. Applies a `jq` filter to the error envelope; each yield is rendered per `--output-errors`. Pairing with the default `none` warns to stderr (the filter is a no-op) but does not block the call |
 
 ### Structured value format
 
@@ -114,8 +112,13 @@ structured value, use bash process substitution:
 | `--output FORMAT` | *(none)* | CLI-only. `json` / `table` / `csv` / `text` rendering by `_format_output`; `none` suppresses output (use when only the exit code matters). Default `json` is canonical/lossless. Symmetric with `--output-errors none` |
 | `--query EXPR` | *(none)* | CLI-only. Pipes the response through `jq` (`jqlib.all`). Runs and validates even under `--output none` so jq errors stay observable (exit 2) regardless of the format flag |
 | `--csv-bom` | *(none)* | CLI-only. Prepends UTF-8 BOM in `_print_csv` |
+| `--output-errors {none\|json\|text\|csv\|table}` | *(none)* | CLI-only. The error-path twin of `--output`: catches an exception raised by the SDK call and echoes it to **stderr** in Python's top-level format (no traceback) — for `ApiException` this includes status / reason / headers / body. Default `none` then exits `1` with no envelope; any other format additionally renders the envelope on **stdout** and exits `3`, reusing the same `_format_output`. See [`sdk-deviations.md`](sdk-deviations.md) for the schema and [`exit-codes.md`](exit-codes.md) for exit codes |
+| `--query-errors EXPR` | *(none)* | CLI-only. The error-path twin of `--query`: applies a `jq` filter to the error envelope; each yield is rendered per `--output-errors`. Pairing with the default `none` warns to stderr (the filter is a no-op) but does not block the call |
 
-All three are also cataloged in [`sdk-deviations.md`](sdk-deviations.md).
+All five are also cataloged in [`sdk-deviations.md`](sdk-deviations.md). Because
+they bind to the single SDK method call (not the client `Configuration`), they
+are per-command leaf options — placing them before the command path is a usage
+error, exactly like `--output` / `--query`.
 
 ## Iteration controls
 

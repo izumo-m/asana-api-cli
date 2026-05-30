@@ -204,13 +204,10 @@ class TestGlobalOptionNamesInventory:
             # option on upload commands (see test_cli.py).
             "return_page_iterator",
             "page_limit",
-            # v3.1: error output controls. output_errors picks how
-            # SDK exceptions surface (default 'none': stderr echo + exit
-            # 1; json/text/csv/table: same stderr echo + envelope on
-            # stdout + exit 3). query_errors filters the envelope via
-            # jq. See docs/exit-codes.md / docs/sdk-deviations.md.
-            "output_errors",
-            "query_errors",
+            # The error output controls (output_errors / query_errors) are NOT
+            # global: they are per-command formatter options on every leaf
+            # command, symmetric with --output / --query. See test_formatter.py
+            # and docs/cli-sdk-mapping.md "Output formatter options".
         ]
         if _SDK_HAS_RETRY_STRATEGY:
             expected_names.append("retry_strategy_overrides")

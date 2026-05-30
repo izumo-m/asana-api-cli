@@ -13,11 +13,17 @@ import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
 
-from asana_api_cli.session import runtime
-
 
 def formatted(f: Any) -> Any:
-    """Decorator that adds --output / --query and auto-formats the returned data."""
+    """Decorator that adds the output-formatting options and renders the result.
+
+    Success path: ``--output`` / ``--query`` / ``--csv-bom``. Error path:
+    ``--output-errors`` / ``--query-errors`` — the symmetric counterparts that
+    format an exception raised by the wrapped SDK call. Both pairs are
+    per-command (leaf) options bound to the single method invocation, not
+    global flags: a CLI run dispatches exactly one leaf command, so the error
+    controls live next to their success twins and flow through as kwargs.
+    """
 
     @click.option(
         "--output",
@@ -48,14 +54,55 @@ def formatted(f: Any) -> Any:
             "non-ASCII characters correctly (asana-api extension)"
         ),
     )
+    @click.option(
+        "--output-errors",
+        "output_errors",
+        type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
+        default="none",
+        show_default=True,
+        help=(
+            "How to surface exceptions from the SDK call. The exception is "
+            "always echoed to stderr without traceback frames (for "
+            "ApiException this includes status/reason/headers/body). 'none' "
+            "(default) then exits 1 with no envelope. json/text/csv/table "
+            "additionally render an envelope "
+            "(exception/status/reason/body/headers) on stdout and exit 3 "
+            "(asana-api extension)"
+        ),
+    )
+    @click.option(
+        "--query-errors",
+        "query_errors",
+        default=None,
+        help=(
+            "Apply a jq filter to the error envelope; result is rendered via "
+            "--output-errors. Pairing with the default 'none' emits a stderr "
+            "warning (the filter would be a no-op) but does not block the call "
+            "(asana-api extension)"
+        ),
+    )
     @functools.wraps(f)
     def wrapper(
         *args: Any,
         output_format: str,
         jq_query: str | None,
         csv_bom: bool,
+        output_errors: str,
+        query_errors: str | None,
         **kwargs: Any,
     ) -> None:
+        # ``--query-errors`` paired with the default ``--output-errors none``
+        # has no envelope to filter — the expression would silently do nothing.
+        # Warn (don't block) so the underlying call result / exception is
+        # preserved rather than masked by a usage error. Fires on every
+        # invocation regardless of outcome, mirroring the success path.
+        if output_errors == "none" and query_errors is not None:
+            click.echo(
+                "warning: --query-errors is ignored when --output-errors is "
+                "'none' (the default) — pass --output-errors {json,text,csv,table} "
+                "to enable error filtering.",
+                err=True,
+            )
         try:
             data = f(*args, **kwargs)
             # Iterator consumption is done inside the session context in
@@ -78,11 +125,11 @@ def formatted(f: Any) -> Any:
             # body — the useful payload (e.g. the 412 sync-token body
             # in events polling) stays visible without traceback noise.
             _echo_exception_only(e)
-            if runtime.output_errors == "none":
+            if output_errors == "none":
                 sys.exit(1)
             # Otherwise also render a ``{exception, ...}`` envelope on
             # stdout and exit 3.
-            _handle_exception(e)
+            _handle_exception(e, output_errors=output_errors, query_errors=query_errors)
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
     return wrapper
@@ -128,12 +175,14 @@ def _echo_exception_only(e: BaseException) -> None:
     )
 
 
-def _handle_exception(e: Exception) -> NoReturn:
+def _handle_exception(e: Exception, *, output_errors: str, query_errors: str | None) -> NoReturn:
     """Render an exception envelope on stdout and exit 3.
 
-    Only called when ``runtime.output_errors`` is one of
-    ``json|text|csv|table`` (an envelope format was explicitly
-    requested). The stderr echo of the exception is done upstream in
+    Only called when ``output_errors`` is one of ``json|text|csv|table``
+    (an envelope format was explicitly requested). ``output_errors`` /
+    ``query_errors`` arrive as the leaf command's per-call option values
+    (the error-path twins of ``--output`` / ``--query``), forwarded by
+    :func:`formatted`. The stderr echo of the exception is done upstream in
     :func:`formatted` (via :func:`_echo_exception_only`) before this
     function runs, so both the ``none`` and envelope branches share
     the same stderr format.
@@ -181,8 +230,8 @@ def _handle_exception(e: Exception) -> NoReturn:
 
     _format_output(
         envelope,
-        output_format=runtime.output_errors,
-        jq_query=runtime.query_errors,
+        output_format=output_errors,
+        jq_query=query_errors,
     )
     sys.exit(3)
 

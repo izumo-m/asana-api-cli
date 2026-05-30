@@ -260,10 +260,12 @@ def _escape_help(text: str) -> str:
 #   (kwarg: <name>)          boilerplate **kwargs every method accepts (all_params)
 #   (asana-api extension)    no SDK counterpart                  (CLI-only)
 #
-# Configuration globals and CLI-only formatter flags are hand-written in
-# ``main`` / ``formatted`` / ``_make_global_option_params`` with the matching
-# literal (kept byte-identical between cli.py and click_ext.py by
-# ``test_click_ext.TestHelpTextSync``). This helper builds every label
+# Configuration globals carry the literal by hand in both ``main`` and
+# ``_make_global_option_params`` (kept byte-identical between cli.py and
+# click_ext.py by ``test_click_ext.TestHelpTextSync``); the CLI-only formatter
+# flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
+# ``--output-errors`` / ``--query-errors``) live only in ``formatted``. This
+# helper builds every label
 # ``_make_command`` derives at runtime: ``arg`` / ``opts`` for path / body /
 # docstring params, ``kwarg`` for the common per-call kwargs, and the
 # extension marker on the deprecated aliases.
@@ -843,9 +845,10 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
 
     callback = formatted(inner_callback)
 
-    # ``formatted`` adds --output and --query via click.option decorators; pull
-    # those Option instances out of the wrapped callback (in natural order)
-    # and append them to our options list.
+    # ``formatted`` adds the output-formatting options (--output / --query /
+    # --csv-bom and their error-path twins --output-errors / --query-errors)
+    # via click.option decorators; pull those Option instances out of the
+    # wrapped callback (in natural order) and append them to our options list.
     fmt_params = list(reversed(getattr(callback, "__click_params__", [])))
     options.extend(fmt_params)
 
@@ -1069,33 +1072,6 @@ def _retry_strategy_option(f: Any) -> Any:
         "are set. (Configuration: page_limit)"
     ),
 )
-@click.option(
-    "--output-errors",
-    "output_errors",
-    type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
-    default="none",
-    show_default=True,
-    help=(
-        "How to surface exceptions from the SDK call. The exception is "
-        "always echoed to stderr without traceback frames (for "
-        "ApiException this includes status/reason/headers/body). 'none' "
-        "(default) then exits 1 with no envelope. json/text/csv/table "
-        "additionally render an envelope "
-        "(exception/status/reason/body/headers) on stdout and exit 3 "
-        "(asana-api extension)"
-    ),
-)
-@click.option(
-    "--query-errors",
-    "query_errors",
-    default=None,
-    help=(
-        "Apply a jq filter to the error envelope; result is rendered via "
-        "--output-errors. Pairing with the default 'none' emits a stderr "
-        "warning (the filter would be a no-op) but does not block the call "
-        "(asana-api extension)"
-    ),
-)
 def main(
     host: str | None,
     proxy: str | None,
@@ -1118,8 +1094,6 @@ def main(
     debug: bool = False,
     return_page_iterator: bool | None = None,
     page_limit: int | None = None,
-    output_errors: str = "none",
-    query_errors: str | None = None,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
@@ -1159,11 +1133,6 @@ def main(
     if return_page_iterator is not None:
         runtime.return_page_iterator = return_page_iterator
     runtime.page_limit = page_limit
-    runtime.output_errors = output_errors
-    runtime.query_errors = query_errors
-    # The warning for ``--query-errors`` paired with ``--output-errors=none``
-    # fires from ``click_ext._consume_global_options`` (which runs on every
-    # leaf-command invocation). Adding the call here too would double-warn.
 
 
 def _register_groups(root: click.Group) -> None:

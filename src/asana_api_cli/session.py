@@ -167,10 +167,11 @@ class _Runtime:
     # Configuration-backed iterator knobs. The per-call kwargs
     # (full_payload / item_limit / header_params / _request_timeout) are NOT
     # here: they are per-command options forwarded by ``cli.py:_make_command``.
+    # The CLI-only output-formatting options (--output / --query and their
+    # error-path twins --output-errors / --query-errors) are likewise not here:
+    # they flow as kwargs through ``formatter.py:formatted``.
     return_page_iterator: bool | None = None
     page_limit: int | None = None
-    output_errors: str = "none"
-    query_errors: str | None = None
 
 
 runtime = _Runtime()

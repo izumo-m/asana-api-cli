@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Structured error handling** — new global flags `--output-errors
-  {none|json|text|csv|table}` and `--query-errors EXPR`. The SDK exception is
+- **Structured error handling** — new per-command options `--output-errors
+  {none|json|text|csv|table}` and `--query-errors EXPR` (the error-path twins of
+  `--output` / `--query`, on every command). The SDK exception is
   always echoed to **stderr** in Python's top-level format (no traceback; for
   `ApiException` this already includes status / reason / headers / body). The
   default `none` exits `1` with no envelope, so the response payload (e.g. the
