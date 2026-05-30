@@ -270,11 +270,17 @@ Coverage at a glance:
 - **Retry**: `--retry-strategy` (shorthand, JSON object, or `@file`)
 - **Logging / debug**: `--debug`, `--logger-format`, `--logger-file`
 - **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`
-- **Structured errors**: `--exception-output {none|json|text|csv|table}`, `--exception-query EXPR` — see [`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md)
 
 `--request-timeout`, `--header-params`, `--item-limit`, and `--full-payload`
 are **not** global: they are per-call SDK kwargs (the method `all_params`),
 exposed as options on every command and forwarded straight to the SDK call.
+
+The output-formatting flags `--output` / `--query` / `--csv-bom` and the
+structured-error flags `--exception-output {none|json|text|csv|table}` /
+`--exception-query EXPR` (see
+[`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md))
+are likewise **not** global: they are per-command leaf options bound to the
+single SDK call, so they must appear **after** the command path, not before it.
 
 `--multibyte-filenames` is likewise **not** global: it is an asana-api
 extension exposed only on file-upload commands (e.g. `attachments
