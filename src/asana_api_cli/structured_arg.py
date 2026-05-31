@@ -24,7 +24,7 @@ insensitive). ``1`` / ``0`` are intentionally rejected so int and bool
 fields cannot be confused by readers of the command line.
 
 The module also hosts :func:`default_header_callback`, a separate
-``NAME=VALUE``-per-occurrence parser for the repeatable ``--default-header``
+``NAME=VALUE``-per-occurrence parser for the repeatable ``--set-default-header``
 global. It is deliberately not the hybrid parser above: header values often
 contain commas, which the ``key=value,key=value`` shorthand would mis-split.
 """
@@ -210,7 +210,7 @@ def click_callback(
 def default_header_callback(
     ctx: click.Context, param: click.Parameter, value: tuple[str, ...]
 ) -> dict[str, str] | None:
-    """Click ``callback`` for a repeatable ``--default-header NAME=VALUE`` option.
+    """Click ``callback`` for a repeatable ``--set-default-header NAME=VALUE`` option.
 
     ``multiple=True`` hands the callback a tuple of raw ``NAME=VALUE`` tokens
     (empty when the flag was not given). Returns ``None`` for "not given" so the

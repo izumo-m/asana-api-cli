@@ -510,7 +510,7 @@ class TestRetryStrategyReachesSession:
 
 
 class TestHttpHeaderGlobalsReachClient:
-    """``--user-agent`` and ``--default-header`` are ApiClient-instance globals;
+    """``--user-agent`` and ``--set-default-header`` are ApiClient-instance globals;
     they must reach the ``ApiClient`` that issues the request, and (like every
     global) be accepted at the leaf-command level."""
 
@@ -538,7 +538,14 @@ class TestHttpHeaderGlobalsReachClient:
         monkeypatch.setattr(asana.TasksApi, "get_task", patched)
         result = make_runner().invoke(
             cmd,
-            ["--default-header", "X-Foo=bar", "--default-header", "X-Baz=qux", "--task", "T"],
+            [
+                "--set-default-header",
+                "X-Foo=bar",
+                "--set-default-header",
+                "X-Baz=qux",
+                "--task",
+                "T",
+            ],
         )
         assert result.exit_code == 0, full_output(result)
         assert captured[0]["X-Foo"] == "bar"
@@ -547,7 +554,7 @@ class TestHttpHeaderGlobalsReachClient:
     def test_malformed_default_header_is_usage_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
-        result = make_runner().invoke(cmd, ["--default-header", "noequals", "--task", "T"])
+        result = make_runner().invoke(cmd, ["--set-default-header", "noequals", "--task", "T"])
         assert result.exit_code == 2, full_output(result)
         assert "NAME=VALUE" in full_output(result)
 

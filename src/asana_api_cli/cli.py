@@ -350,14 +350,14 @@ def _escape_help(text: str) -> str:
 # asana-api label uses parentheses. Six kinds cover the SDK input structure:
 #
 #   (Configuration: <name>)  set on asana.Configuration         (global flags)
-#   (ApiClient: <name>)      set on the ApiClient instance       (user_agent, default_headers)
+#   (ApiClient: <name>)      set on the ApiClient instance       (user_agent, set_default_header)
 #   (args: <name>)           positional method argument          (body / path GID / workspace_gid)
 #   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
 #   (kwargs: <name>)         boilerplate **kwargs every method accepts (all_params)
 #   (asana-api: extension)   no SDK counterpart                  (CLI-only)
 #
 # Configuration globals and the two ApiClient-instance globals (--user-agent /
-# --default-header) carry the literal by hand in both ``main`` and
+# --set-default-header) carry the literal by hand in both ``main`` and
 # ``_make_global_option_params`` (kept byte-identical between cli.py and
 # click_ext.py by ``test_click_ext.TestHelpTextSync``); the CLI-only formatter
 # flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
@@ -1210,7 +1210,7 @@ def _retry_strategy_option(f: Any) -> Any:
     help=("Override the User-Agent header the SDK sends on every request. (ApiClient: user_agent)"),
 )
 @click.option(
-    "--default-header",
+    "--set-default-header",
     "default_headers",
     multiple=True,
     callback=default_header_callback,
@@ -1218,7 +1218,7 @@ def _retry_strategy_option(f: Any) -> Any:
         "Add an HTTP header sent on every request, given as NAME=VALUE; "
         "repeatable. Unlike per-call --header-params it applies to all "
         "calls. Not redacted in --debug output — see SECURITY.md. "
-        "(ApiClient: default_headers)"
+        "(ApiClient: set_default_header)"
     ),
 )
 @_retry_strategy_option

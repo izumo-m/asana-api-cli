@@ -224,13 +224,13 @@ class TestRetryFieldSchema:
 def _default_headers(*tokens: str) -> dict[str, str] | None:
     """Run ``default_header_callback`` with a real (throwaway) Click context,
     mirroring how ``multiple=True`` hands it a tuple of raw tokens."""
-    param = click.Option(["--default-header"], multiple=True)
+    param = click.Option(["--set-default-header"], multiple=True)
     ctx = click.Context(click.Command("test"))
     return default_header_callback(ctx, param, tokens)
 
 
 class TestDefaultHeaderCallback:
-    """``--default-header NAME=VALUE`` (repeatable) parser."""
+    """``--set-default-header NAME=VALUE`` (repeatable) parser."""
 
     def test_not_given_returns_none(self) -> None:
         # Matches the unset sentinel the other globals use.

@@ -166,14 +166,14 @@ def _make_global_option_params() -> list[click.Option]:
             ),
         ),
         click.Option(
-            ["--default-header", "default_headers"],
+            ["--set-default-header", "default_headers"],
             multiple=True,
             callback=default_header_callback,
             help=(
                 "Add an HTTP header sent on every request, given as NAME=VALUE; "
                 "repeatable. Unlike per-call --header-params it applies to all "
                 "calls. Not redacted in --debug output — see SECURITY.md. "
-                "(ApiClient: default_headers)"
+                "(ApiClient: set_default_header)"
             ),
         ),
         *(

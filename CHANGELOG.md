@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-06-01
+
+### Fixed
+
+- The session-wide HTTP-header global, added in 3.1.0 as `--default-header`,
+  is now **`--set-default-header`** — matching the SDK method it drives
+  (`ApiClient.set_default_header`) and this project's convention of naming a
+  flag after its SDK destination. If you used `--default-header` with 3.1.0,
+  switch to `--set-default-header`.
+
 ## [3.1.0] - 2026-05-31
 
 ### Added
@@ -358,7 +368,8 @@ Combining a deprecated alias with its replacement (e.g.
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.1...HEAD
+[3.1.1]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...v3.0.0
 [2.1.1]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.0...v2.1.1

@@ -1,6 +1,6 @@
 [project]
 name = "asana-api-cli"
-version = "3.1.0"
+version = "3.1.1"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo"}]
 readme = "README.md"
@@ -35,13 +35,13 @@ asana-api = "asana_api_cli.cli:main"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.6",
-    "basedpyright>=1.13",
+    "ruff>=0.15",
+    "basedpyright>=1.39",
     "pytest>=9,<10",
-    "build>=1,<2",
-    "twine>=6,<7",
-    "vermin>=1.6,<2",
-    "vcrpy>=6",
+    "build>=1.5,<2",
+    "twine>=6.2,<7",
+    "vermin>=1.8,<2",
+    "vcrpy>=8",
     "pytest-recording>=0.13",
 ]
 

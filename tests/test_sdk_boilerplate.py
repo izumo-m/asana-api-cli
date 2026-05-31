@@ -53,8 +53,8 @@ EXPECTED_ALL_PARAMS: frozenset[str] = frozenset(
     }
 )
 
-# Public attributes on a default ``asana.Configuration()``. Not every settable
-# attribute is a CLI flag: object-/callable-typed members (``logger*``,
+# Settable attributes the CLI knows about on a default ``asana.Configuration()``.
+# Not every one is a CLI flag: object-/callable-typed members (``logger*``,
 # ``refresh_api_key_hook``) cannot be flags, and the inert auth fields
 # (``username`` / ``password`` / ``api_key`` / ``api_key_prefix``) are
 # deliberately NOT exposed — Asana auth is Bearer-token only, so they are
@@ -62,6 +62,14 @@ EXPECTED_ALL_PARAMS: frozenset[str] = frozenset(
 # set because the SDK's Configuration still declares them; this guard tracks the
 # SDK surface, not the CLI's. ``logger_format`` / ``logger_file`` reach the
 # ``logger*`` members via @property setters.
+#
+# This is the union across the supported asana range (>=5.0.2), pinned at the
+# latest. ``test_no_unknown_configuration_settable_attrs`` checks only one
+# direction — that the installed SDK exposes nothing OUTSIDE this set, since a
+# *new* attribute is the actionable drift (it likely needs a flag). Older SDKs
+# initialize fewer attributes (``access_token`` arrived in 5.0.6,
+# ``retry_strategy`` in 5.1.0); those absences are tolerated so the guard passes
+# on the floor as well as the pinned version.
 EXPECTED_CONFIGURATION_ATTRS: frozenset[str] = frozenset(
     {
         "access_token",
@@ -191,15 +199,15 @@ def test_all_methods_share_expected_all_params() -> None:
     )
 
 
-def test_configuration_settable_attrs_match() -> None:
+def test_no_unknown_configuration_settable_attrs() -> None:
     got = frozenset(k for k in vars(asana.Configuration()) if not k.startswith("_"))
-    assert got == EXPECTED_CONFIGURATION_ATTRS, (
-        "asana.Configuration public attributes drifted:\n"
-        f"  added:   {sorted(got - EXPECTED_CONFIGURATION_ATTRS)}\n"
-        f"  removed: {sorted(EXPECTED_CONFIGURATION_ATTRS - got)}\n"
+    unknown = got - EXPECTED_CONFIGURATION_ATTRS
+    assert not unknown, (
+        "asana.Configuration exposes settable attributes the CLI does not know "
+        f"about: {sorted(unknown)}\n"
         "A newly settable property likely needs a global flag + "
-        "(Configuration: <name>) label in cli.py / click_ext.py. "
-        "See docs/cli-sdk-mapping.md."
+        "(Configuration: <name>) label in cli.py / click_ext.py, then adding it "
+        "to EXPECTED_CONFIGURATION_ATTRS. See docs/cli-sdk-mapping.md."
     )
 
 

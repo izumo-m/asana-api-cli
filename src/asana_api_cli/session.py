@@ -222,7 +222,7 @@ class AsanaSession:
 
         # ApiClient-instance settings (not Configuration knobs) applied after
         # construction. ``default_headers`` first, then ``user_agent`` last, so
-        # the dedicated ``--user-agent`` wins over a ``--default-header`` that
+        # the dedicated ``--user-agent`` wins over a ``--set-default-header`` that
         # also targets ``User-Agent`` (both write ``default_headers['User-Agent']``).
         if runtime.default_headers:
             for name, value in runtime.default_headers.items():
