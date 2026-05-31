@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import contextlib
 import csv
 import functools
 import io
 import json
 import sys
+import traceback
 from typing import Any, NoReturn
 
 import click
@@ -13,24 +13,36 @@ import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
 
-from asana_api_cli.session import runtime
-
 
 def formatted(f: Any) -> Any:
-    """Decorator that adds --output / --query and auto-formats the returned data."""
+    """Decorator that adds the output-formatting options and renders the result.
+
+    Success path: ``--output`` / ``--query`` / ``--csv-bom``. Error path:
+    ``--exception-output`` / ``--exception-query`` — the symmetric counterparts that
+    format an exception raised by the wrapped SDK call. Both pairs are
+    per-command (leaf) options bound to the single method invocation, not
+    global flags: a CLI run dispatches exactly one leaf command, so the error
+    controls live next to their success twins and flow through as kwargs.
+    """
 
     @click.option(
         "--output",
         "output_format",
-        type=click.Choice(["json", "table", "csv", "text"], case_sensitive=False),
+        type=click.Choice(["json", "table", "csv", "text", "none"], case_sensitive=False),
         default="json",
-        help="Output format (default: json) [asana-api extension]",
+        help=(
+            "Output format (default: json). 'none' suppresses the success "
+            "payload entirely — useful when only the exit code matters "
+            "(e.g. side-effect-only operations like delete-task). "
+            "Symmetric counterpart of --exception-output 'none' "
+            "(asana-api: extension)"
+        ),
     )
     @click.option(
         "--query",
         "jq_query",
         default=None,
-        help="jq expression to filter output [asana-api extension]",
+        help="jq expression to filter output (asana-api: extension)",
     )
     @click.option(
         "--csv-bom",
@@ -39,7 +51,34 @@ def formatted(f: Any) -> Any:
         default=False,
         help=(
             "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
-            "non-ASCII characters correctly [asana-api extension]"
+            "non-ASCII characters correctly (asana-api: extension)"
+        ),
+    )
+    @click.option(
+        "--exception-output",
+        "exception_output",
+        type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
+        default="none",
+        show_default=True,
+        help=(
+            "How to surface exceptions from the SDK call. The exception is "
+            "always echoed to stderr without traceback frames (for "
+            "ApiException this includes status/reason/headers/body). 'none' "
+            "(default) then exits 1 with no envelope. json/text/csv/table "
+            "additionally render an envelope "
+            "(exception/status/reason/body/headers) on stdout and exit 3 "
+            "(asana-api: extension)"
+        ),
+    )
+    @click.option(
+        "--exception-query",
+        "exception_query",
+        default=None,
+        help=(
+            "Apply a jq filter to the error envelope; result is rendered via "
+            "--exception-output. Pairing with the default 'none' emits a stderr "
+            "warning (the filter would be a no-op) but does not block the call "
+            "(asana-api: extension)"
         ),
     )
     @functools.wraps(f)
@@ -48,83 +87,197 @@ def formatted(f: Any) -> Any:
         output_format: str,
         jq_query: str | None,
         csv_bom: bool,
+        exception_output: str,
+        exception_query: str | None,
         **kwargs: Any,
     ) -> None:
+        # ``--exception-query`` paired with the default ``--exception-output none``
+        # has no envelope to filter — the expression would silently do nothing.
+        # Warn (don't block) so the underlying call result / exception is
+        # preserved rather than masked by a usage error. Fires on every
+        # invocation regardless of outcome, mirroring the success path.
+        if exception_output == "none" and exception_query is not None:
+            click.echo(
+                "warning: --exception-query is ignored when --exception-output is "
+                "'none' (the default) — pass --exception-output {json,text,csv,table} "
+                "to enable error filtering.",
+                err=True,
+            )
         try:
             data = f(*args, **kwargs)
-            # Collapse the asana SDK PageIterator / generator into a list
-            if not isinstance(data, (dict, list, str, int, float, bool, type(None))):
-                with contextlib.suppress(TypeError):
-                    data = list(data)
-        except ApiException as e:
-            _handle_api_exception(e)
+            # Iterator consumption is done inside the session context in
+            # ``cli.py:_make_command`` (Layer B post-judge via
+            # ``isinstance(result, collections.abc.Iterator)``). Iterating
+            # here — outside that context — would leak ``Authorization``
+            # into ``--debug`` log on multi-page iterators, so the upstream
+            # gate is load-bearing.
+        except (
+            click.exceptions.ClickException,
+            click.exceptions.Abort,
+            click.exceptions.Exit,
+        ):
+            # Click's own control flow (BadParameter, ctx.exit, Ctrl-C in
+            # prompts) is not an "API call exception" — let Click handle it.
+            raise
+        except Exception as e:
+            # Always echo the exception (no traceback frames) to stderr.
+            # For ApiException this includes status / reason / headers /
+            # body — the useful payload (e.g. the 412 sync-token body
+            # in events polling) stays visible without traceback noise.
+            _echo_exception_only(e)
+            if exception_output == "none":
+                sys.exit(1)
+            # Otherwise also render a ``{exception, ...}`` envelope on
+            # stdout and exit 3.
+            _handle_exception(e, exception_output=exception_output, exception_query=exception_query)
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
     return wrapper
 
 
-def _handle_api_exception(e: ApiException) -> NoReturn:
-    """Print an Asana API error in human-readable form and exit."""
-    status = e.status or "error"
-    messages: list[str] = []
-    body = e.body
-    if isinstance(body, bytes):
-        with contextlib.suppress(UnicodeDecodeError):
-            body = body.decode("utf-8")
-    if isinstance(body, str):
-        with contextlib.suppress(json.JSONDecodeError):
-            payload = json.loads(body)
-            if isinstance(payload, dict):
-                for err in payload.get("errors") or []:
-                    if isinstance(err, dict) and "message" in err:
-                        messages.append(str(err["message"]))
-    if not messages:
-        messages.append(e.reason or "Unknown API error")
-    for msg in messages:
-        click.echo(f"Error ({status}): {msg}", err=True)
-    # When the body was not JSON, show a hint and,
-    # in debug mode, dump the raw body so the user can diagnose the issue.
-    if isinstance(body, str) and body and not _is_json(body):
-        click.echo(
-            "The server returned a non-JSON response. "
-            "Re-run with --debug to see the full response body.",
-            err=True,
-        )
-        if runtime.debug:
-            click.echo("--- raw response body ---", err=True)
-            click.echo(body, err=True)
-            click.echo("--- end of response body ---", err=True)
-    sys.exit(1)
+def formatter_flag_names() -> frozenset[str]:
+    """Flag strings declared by :func:`formatted` (``--output`` / ``--query`` /
+    ``--csv-bom`` / ``--exception-output`` / ``--exception-query``).
+
+    Derived from the decorator itself (not a hand-kept list) so it cannot drift
+    from the actual options — including when those flags are later renamed.
+    ``cli.py`` uses it to detect when an SDK arg/opt name collides with one of
+    these built-in flags. The throwaway callable is never invoked; only its
+    attached ``__click_params__`` is read.
+    """
+    params = getattr(formatted(lambda **_: None), "__click_params__", [])
+    flags: set[str] = set()
+    for p in params:
+        flags.update(p.opts)
+        flags.update(getattr(p, "secondary_opts", []))
+    return frozenset(flags)
 
 
-def _is_json(text: str) -> bool:
-    """Return True if *text* looks like JSON."""
-    try:
-        json.loads(text)
-    except (json.JSONDecodeError, ValueError):
-        return False
-    return True
+def _qualified_exception_name(e: BaseException) -> str:
+    """Return ``module.qualname`` so SDK users can import the same symbol.
+
+    Example: ``urllib3.exceptions.MaxRetryError`` — readers can
+    ``from urllib3.exceptions import MaxRetryError`` to handle the same
+    error in their own SDK code. Built-ins surface as
+    ``builtins.<name>``; the ``builtins.`` prefix is technically
+    correct and is left as-is rather than special-cased.
+    """
+    cls = type(e)
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+def _echo_exception_only(e: BaseException) -> None:
+    """Write ``traceback.format_exception_only`` output to stderr.
+
+    Format: qualified class name + the exception's ``__str__``, no
+    traceback frames. ``ApiException.__str__`` is multi-line, so the
+    full stderr block looks like::
+
+        asana.rest.ApiException: (412)
+        Reason: Precondition Failed
+        HTTP response headers: {...}
+        HTTP response body: b'{...}'
+
+    — i.e. the full HTTP response is visible without re-deriving it
+    from the envelope.
+
+    Always written from :func:`formatted` (both
+    ``--exception-output=none`` and the envelope formats), so the raw
+    exception stays visible even when ``--exception-query`` would
+    otherwise strip it from stdout.
+    """
+    click.echo(
+        "".join(traceback.format_exception_only(type(e), e)),
+        err=True,
+        nl=False,
+    )
+
+
+def _handle_exception(
+    e: Exception, *, exception_output: str, exception_query: str | None
+) -> NoReturn:
+    """Render an exception as an envelope on stdout, then exit 3.
+
+    Only reached for the envelope formats (``json|text|csv|table``); the
+    ``none`` path and the stderr echo are handled upstream in
+    :func:`formatted`. For the envelope schema and exit-code contract see
+    ``docs/usage.md`` ("Error output"); for the rationale,
+    ``docs/sdk-deviations.md``.
+    """
+    envelope: dict[str, Any]
+    if isinstance(e, ApiException):
+        # ApiException carries full HTTP context → 5-field envelope.
+        raw_body = e.body
+        body_text: str | None
+        if isinstance(raw_body, (bytes, bytearray)):
+            body_text = bytes(raw_body).decode("utf-8", errors="replace")
+        elif isinstance(raw_body, str):
+            body_text = raw_body
+        else:
+            body_text = None
+        envelope = {
+            "exception": _qualified_exception_name(e),
+            "status": e.status,
+            "reason": e.reason,
+            "body": body_text,
+            "headers": dict(e.headers) if e.headers is not None else None,
+        }
+    else:
+        # No HTTP context → 2-field envelope.
+        envelope = {
+            "exception": _qualified_exception_name(e),
+            "reason": str(e),
+        }
+
+    _format_output(
+        envelope,
+        output_format=exception_output,
+        jq_query=exception_query,
+    )
+    # Envelope written to stdout; exit 3 is the API / connection-error code.
+    sys.exit(3)
 
 
 def _format_output(
-    data: Any, *, output_format: str, jq_query: str | None, csv_bom: bool = False
+    data: Any,
+    *,
+    output_format: str,
+    jq_query: str | None,
+    csv_bom: bool = False,
 ) -> None:
+    """Render *data* on stdout.
+
+    The same renderer powers both the success path (``--output``) and
+    the error envelope path (``--exception-output``); both write to
+    stdout, so scripts can consume them uniformly. ``exit_code``
+    (``0`` vs ``3``) is the discriminator.
+    """
     # ``--query EXPR`` is treated as the equivalent of piping through
     # ``jq 'EXPR'``: jq may yield 0, 1, or many values and each output
     # format renders them naturally. When no query is given, the data
     # is treated as a single yield.
+    #
+    # The jq pass runs *before* the ``output_format == "none"`` short-circuit
+    # so the user-supplied expression is still validated (syntax + runtime
+    # errors surface as exit 2). Skipping it when output is silenced would
+    # make ``--query`` checking depend on the chosen format, masking
+    # script-side jq bugs the moment ``--output none`` is added.
     if jq_query:
         try:
             results = jqlib.all(jq_query, data)
         except ValueError as e:
             click.echo(f"Invalid jq expression: {e}", err=True)
-            sys.exit(1)
+            sys.exit(2)
     else:
         results = [data]
 
+    if output_format == "none":
+        # ``--output none`` suppresses the success payload entirely. The jq
+        # pass above has already executed (and exited 2 on any error), so
+        # value-level validation is the same as for the rendered formats.
+        return
+
     if output_format == "json":
-        # Stream of values: each yield is its own JSON document. Matches
-        # external ``jq``'s default output.
         for v in results:
             click.echo(json.dumps(v, indent=2, ensure_ascii=False))
         return
@@ -150,11 +303,19 @@ def _format_output(
 
     if not rows and non_rowable:
         for v in non_rowable:
-            click.echo(v)
+            click.echo(_scalar_text(v))
         return
 
+    # Stringify nested values (dict / list) as JSON so cells use JSON
+    # syntax (`{"a":"b"}`) rather than Python repr (`{'a': 'b'}`).
+    rows = [{k: _scalar_text(v) for k, v in row.items()} for row in rows]
+
     if output_format == "table":
-        click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
+        # Skip empty data instead of emitting a spurious blank line:
+        # ``tabulate([], ...)`` returns ``""`` and ``click.echo("")`` would
+        # still write a newline. Matches ``_print_csv``'s empty-rows guard.
+        if rows:
+            click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
     elif output_format == "csv":
         _print_csv(rows, with_bom=csv_bom)
 
@@ -176,25 +337,35 @@ def _to_rows(data: Any) -> list[dict[str, Any]] | None:
     return None
 
 
+def _scalar_text(value: Any) -> str:
+    """Single-cell text representation.
+
+    Scalars (None / str / int / float / bool) are stringified naturally;
+    nested containers (dict / list) are JSON-encoded so that text / csv /
+    table cells use JSON syntax (``{"a":"b"}``) rather than Python repr
+    (``{'a': 'b'}``).
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return str(value)
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def _print_text(data: Any) -> None:
     """Print data in plain text format (like ``aws --output text``)."""
-    if data is None:
-        click.echo("None")
-        return
-    if isinstance(data, (str, int, float, bool)):
-        click.echo(data)
-        return
     if isinstance(data, dict):
-        click.echo("\t".join(str(v) for v in data.values()))
+        click.echo("\t".join(_scalar_text(v) for v in data.values()))
         return
     if isinstance(data, list):
         for item in data:
             if isinstance(item, dict):
-                click.echo("\t".join(str(v) for v in item.values()))
+                click.echo("\t".join(_scalar_text(v) for v in item.values()))
             else:
-                click.echo(item)
+                click.echo(_scalar_text(item))
         return
-    click.echo(data)
+    click.echo(_scalar_text(data))
 
 
 def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:

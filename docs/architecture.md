@@ -1,102 +1,51 @@
 # Architecture
 
-`asana-api-cli` is a **runtime-introspection wrapper** around `python-asana`. The CLI command tree is built at import time by walking every `*Api` class on the installed `asana` package and generating Click commands per method. There is no codegen step — the static `tools/codegen.py` script was removed in v2.0.0.
+Runtime-introspection wrapper around `python-asana`. The CLI command tree is built at import time; no codegen.
 
-## File layout
-
-The source tree is deliberately small. Seven hand-written modules under `src/asana_api_cli/`:
+## Modules (`src/asana_api_cli/`)
 
 | File | Role |
 |---|---|
-| `cli.py` | Runtime introspection + Click command tree |
-| `session.py` | SDK client + body/workspace resolution helpers; installs the debug redactor and the multibyte-filename patch |
-| `formatter.py` | Output formatting (`json` / `table` / `csv` / `text`) + the `@formatted` decorator |
+| `cli.py` | Runtime introspection + Click command tree; body / workspace input resolution |
+| `session.py` | SDK client (`Configuration` + `ApiClient`); installs the debug redactor and the multibyte-filename patch on context-manager entry (`open`), reverses them on exit (`close`) |
+| `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
 | `click_ext.py` | `LazyGroup` for cheap top-level `--help`; mixins propagating global options to subgroups |
-| `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output (stdlib-only, copyable) |
-| `structured_arg.py` | Hybrid value parser for structured CLI options (`--retry-strategy`, `--api-key`, `--api-key-prefix`): accepts `k=v,k=v` shorthand, JSON object, or `@path` |
+| `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |
+| `structured_arg.py` | Hybrid value parser for structured options (`k=v,k=v` / JSON object / `@path`) |
 | `version.py` | `version_string()` used by `--version` |
 
-If you find yourself wanting to add an eighth module, reconsider — the current shape keeps cognitive load low. Add to one of these seven unless the new concern truly doesn't fit any of them.
+## Command construction (import time)
 
-## How commands are constructed
+`cli.py` walks every `*Api` class on the installed `asana` package and produces:
 
-At import time, `cli.py` walks every `*Api` class on `asana` and produces:
+1. One Click subgroup per `*Api` class (`TasksApi` → `tasks`).
+2. One Click command per method (`get_tasks` → `get-tasks`).
+3. Click options per docstring `:param:` line; `snake_case` → `kebab-case`, trailing `_gid` stripped (`task_gid` → `--task`).
 
-1. One Click subgroup per `*Api` class (e.g. `TasksApi` → `tasks`, `AuditLogAPIApi` → `audit-log-api`).
-2. One Click command per method on that class (e.g. `get_tasks` → `get-tasks`).
-3. Click options per docstring `:param:` line, with name conversion (`snake_case` → `kebab-case`, `_gid` suffix stripped, so `task_gid` → `--task`).
+Method-level introspection is deferred per group so top-level `--help` cost stays flat as the SDK grows.
 
-Method-level introspection is **deferred per group**: top-level `asana-api --help` only enumerates the group names, so its cost stays flat as the SDK grows.
+## SDK-destination labels
 
-**The entry point for changing command shape is `_make_command()` in `cli.py`.** Any change to how an SDK method becomes a CLI command — adding a pagination flag, hiding an SDK param, deprecation aliases, renaming `--task` etc. — is an edit to `_make_command()`.
+Every option's `--help` ends with a uniform `(<kind>: <name>)` label naming where its value lands in the `python-asana` call. The full label vocabulary (the six kinds) lives in [`cli-sdk-mapping.md`](cli-sdk-mapping.md#sdk-destination-help-labels); this section covers how the labels are produced and kept in sync with the code.
 
-## CLI surface snapshot test
+`cli.py:_sdk_dest()` builds every label `_make_command` derives at runtime — `args` / `opts` for path / body / docstring params, `kwargs` for the common per-call kwargs, and the extension marker on the deprecated aliases and the upload-only `--multibyte-filenames` flag. The `Configuration` globals (and the two `ApiClient`-instance globals `--user-agent` / `--default-header`) carry the matching `(Configuration: …)` / `(ApiClient: …)` literal by hand in both `cli.py:main` and `click_ext.py:_make_global_option_params` (kept byte-identical by `test_click_ext.py:TestHelpTextSync`); the CLI-only formatter flags (`--output` / `--query` / `--csv-bom` and the error-path twins `--exception-output` / `--exception-query`) carry theirs in `formatter.py:formatted`. `--workspace` is labeled per endpoint (`args` when positional, `opts` otherwise).
 
-`tests/test_cli_surface.py` deep-compares `introspect_to_manifest()` output against `tests/fixtures/cli_surface.json`. The fixture captures every group, command, and docstring-derived option signature. Any unintended change (typically from an `asana` SDK bump that adds/removes/renames a method) fails this test loudly.
+## Invocation flow
 
-**What the manifest tracks**: only docstring-derived parameters (`op.opts_params`). Synthetic options invented inside `_make_command` (pagination control flags like `--page-limit` / `--item-limit` / `--no-return-page-iterator` / `--full-payload`, deprecation aliases like `--all-items`) do **not** appear in the manifest. Adding such a flag does not require regenerating the fixture.
+1. `main` parses global options and writes them into the shared `runtime` singleton; `AsanaSession.__init__` reads them, applies the `Configuration` knobs (host, retry, page_limit, return_page_iterator, ...), and builds the `ApiClient` — touching no process globals. Entering the session (`open()`, via `__enter__`) installs the global side effects: under `--debug`, the SDK `debug` flag (which flips `http.client` debuglevel to 1 and raises the asana / urllib3 loggers to DEBUG) plus the `Authorization` redactor that masks the resulting wire trace; and the multipart filename patch when `runtime.multibyte_filenames` is set (driven by the per-command `--multibyte-filenames` flag on upload commands — see step 2, not a global). `close()` (via `__exit__`) reverses all of them — restoring the prior debuglevel and logger levels before removing the mask — so the globals live only for the `with` block.
+2. The resolved command invokes the SDK `*Api` method via `_make_command()`, passing the docstring-derived `opts` and the common per-call kwargs (`item_limit` / `full_payload` / `header_params` / `_request_timeout`) — both are per-command options read from the command's own flags. `_request_timeout` reaches every page request through the SDK `PageIterator`. If the SDK returns a lazy iterator (`isinstance(result, collections.abc.Iterator)` check), it is consumed into a list inside the session context so multi-page HTTP requests stay under the auth redactor.
+3. `@formatted` (in `formatter.py`) renders the response, optionally piped through `jq` via `--query`.
 
-## When bumping the `asana` dependency
+## Error handling
 
-1. Edit `dependencies` in `pyproject.toml` to raise the lower bound.
-2. `uv sync` to install the new SDK.
-3. `uv run pytest` — failures in `test_cli_surface.py` print the diff.
-4. Review the diff; describe user-visible changes in `CHANGELOG.md`.
-5. Regenerate the fixture (exact command in `tests/test_cli_surface.py`'s module docstring).
-6. Verify the no-op disclosure on `--username` / `--password` / `--api-key` /
-   `--api-key-prefix` still holds for the new SDK. These four flags are
-   exposed for `Configuration` parity but are inert in python-asana 5.2.4
-   because every `*Api` method passes
-   `auth_settings = ['personalAccessToken']` only. Re-check with:
+`formatter.py:_handle_exception` builds an envelope from any exception raised by the SDK call path (ApiException, urllib3 connection errors, etc.) and routes it through the same `_format_output` used by the success path. `_echo_exception_only` first writes the exception to **stderr** (`traceback.format_exception_only` — qualified class name + `__str__`, no frames), applied pre-`--exception-query` so unexpected error shapes stay diagnosable. Click's own errors (`ClickException`, `Abort`, `Exit`) are re-raised, not envelope-wrapped. The user-facing contract — exit codes, the 5/2-field envelope schema, and the stderr echo — is documented in [`usage.md`](usage.md#error-output) and [`usage.md`](usage.md#exit-codes).
 
-   ```bash
-   grep -rh "auth_settings = \[" .venv/lib/python*/site-packages/asana/api/ | sort -u
-   ```
+## Extension point
 
-   If the output is anything other than the single
-   `auth_settings = ['personalAccessToken']` line, the disclosure in
-   the `--help` text (and `docs/cli-sdk-mapping.md` /
-   `docs/sdk-deviations.md`) needs to be updated to reflect what the
-   new SDK actually wires up. Bump the python-asana version pin in the
-   `--help` strings too.
-7. *(Optional, soft improvement)* Review the group descriptions when
-   the SDK adds or removes resource groups:
-   - [`docs/api-groups.md`](api-groups.md) is the authoritative table
-     (CLI group → Asana reference link → short description).
-   - `_GROUP_DESCRIPTIONS` in `src/asana_api_cli/cli.py` mirrors that
-     table; the `test_group_descriptions_match_docs` test asserts the
-     two stay in sync.
-   - Groups that are new in this SDK render with a fallback English
-     name derived from the class name (e.g. `FooBar` → "Foo bar") so
-     the CLI keeps working without action. Add curated entries to both
-     the doc and the dict for richer wording.
-   - Removed groups can stay in both places — they're harmless dead
-     data and re-engage on downgrades.
-   - Source descriptions from
-     [developers.asana.com/llms.txt](https://developers.asana.com/llms.txt)
-     (an AI-friendly Markdown index of the reference) and/or the
-     individual `/reference/<group>.md` pages.
-8. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`, and `CHANGELOG.md` together.
+All changes to how an SDK method becomes a CLI command go through `_make_command()` in `cli.py` — docstring-derived per-method opts, the common per-call kwargs (`all_params`), deprecation aliases, option renames. The `Configuration` knobs are the global flags, declared in `cli.py:main()` + `click_ext.py:_make_global_option_params()` and consumed via `runtime`.
 
-## Output formats
+## Surface snapshot guardrail
 
-The four formats (`json` / `table` / `csv` / `text`) and the `--csv-bom` flag are intentionally retained:
+`tests/test_cli_surface.py` deep-compares `introspect_to_manifest()` against `tests/fixtures/cli_surface.json`. An SDK bump that adds, removes, or renames a docstring-derived option fails this test. Synthetic options (global flags, deprecation aliases) are intentionally outside the manifest.
 
-- `json` is canonical and lossless.
-- `csv` has Excel-on-Windows users; `--csv-bom` was added in v2.1.0 for that workflow.
-- `table` and `text` cover casual eyeballing and shell-script consumption respectively.
-
-## Pagination
-
-Paginatable commands (those whose SDK method has a `:param limit:`) expose every SDK pagination input as a 1:1 CLI flag:
-
-| CLI flag | SDK input |
-|---|---|
-| `--limit N` | `opts["limit"]` |
-| `--offset T` | `opts["offset"]` |
-| `--page-limit N` | `Configuration.page_limit` |
-| `--item-limit N` | kwarg `item_limit=N` |
-| `--return-page-iterator` / `--no-return-page-iterator` | `Configuration.return_page_iterator` |
-| `--full-payload` | kwarg `full_payload=True` |
-
-Default behavior is the SDK iterator path — the CLI walks every page and prints a flat list of items. `--all-items`, `--page-size`, `--max-items` are kept as v2 deprecation aliases that emit a stderr warning and forward to the equivalent flag above.
+`tests/test_sdk_boilerplate.py` is the companion guard for the two SDK-uniform input families that the manifest deliberately omits: every method's `all_params` (the boilerplate `**kwargs`) and the settable `asana.Configuration` attributes. An SDK bump that adds a new boilerplate kwarg or Configuration property fails it, forcing a conscious classification — a `Configuration` global flag, or a common per-command `(kwargs: ...)` option — rather than a silent miss. It also pins which methods perform a multipart upload (a whole-SDK source scan for `local_var_files` population), proving the cheap `file`-opt proxy (`_Operation.does_upload`) that gates the per-command `--multibyte-filenames` flag stays exact as the SDK evolves.

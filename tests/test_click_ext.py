@@ -8,60 +8,38 @@ that ``--debug`` / ``--host`` / ``--access-token`` etc. work at any level.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 import click
-import pytest
+from _cli_runner import full_output, make_runner
 
 from asana_api_cli.click_ext import (
+    _COMPACT_SECTION_LABELS,
     GLOBAL_OPTION_GROUPS,
     GLOBAL_OPTION_NAMES,
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
-    _COMPACT_SECTION_LABELS,
 )
 from asana_api_cli.session import runtime
-
-from _cli_runner import full_output, make_runner
 
 
 def _count_option_appearances(output: str, flag: str) -> int:
     """Count distinct appearances of ``flag`` as a standalone token in ``output``.
 
-    Used by tests asserting an option is not duplicated in help. Word
-    boundaries (``\\b``) ensure ``--foo`` does not match inside ``--foo-bar``,
-    and the leading lookbehind for whitespace/start-of-string keeps us from
-    matching, e.g., ``--api-key-prefix`` inside the substring ``api-key``
-    when checking ``--api-key``.
+    Used by tests asserting an option is not duplicated in help. The leading
+    whitespace/start-of-string lookbehind plus the trailing word boundary
+    (``\\b``) match ``flag`` only as a standalone token, not as a substring of
+    a longer flag name or value.
     """
     pattern = r"(?:^|(?<=\s))" + re.escape(flag) + r"\b"
     return len(re.findall(pattern, output, re.MULTILINE))
 
 
-@pytest.fixture(autouse=True)
-def _reset_runtime() -> None:
-    """Reset the shared runtime singleton between tests."""
-    runtime.debug = False
-    runtime.host = None
-    runtime.proxy = None
-    runtime.verify_ssl = None
-    runtime.ssl_ca_cert = None
-    runtime.cert_file = None
-    runtime.key_file = None
-    runtime.assert_hostname = None
-    runtime.retry_strategy_overrides = None
-    runtime.request_timeout = None
-    runtime.connection_pool_maxsize = None
-    runtime.access_token = None
-    runtime.username = None
-    runtime.password = None
-    runtime.api_key = None
-    runtime.api_key_prefix = None
-    runtime.temp_folder_path = None
-    runtime.safe_chars_for_path_param = None
-    runtime.logger_format = None
-    runtime.logger_file = None
-    runtime.multibyte_filenames = False
+# Runtime isolation between tests is provided by the autouse
+# ``_reset_runtime`` fixture in ``tests/conftest.py``. It snapshots all
+# ``_Runtime`` fields via ``dataclasses.fields`` so new fields are picked
+# up automatically — no per-file maintenance needed here.
 
 
 def _build_cli() -> click.Group:
@@ -150,7 +128,7 @@ class TestHelpRendering:
     def test_globals_appear_exactly_once_in_subcommand_help(self) -> None:
         result = make_runner().invoke(_build_cli(), ["tasks", "act", "--help"])
         assert result.exit_code == 0, full_output(result)
-        for flag in ("--debug", "--access-token", "--username"):
+        for flag in ("--debug", "--access-token", "--host"):
             count = _count_option_appearances(full_output(result), flag)
             assert count == 1, f"{flag} appears {count} times in:\n{full_output(result)}"
 
@@ -172,7 +150,7 @@ class TestHelpRendering:
             )
 
     def test_subcommand_help_uses_compact_global_options_table(self) -> None:
-        # All 21 globals are auto-injected on subcommands via
+        # Every global is auto-injected on subcommands via
         # _make_global_option_params(). The compact form renders them as a
         # one-row-per-category table under a "Global Options:" umbrella with
         # a pointer back to `asana-api --help` for descriptions.
@@ -191,20 +169,6 @@ class TestHelpRendering:
         # must NOT be repeated on the subcommand — the compact form is
         # supposed to skip exactly that.
         assert "Override urllib3 Retry fields" not in full_output(result)
-
-    def test_no_op_section_marks_python_asana_version_on_root(self) -> None:
-        # The long section heading appears on root help (full detail). On
-        # subcommands the compact form abbreviates it via
-        # _COMPACT_SECTION_LABELS, so checking the long form there is wrong.
-        # We exercise the long form by invoking the *real* CLI's root --help,
-        # which declares all 21 globals (the test fixture only declares 3).
-        from asana_api_cli.cli import main
-
-        result = make_runner().invoke(main, ["--help"])
-        assert result.exit_code == 0, full_output(result)
-        assert "No-op (SDK parity placeholders — inert in python-asana 5.2.4):" in full_output(
-            result
-        )
 
 
 class TestShellCompletion:
@@ -228,18 +192,28 @@ class TestGlobalOptionNamesInventory:
             "cert_file",
             "key_file",
             "assert_hostname",
-            "request_timeout",
             "connection_pool_maxsize",
             "access_token",
-            "username",
-            "password",
-            "api_key",
-            "api_key_prefix",
             "temp_folder_path",
             "safe_chars_for_path_param",
             "logger_format",
             "logger_file",
-            "multibyte_filenames",
+            # ApiClient-instance settings (not Configuration knobs): applied to
+            # the ApiClient after construction. Session-wide, unlike the
+            # per-call --header-params opt.
+            "user_agent",
+            "default_headers",
+            # Configuration-backed iterator knobs stay global. The per-call
+            # kwargs (item_limit / full_payload / header_params /
+            # _request_timeout) are per-command options now, not globals.
+            # multibyte_filenames is also no longer global — it is a per-command
+            # option on upload commands (see test_cli.py).
+            "return_page_iterator",
+            "page_limit",
+            # The error output controls (exception_output / exception_query) are NOT
+            # global: they are per-command formatter options on every leaf
+            # command, symmetric with --output / --query. See test_formatter.py
+            # and docs/cli-sdk-mapping.md "Output formatter options".
         ]
         if _SDK_HAS_RETRY_STRATEGY:
             expected_names.append("retry_strategy_overrides")
@@ -312,6 +286,58 @@ class TestHelpTextSync:
         }
         assert not mismatched, "\n".join(
             f"{name}: cli={cli!r} ext={ext!r}" for name, (cli, ext) in mismatched.items()
+        )
+
+    def test_cli_and_click_ext_full_signature_match(self) -> None:
+        """Help text alone is not enough: the two declaration sites must also
+        agree on flag spelling, default, flag-ness, and **type** — a
+        ``click.IntRange(min=1)`` or ``click.Path(exists=True, ...)`` that
+        drifts on only one side would make the same flag validate/coerce
+        differently at the root vs. on a subcommand, silently, while the
+        help-text check above still passes. This is what the "byte-identical"
+        claims in cli.py / click_ext.py / docs/architecture.md actually
+        promise, so enforce the whole signature.
+        """
+        from asana_api_cli.cli import main
+        from asana_api_cli.click_ext import _make_global_option_params
+
+        def _type_fingerprint(t: click.ParamType) -> tuple[Any, ...]:
+            parts: list[Any] = [type(t).__name__]
+            for attr in ("min", "max", "clamp", "exists", "dir_okay", "file_okay"):
+                if hasattr(t, attr):
+                    parts.append((attr, getattr(t, attr)))
+            if isinstance(t, click.Choice):
+                parts.append(("choices", tuple(t.choices)))
+            return tuple(parts)
+
+        def _sig(p: click.Option) -> tuple[Any, ...]:
+            return (
+                p.help,
+                tuple(p.opts),
+                tuple(p.secondary_opts),
+                p.default,
+                p.is_flag,
+                _type_fingerprint(p.type),
+            )
+
+        cli_sig = {
+            p.name: _sig(p)
+            for p in main.params
+            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
+        }
+        ext_sig = {
+            p.name: _sig(p)
+            for p in _make_global_option_params()
+            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
+        }
+        assert cli_sig.keys() == ext_sig.keys()
+        mismatched = {
+            name: (cli_sig[name], ext_sig[name])
+            for name in cli_sig
+            if cli_sig[name] != ext_sig[name]
+        }
+        assert not mismatched, "\n".join(
+            f"{name}:\n  cli={cli!r}\n  ext={ext!r}" for name, (cli, ext) in mismatched.items()
         )
 
 

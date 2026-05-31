@@ -5,7 +5,9 @@ Catalog of every intentional gap between `asana-api-cli` and the
 CLI-only additions — framed by [Constitution #1 (parity is the top
 priority) and #2 (security overrides parity)](principles.md#constitution).
 Companion of [`cli-sdk-mapping.md`](cli-sdk-mapping.md), which catalogs
-the *parity* side (which built-in option maps to which SDK input).
+the *parity* side (which built-in option maps to which SDK input). The
+*behavior* of the CLI-only flags below is documented in
+[`usage.md`](usage.md); this file records the *why*.
 
 This document is **reference**, not required reading for code changes.
 The CLI surface snapshot test (`tests/test_cli_surface.py`) and per-feature
@@ -16,18 +18,18 @@ can tell intentional non-parity from an oversight.
 Code anchors below name functions/classes (not line numbers) so the
 references stay valid across edits.
 
-## Convention: `[asana-api extension]` marker
+## Convention: `(asana-api: extension)` marker
 
 Every CLI-only flag cataloged below (the rows whose "SDK behavior" column
-is "Not in SDK") ends its `--help` text with the `[asana-api extension]`
+is "Not in SDK") ends its `--help` text with the `(asana-api: extension)`
 marker so users can tell at a glance which options have no SDK
 counterpart. The catalog and the marker are kept in sync: adding a new
 CLI-only flag means adding both a row here and the marker to the help
 text; removing one without the other is a bug.
 
 Flags that *remap* an existing SDK input to a different CLI surface
-(e.g. `--request-timeout` remapping the SDK's `_request_timeout`
-per-call kwarg to a global flag) are not marked — the underlying feature exists in the
+(e.g. `--task` exposing the SDK's `task_gid` positional argument as a
+named option) are not marked — the underlying feature exists in the
 SDK, only the surface differs. Behavior-only deviations such as the
 `--debug` token redaction (constitution #2) are likewise not marked,
 because the flag itself is SDK-derived; the deviation is enforced by a
@@ -43,10 +45,12 @@ stronger principle.
 
 ## Configuration properties that cannot be set from the CLI
 
-Every other `asana.Configuration` property has a 1:1 CLI flag (see
+Most other `asana.Configuration` properties have a 1:1 CLI flag (see
 [`cli-sdk-mapping.md`](cli-sdk-mapping.md)). The properties below have
 no flag because their values are Python objects that cannot be
-constructed from a command-line string.
+constructed from a command-line string. (The inert auth fields
+`username` / `password` / `api_key` / `api_key_prefix` are also not
+exposed, for a different reason — see *Inert auth fields* below.)
 
 | SDK property | Type | Reason |
 |---|---|---|
@@ -56,30 +60,42 @@ constructed from a command-line string.
 | `Configuration.logger_file_handler` | `logging.FileHandler` | Handler instance |
 | `urllib3.util.retry.Retry.history` | `tuple[RequestHistory, ...]` | Retry's internal execution log, not a configuration knob — explicitly excluded from `--retry-strategy`'s field set |
 
-## Personal-access-token leakage and the no-op auth properties
+## Inert auth fields (not exposed)
 
-`--username`, `--password`, `--api-key`, and `--api-key-prefix` exist for
-1:1 parity with `Configuration.username` / `password` / `api_key` /
-`api_key_prefix`, but as of python-asana 5.2.4 they are **inert in the
-request path**: every generated `*Api` method passes
-`auth_settings = ['personalAccessToken']`, so only `Configuration.access_token`
-actually emits a header. The `--help` text of each of those four flags
-calls this out explicitly with a python-asana version pin so the
-disclosure is re-verified when the SDK is bumped (see
-[`architecture.md`](architecture.md#when-bumping-the-asana-dependency)).
+`Configuration.username` / `password` / `api_key` / `api_key_prefix` exist on
+the SDK's Configuration only as swagger-codegen boilerplate (the HTTP basic
+auth + apiKey auth schemes the generator always emits). Asana's API uses
+**Bearer tokens only**: `Configuration.auth_settings()` returns just the
+`token` entry, and every `*Api` method passes
+`auth_settings = ['personalAccessToken']`, so these four fields never emit a
+header. Asana does not document basic auth at all, and API keys are officially
+deprecated and being shut off (personal access tokens are the replacement).
+
+The CLI therefore does **not** expose `--username` / `--password` /
+`--api-key` / `--api-key-prefix` — surfacing inert flags would mislead users
+into thinking those auth modes work. This is a deliberate deviation from
+"expose every settable `Configuration` property"
+([constitution #1](principles.md#constitution)): (a) it removes a misleading
+no-op surface, (b) the faithful auth path stays reachable via `--access-token`
+(PAT / Service Account token), and (c) it is cataloged here. Use
+`--access-token` (or `$ASANA_ACCESS_TOKEN`) to authenticate.
 
 ## CLI behavior that differs from raw SDK behavior
 
+The **CLI behavior** column is a summary; the full behavior of each flag is in
+[`usage.md`](usage.md). The **Reason** column is the rationale these deviations
+exist (constitution #1 (c)).
+
 | Area | SDK behavior | CLI behavior | Reason | Code anchor |
 |---|---|---|---|---|
-| Personal access token in `--debug` output (`Authorization: Bearer <token>` / `Basic <token>`) | Printed verbatim by `http.client`'s wire-level `print()` when debug level is set; the SDK's own loggers do not log headers, but `http.client` does | The token is masked before the line is written (mask format: see `_default_mask_token`) | Constitution #2 (security overrides parity). Personal access tokens must never appear in user-visible output, so debug logs stay safe to paste into bug reports | `HttpClientAuthRedactor` and `_default_mask_token` in `redactor.py`; installed by `AsanaSession.__init__` when `--debug` is set |
-| `_request_timeout` per-call kwarg | Per-call kwarg on each SDK method | Surfaced as the global `--request-timeout` flag; the session wraps `ApiClient.call_api` to inject the kwarg | A CLI invocation is a single API call from the user's perspective, so a global flag is more ergonomic than a per-method surface | `--request-timeout` option in `cli.py:main`; `AsanaSession._install_timeout` in `session.py` |
-| Multipart filename with non-ASCII characters | Emits `filename="..."` only; non-ASCII bytes round-trip is undefined | Emits the RFC 5987 `filename*=UTF-8''<percent-encoded>` parameter alongside `filename=` when `--multibyte-filenames` is set | SDK gap: the Asana API needs RFC 5987 to round-trip non-ASCII attachment names. Opt-in so default upload semantics do not change silently | `--multibyte-filenames` option in `cli.py:main`; `MultibyteFilenameSupport` in `session.py` |
-| Default pagination return shape | `Configuration.return_page_iterator = True` produces a `PageIterator` (iterator object) | The iterator is walked to completion (`list(result)`) inside the session context and printed as a flat list of items | (1) An unwalked iterator cannot be serialized to stdout — the CLI must materialize a complete payload. (2) Materializing inside the session context keeps `HttpClientAuthRedactor` active for every page request; lazy iteration after the session exits would leak `Authorization` headers on pages 2..N (constitution #2 tie-in) | `_make_command` in `cli.py` (`paginatable and effective_iter and not full_payload` branch) |
-| `--output FORMAT` | (Not in SDK — SDK returns Python objects) | Renders the response into one of `json` / `table` / `csv` / `text` (default `json` — canonical, lossless) | Shell ergonomics: CLI output must be text. The four formats serve different consumer types (machines via JSON, humans via table, spreadsheets via CSV, scripts via text) | `--output` option and `_format_output` in `formatter.py` |
-| `--query EXPR` | (Not in SDK — SDK returns Python objects) | Pipes the response through jq with the given expression; each yield is rendered separately according to the chosen output format | Shell ergonomics: extracts fields / items inline without spawning a separate `jq` process. Mirrors `aws --query` | `--query` option and the `jqlib.all` call in `_format_output` in `formatter.py` |
-| `--csv-bom` | (Not in SDK — SDK returns Python objects) | Prepends a UTF-8 BOM to CSV output when set | Windows ergonomics: Excel on Windows needs the BOM to decode UTF-8 CSV correctly. Opt-in so Unix pipelines stay clean | `--csv-bom` option and `_print_csv` in `formatter.py` |
-| `--all-items` / `--page-size` / `--max-items` | (Not in SDK) | Accepted as v2-era deprecation aliases of the new flags. `--all-items` is a no-op (the new default already walks every page); `--page-size N` aliases `--limit N`; `--max-items N` aliases `--item-limit N`. Each emits a stderr warning, and the wrapper rejects passing both an alias and its replacement | v2 → v3 migration path; aliases scheduled for removal in v3.1+ | `_make_command` in `cli.py` (deprecation branches around `all_items` / `page_size` / `max_items`) |
+| Personal access token in `--debug` output | Printed verbatim by `http.client`'s wire-level `print()`; the SDK's own loggers do not log headers | The token is masked before the line is written (mask format: `_default_mask_token`) | Constitution #2 (security overrides parity): tokens must never appear in user-visible output, so debug logs stay safe to paste into bug reports | `HttpClientAuthRedactor` / `_default_mask_token` in `redactor.py`; installed on session entry (`AsanaSession.open`) under `--debug` |
+| Multipart filename with non-ASCII characters | Emits `filename="..."` only, omitting the RFC 5987 `filename*=` parameter, so non-ASCII names are stored garbled | Emits the RFC 5987 `filename*=` parameter when `--multibyte-filenames` is passed ([`usage.md`](usage.md#file-uploads)) | Works around a `python-asana` bug: without `filename*=` the server cannot decode non-ASCII attachment names. Opt-in so default upload semantics do not change silently; exposed only on upload commands | `--multibyte-filenames` built per-command in `cli.py:_make_command`; `MultibyteFilenameSupport` in `session.py`; guarded by `tests/test_sdk_boilerplate.py` |
+| Default pagination return shape | `return_page_iterator=True` yields a lazy iterator (`PageIterator` / `EventIterator`) | The iterator is walked to completion (`list(result)`) inside the session context and printed as a flat list ([`usage.md`](usage.md#pagination)) | (1) An unwalked iterator cannot be serialized to stdout. (2) Materializing inside the session keeps `HttpClientAuthRedactor` active for every page request; lazy iteration after the session exits would leak `Authorization` headers on pages 2..N (constitution #2) | post-judge `isinstance` check in `_make_command`'s inner callback in `cli.py` |
+| `--output` / `--query` / `--csv-bom` | (Not in SDK — it returns Python objects) | Render / jq-filter / BOM-prefix the response ([`usage.md`](usage.md#output-formatting)) | Shell ergonomics: CLI output must be text, and consumers differ (machines / humans / spreadsheets / scripts); `--csv-bom` covers Excel-on-Windows; `none` covers the "exit code only" case | `_format_output` / `_print_csv` in `formatter.py` |
+| `--exception-output` / `--exception-query` (v3.1+) | (Not in SDK — Python raises per HTTP error) | Catch the exception, echo it to stderr, and optionally render a structured envelope on stdout ([`usage.md`](usage.md#error-output)) | Gives scripts a structured stdout error channel keyed by exit `3`, while the stderr echo keeps the response readable without opting in | `_echo_exception_only` / `_handle_exception` / `_format_output` in `formatter.py` |
+| Exit code on failure | Python defaults | `0` success, `1` unhandled error (catch-all, incl. an uncaught SDK exception under default `--exception-output=none`), `2` user-input invalid, `3` envelope-rendered error ([`usage.md`](usage.md#exit-codes)) | Lets scripts distinguish the defined failure kinds (`2` / `3`) from everything else (`1`) | `formatted` (exit 1) / `_handle_exception` (exit 3) in `formatter.py`; `sys.exit(2)` sites in `session.py` / `formatter.py` |
+| `--all-items` / `--page-size` / `--max-items` | (Not in SDK) | v2-era deprecation aliases of the v3 flags ([`usage.md`](usage.md#deprecated-aliases)) | v2 → v3 migration path; scheduled for removal in a future release | `_make_command` in `cli.py` (deprecation branches around `all_items` / `page_size` / `max_items`) |
+| SDK arg/opt name colliding with a built-in CLI flag | (Not in SDK — no flag namespace) | The colliding SDK arg/opt is exposed as `--sdk-<name>`; the built-in keeps its bare name and the SDK param keeps its real name in dest / call / label | The CLI adds extension flags that share the `--` namespace; on collision the SDK param must stay reachable (constitution #1 (b)), and prefixing the SDK side keeps every built-in flag stable across commands (no per-command polysemy) | `_reserved_flags` / `_decls` in `cli.py`; `tests/test_cli.py::TestFlagCollisions` |
 
 ## Decisions deferred (v3.0)
 

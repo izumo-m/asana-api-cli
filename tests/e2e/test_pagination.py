@@ -11,13 +11,12 @@ projects provisioned by ``tools/e2e_init.py``:
 
 Live record::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest --record-mode=all tests/e2e/test_pagination.py
+    ASANA_PYTEST_WORKSPACE=<gid> \\
+        uv run pytest --live --record tests/e2e/test_pagination.py
 
 Replay::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest tests/e2e/test_pagination.py
+    uv run pytest tests/e2e/test_pagination.py
 """
 
 from __future__ import annotations
@@ -25,10 +24,9 @@ from __future__ import annotations
 import json
 
 import pytest
+from _cli_runner import make_runner
 
 from asana_api_cli.cli import main
-
-from _cli_runner import make_runner
 
 # Must match ``PROJECT_SPECS[0].task_count`` in ``tools/e2e_init.py``.
 TOTAL_TASKS = 1500
@@ -115,15 +113,23 @@ def test_full_payload_without_limit_errors(pagination_project_gid: str) -> None:
     Pairs with ``test_full_payload_under_threshold`` which covers the
     success case.
     """
-    code, _, err = _run(
+    # --exception-output json opts into the envelope path so we can inspect
+    # the API body programmatically on **stdout**. The default 'none'
+    # would exit 1 with the body on **stderr** — readable for humans
+    # but not what this test's ``out`` capture parses as JSON.
+    code, out, _ = _run(
         "tasks",
         "get-tasks",
         "--project",
         pagination_project_gid,
         "--full-payload",
+        "--exception-output",
+        "json",
     )
-    assert code != 0
-    assert "too large" in err.lower()
+    assert code == 3
+    envelope = json.loads(out)
+    assert envelope["status"] == 400
+    assert "too large" in envelope["body"].lower()
 
 
 @pytest.mark.vcr

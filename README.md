@@ -1,30 +1,40 @@
 # asana-api-cli
 
-A CLI that exposes **every method of the official
-[`python-asana`](https://github.com/Asana/python-asana) SDK** as
-`asana-api <group> <command>`. The command tree is generated at runtime
-from the installed `asana` package, automatically tracking whatever
-SDK version is installed in the same environment.
+Call any Asana endpoint from your shell — no throwaway Python script
+needed. `asana-api <group> <command>` turns **every method of the official
+[`python-asana`](https://github.com/Asana/python-asana) SDK** into a
+command, so you can read, create, and inspect Asana data one line at a time.
+
+And because each command maps 1:1 to an SDK method, the call you work out in
+the shell is the call you write in Python:
+
+```bash
+# Work it out interactively...
+asana-api tasks get-tasks --project 123 --opt-fields name,assignee.name
+```
+
+```python
+# ...then drop the same call into your app:
+asana.TasksApi(client).get_tasks({"project": "123", "opt_fields": "name,assignee.name"})
+```
 
 ## Why asana-api-cli
 
-- **Complete SDK coverage.** Every method of every `*Api` class in
-  `python-asana` becomes a CLI command. Because the tree is introspected
-  from the installed `asana` package, new methods surface the moment
-  upstream ships them — no `asana-api-cli` release required.
-- **Tracks the SDK version you actually use.** Because commands are
-  introspected from whatever `asana` is installed in the same environment,
-  the CLI surface matches the SDK version pinned in your project. When using
-  `asana-api-cli` as a dev-dependency, `pip install -U asana` updates the
-  CLI's available commands in lockstep with your application code.
-- **SDK-compatible arguments and output.** Command arguments map to
-  `python-asana` method parameters (with minor naming adjustments — hyphens
-  become underscores, group names map back to PascalCase `*Api` class
-  names), and JSON output matches the SDK's response shape. The CLI makes
-  it easy to iterate: try different arguments, inspect the response, and
-  refine until you understand the endpoint's behavior. Once verified,
-  translate the call into the equivalent `python-asana` invocation in your
-  app — far fewer surprises on the first integration.
+- **Explore the whole API from the shell.** Every method of every `*Api`
+  class is a command — list tasks, create a project, poll events — with no
+  script and no boilerplate.
+- **What you learn transfers to Python.** Flags map to SDK method
+  parameters, and JSON output matches the SDK's response shape — so a
+  working shell call becomes a working SDK call. Each option's `--help`
+  even names where its value lands in the SDK.
+- **Always matches your SDK version.** The command tree is built at startup
+  by introspecting the installed `asana` package. Install it beside your
+  project's SDK and the two stay in lock-step — new upstream methods appear
+  the moment `pip install -U asana` lands, with no `asana-api-cli` release
+  and no stale docs.
+- **Shell-native ergonomics.** JSON / table / CSV / text output, `jq`
+  filtering (`--query`), automatic pagination, structured error envelopes,
+  and `--debug` request tracing with the auth token masked.
 
 ## Installation
 
@@ -97,14 +107,14 @@ The token can be issued from the
 No token is needed for `--help` or argument validation errors.
 
 ```bash
-export ASANA_ACCESS_TOKEN="1/12345..."
+export ASANA_ACCESS_TOKEN="2/12345..."
 export ASANA_DEFAULT_WORKSPACE="12345678"   # optional
 ```
 
 On Windows PowerShell:
 
 ```powershell
-$env:ASANA_ACCESS_TOKEN = "1/12345..."
+$env:ASANA_ACCESS_TOKEN = "2/12345..."
 $env:ASANA_DEFAULT_WORKSPACE = "12345678"   # optional
 ```
 
@@ -135,10 +145,12 @@ asana-api --help
 asana-api tasks --help
 asana-api tasks get-tasks --help
 
-# List workspaces and projects
+# List workspaces
 asana-api workspaces get-workspaces
-asana-api projects get-projects-for-workspace
-asana-api projects get-projects --workspace <WORKSPACE_GID>
+
+# List up to 50 projects
+asana-api projects get-projects-for-workspace --item-limit 50
+asana-api projects get-projects --workspace <WORKSPACE_GID> --item-limit 50
 
 # List every task in a project (walks every page by default)
 asana-api tasks get-tasks --project <PROJECT_GID>
@@ -153,122 +165,30 @@ asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload
 asana-api tasks get-task --task <TASK_GID>
 
 # Create a task (body is a JSON string)
-asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PID>"]}}'
+asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PROJECT_GID>"]}}'
 
 # Output formats — pair non-JSON formats with `--query '.data'` to unwrap the
 # `{"data": [...]}` envelope into one row per item.
-asana-api tasks get-tasks --project <PID> --query '.data' --output table
-asana-api tasks get-tasks --project <PID> --query '.data' --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output table
+asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output csv
 
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
 # Windows, which otherwise displays non-ASCII characters as garbled text.
-asana-api tasks get-tasks --project <PID> --output csv --csv-bom > tasks.csv
+asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
+
+# --output none suppresses the success payload — handy for side-effect-only
+# calls (delete/update) where only the exit code matters. The `--query` pass
+# still runs, so jq syntax errors are caught even when output is silenced.
+asana-api tasks delete-task --task <TASK_GID> --output none
 ```
 
-See [Pagination](#pagination) for fetching across pages and
-[Global options](#global-options) for `--debug`, `--access-token`, etc.
+For the complete option reference — global options, pagination, output formats,
+workspace resolution, error handling, and exit codes — see
+[`docs/usage.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/usage.md).
 
-### Workspace resolution
-
-Many API endpoints require a workspace. For commands wrapping such
-endpoints (e.g. `get-projects-for-workspace`), the CLI resolves it in
-this order:
-
-1. `--workspace <GID>` on the command
-2. `ASANA_DEFAULT_WORKSPACE` environment variable
-
-For commands where workspace is optional (e.g. `get-tasks`), the env-var
-fallback is **not** used — pass `--workspace` explicitly if needed. This
-avoids ambiguity with alternative scope parameters like `--project` that
-the Asana API accepts in place of workspace.
-
-## Pagination
-
-Paginatable commands like `tasks get-tasks` expose every pagination input
-of the `python-asana` SDK as a CLI flag. Each flag maps 1:1 to an SDK
-`Configuration` property, `opts` key, or method kwarg, so you can probe
-SDK behavior from the shell before writing any Python.
-
-| CLI flag | SDK input | Effect |
-|----------|-----------|--------|
-| (none) | — | SDK default: walks every page automatically and outputs a flat JSON list of items |
-| `--limit N` | `opts["limit"]` | Per-page size sent to the server (Asana API requires 1-100) |
-| `--offset <TOKEN>` | `opts["offset"]` | Pagination cursor (the `next_page.offset` from a previous response) |
-| `--page-limit N` | `Configuration.page_limit` | Same as `--limit` via Configuration (default: 100). Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
-| `--item-limit N` | kwarg `item_limit=N` | Stop after N items have been collected. Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
-| `--return-page-iterator` / `--no-return-page-iterator` | `Configuration.return_page_iterator` | Toggle the SDK page iterator (default: enabled). `--no-return-page-iterator` disables auto-pagination — the command runs one HTTP request and outputs the raw `{data, next_page}` dict |
-| `--full-payload` | kwarg `full_payload=True` | Same effect as `--no-return-page-iterator` (per-call kwarg form) |
-
-```bash
-# Default: walk every page, return a flat list of items
-asana-api tasks get-tasks --project <PID>
-
-# Cap the result to the first 250 items
-asana-api tasks get-tasks --project <PID> --item-limit 250
-
-# Single HTTP call: one page + next_page cursor
-asana-api tasks get-tasks --project <PID> --limit 100 --no-return-page-iterator
-
-# Resume from a cursor
-asana-api tasks get-tasks --project <PID> --offset <TOKEN>
-```
-
-### Deprecated flags (v2.x → v3.0)
-
-The following v2 flags are retained as deprecation aliases. Each emits a
-stderr warning and forwards to the corresponding v3 flag; they will be
-removed in a future release.
-
-| Deprecated | Replacement |
-|------------|-------------|
-| `--all-items` | (no-op; walking every page is now the default) |
-| `--page-size N` | `--limit N` |
-| `--max-items N` | `--item-limit N` |
-
-Combining a deprecated alias with its v3 counterpart (e.g. `--page-size`
-together with `--limit`) is rejected with a usage error.
-
-## Global options
-
-These options work at any level of the command tree, so the following are
-equivalent:
-
-```bash
-asana-api --debug tasks get-tasks --project <PID>
-asana-api tasks get-tasks --project <PID> --debug
-```
-
-When the same option is given at multiple levels, the later one wins.
-
-Every non-extension flag below maps 1:1 to a property of
-`asana.Configuration` (or a per-call SDK kwarg) — see
-[`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md)
-for the exact destination of each.
-
-| Option | Description |
-|--------|-------------|
-| `--access-token TOKEN` | Asana personal access token (default: `$ASANA_ACCESS_TOKEN`) |
-| `--host URL` | Override API base URL (default: `https://app.asana.com/api/1.0`) |
-| `--proxy URL` | HTTP/HTTPS proxy URL |
-| `--verify-ssl / --no-verify-ssl` | Toggle TLS certificate verification (default: True) |
-| `--ssl-ca-cert PATH` | Path to a PEM bundle of trusted CA certificates |
-| `--cert-file PATH` | Client TLS certificate for mTLS |
-| `--key-file PATH` | Client TLS private key for mTLS |
-| `--assert-hostname / --no-assert-hostname` | Toggle urllib3 hostname assertion (tri-state: unspecified → urllib3 default) |
-| `--retry-strategy VALUE` | Override `Configuration.retry_strategy` fields. `VALUE` accepts shorthand (`total=5,backoff_factor=1.5,raise_on_status=false`), a JSON object (`'{"total":5,"status_forcelist":[429,500]}'`), or `@path` to a JSON file. List-typed fields require the JSON form. See [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#structured-value-format-api-key-api-key-prefix-retry-strategy) for the field list |
-| `--request-timeout SECONDS` | Per-request timeout in seconds |
-| `--connection-pool-maxsize N` | Max urllib3 connections cached per host (default: cpu_count × 5) |
-| `--temp-folder-path PATH` | Directory for temporary downloads |
-| `--safe-chars-for-path-param S` | Extra characters treated as safe when percent-encoding path parameters |
-| `--logger-format FMT` | Python logging format string for the SDK loggers |
-| `--logger-file PATH` | Path the SDK loggers write to when set |
-| `--multibyte-filenames` | Emit RFC 5987 `filename*=UTF-8''<percent-encoded>` on multipart uploads so Asana decodes non-ASCII attachment filenames correctly |
-| `--debug` | Print HTTP request/response traces to stderr for troubleshooting (`Authorization` values are masked) |
-
-Asana only accepts Bearer-token authentication, so `--username`,
-`--password`, `--api-key`, and `--api-key-prefix` are also exposed for
-1:1 parity with `Configuration` but are inert as of python-asana 5.2.4
-— see the disclosure in [`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md#no-op-auth-properties).
+Asana only accepts Bearer-token authentication (personal access token, Service
+Account, or OAuth), so authenticate with `--access-token` or
+`$ASANA_ACCESS_TOKEN`.
 
 ## Development
 

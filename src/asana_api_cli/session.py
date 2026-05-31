@@ -7,14 +7,13 @@ applying the global configuration passed in from the CLI.
 
 from __future__ import annotations
 
-import functools
-import json
+import http.client
+import logging
 import os
 import sys
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import asana
@@ -24,26 +23,24 @@ from urllib3.fields import RequestField
 from asana_api_cli.redactor import HttpClientAuthRedactor
 
 ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
-DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
 
 
 class MultibyteFilenameSupport:
-    """Context manager that augments ``urllib3.fields.RequestField`` to
-    emit the RFC 5987 ``filename*=UTF-8''<percent-encoded>`` parameter of
-    ``Content-Disposition`` whenever a multipart field has a non-ASCII
-    filename.
+    """Make multipart uploads round-trip filenames with non-ASCII characters.
 
-    Asana's attachment endpoint requires the ``filename*=`` form to
-    decode non-ASCII filenames correctly; without it the server treats
-    the ``filename="..."`` value as a literal and stores it as mojibake
-    or percent-encoded text. The official ``python-asana`` SDK (via
-    urllib3's default multipart formatter) does not emit ``filename*=`` —
-    this is a long-standing upstream gap (Asana forum discussion since
-    2022-12, unresolved as of 2026-05).
+    In ``python-asana`` 5.2.4 (the latest version checked, and likely later
+    ones too), uploading a file whose name has characters outside ASCII
+    stores a garbled (mojibake) name on Asana: the SDK's multipart encoder
+    emits only ``filename="..."`` and omits the RFC 5987 ``filename*=``
+    parameter the server needs to decode them. This context manager patches
+    ``urllib3.fields.RequestField.make_multipart`` to add
+    ``filename*=UTF-8''<percent-encoded>`` for such names.
 
-    Off by default to preserve strict SDK parity. The CLI enables it
-    when ``--multibyte-filenames`` is set; library callers can use it
-    standalone::
+    Off by default to preserve strict SDK parity. The CLI enables it when
+    ``--multibyte-filenames`` is passed to an upload command (e.g.
+    ``attachments create-attachment-for-object``); ``AsanaSession`` then holds
+    the patch open for the duration of that command. The context-manager form
+    scopes the patch to a block::
 
         with MultibyteFilenameSupport():
             # urllib3-based uploads in this block emit filename*=
@@ -88,52 +85,6 @@ class MultibyteFilenameSupport:
         self.uninstall()
 
 
-JsonValue = dict[str, Any] | list[Any] | str | int | float | bool | None
-
-
-def resolve_body(value: str) -> JsonValue:
-    """Parse a body argument as JSON.
-
-    Supports three input forms:
-    - ``@path`` — read JSON from a file
-    - ``-``     — read JSON from stdin
-    - otherwise — parse the string itself as JSON
-    """
-    if value == "-":
-        try:
-            raw = sys.stdin.read()
-        except UnicodeDecodeError as exc:
-            # stdin is reconfigured to UTF-8 at startup (see cli.py main),
-            # so non-UTF-8 input from a pipe surfaces here instead of being
-            # silently misdecoded with the locale code page.
-            click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
-            sys.exit(1)
-    elif value.startswith("@"):
-        path = Path(value[1:])
-        try:
-            raw = path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            click.echo(f"Body file not found: {path}", err=True)
-            sys.exit(1)
-        except UnicodeDecodeError as exc:
-            click.echo(
-                f"Body file {path} is not valid UTF-8: {exc}",
-                err=True,
-            )
-            sys.exit(1)
-        except OSError as exc:
-            click.echo(f"Cannot read body file {path}: {exc}", err=True)
-            sys.exit(1)
-    else:
-        raw = value
-
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as exc:
-        click.echo(f"Invalid JSON in body: {exc}", err=True)
-        sys.exit(1)
-
-
 @dataclass
 class _Runtime:
     """Configuration shared globally during a CLI invocation.
@@ -149,12 +100,13 @@ class _Runtime:
     proxy: str | None = None
     verify_ssl: bool | None = None
     ssl_ca_cert: str | None = None
-    request_timeout: float | None = None
     access_token: str | None = None
     temp_folder_path: str | None = None
+    # Set by the upload command's per-command ``--multibyte-filenames`` flag
+    # (``cli.py:_make_command``), not a global option. Kept here because the
+    # session reads it to decide whether to install ``MultibyteFilenameSupport``;
+    # non-upload commands leave it at this default.
     multibyte_filenames: bool = False
-    username: str | None = None
-    password: str | None = None
     logger_format: str | None = None
     logger_file: str | None = None
     cert_file: str | None = None
@@ -162,42 +114,54 @@ class _Runtime:
     assert_hostname: bool | None = None
     connection_pool_maxsize: int | None = None
     safe_chars_for_path_param: str | None = None
-    api_key: dict[str, str] | None = None
-    api_key_prefix: dict[str, str] | None = None
     retry_strategy_overrides: dict[str, Any] | None = None
+    # ApiClient-instance settings (not Configuration knobs): applied to the
+    # ``ApiClient`` after construction in ``AsanaSession.__init__`` via
+    # ``user_agent`` / ``set_default_header``. Session-wide — they ride every
+    # request, unlike the per-call ``--header-params`` opt.
+    user_agent: str | None = None
+    default_headers: dict[str, str] | None = None
+    # Configuration-backed iterator knobs. The per-call kwargs
+    # (full_payload / item_limit / header_params / _request_timeout) are NOT
+    # here: they are per-command options forwarded by ``cli.py:_make_command``.
+    # The CLI-only output-formatting options (--output / --query and their
+    # error-path twins --exception-output / --exception-query) are likewise not here:
+    # they flow as kwargs through ``formatter.py:formatted``.
+    return_page_iterator: bool | None = None
+    page_limit: int | None = None
 
 
 runtime = _Runtime()
 
 
 class AsanaSession:
-    """Session that holds an ApiClient from the official asana SDK.
+    """Session holding an ApiClient from the official asana SDK.
 
-    Usable as a context manager so the optional debug redactor
-    (installed when ``runtime.debug`` is True) is uninstalled cleanly
-    on exit. Direct instantiation without ``with`` also works — the
-    redactor then stays installed for the lifetime of the process,
-    which is fine for one-shot CLI use but leaks global state for
-    longer-lived library use.
+    Use it as a context manager. The global side effects — the ``--debug``
+    HTTP-log redactor, the ``http.client`` debuglevel flip the SDK's debug
+    setter performs, and the multibyte-filename multipart patch — are
+    installed on ``__enter__`` and reversed on ``__exit__``, so they are in
+    effect only for the duration of the ``with`` block. Constructing a
+    session without entering it builds a plain ApiClient and mutates no
+    process globals.
+
+    Internal class: reached only through the CLI's
+    ``with AsanaSession.from_env() as session:`` and carrying no stability
+    guarantee (see ``docs/principles.md``).
     """
 
-    def __init__(
-        self, token: str, *, return_page_iterator: bool = True, page_limit: int | None = None
-    ) -> None:
+    def __init__(self, token: str) -> None:
         config = asana.Configuration()
         config.access_token = token
-        # *return_page_iterator* and *page_limit* mirror the SDK's
-        # ``asana.Configuration`` properties of the same names: with
-        # ``return_page_iterator=True`` (the SDK default) paginatable
-        # methods return an iterator that walks every page; with False
-        # they return a single ``{data, next_page}`` dict per HTTP call.
-        # ``page_limit`` (SDK default 100) is the per-page size used on the
-        # iterator path when ``opts["limit"]`` is not set.
-        config.return_page_iterator = return_page_iterator
-        if page_limit is not None:
-            config.page_limit = page_limit
 
-        # Apply runtime values to Configuration
+        # Apply runtime values to Configuration.
+        # ``return_page_iterator`` / ``page_limit`` are read from runtime
+        # like the other Configuration knobs. Unspecified ⇒ leave the SDK
+        # default (True / 100) in place.
+        if runtime.return_page_iterator is not None:
+            config.return_page_iterator = runtime.return_page_iterator
+        if runtime.page_limit is not None:
+            config.page_limit = runtime.page_limit
         if runtime.host:
             config.host = runtime.host
         if runtime.proxy:
@@ -211,10 +175,6 @@ class AsanaSession:
             config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.temp_folder_path:
             config.temp_folder_path = runtime.temp_folder_path  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.username is not None:
-            config.username = runtime.username  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.password is not None:
-            config.password = runtime.password  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.logger_format is not None:
             config.logger_format = runtime.logger_format  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.logger_file is not None:
@@ -229,10 +189,6 @@ class AsanaSession:
             config.connection_pool_maxsize = runtime.connection_pool_maxsize  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.safe_chars_for_path_param is not None:
             config.safe_chars_for_path_param = runtime.safe_chars_for_path_param  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.api_key is not None:
-            config.api_key = runtime.api_key  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.api_key_prefix is not None:
-            config.api_key_prefix = runtime.api_key_prefix  # pyright: ignore[reportAttributeAccessIssue]
         if runtime.retry_strategy_overrides is not None:
             # Start from the SDK's default Retry instance so unspecified
             # fields keep their python-asana defaults (e.g. total=5,
@@ -244,66 +200,103 @@ class AsanaSession:
                 **runtime.retry_strategy_overrides
             )
 
+        # Global side effects (the debug redactor, the ``http.client``
+        # debuglevel flip, and the multibyte multipart patch) are installed by
+        # ``open()`` (on ``__enter__``) and reversed by ``close()`` (on
+        # ``__exit__``), so merely constructing a session never mutates process
+        # globals. ApiClient construction stays here because it touches no
+        # globals — a failure just propagates with nothing to unwind.
+        # Pre-initialize the patch handles to ``None`` so ``open()``'s cleanup
+        # and ``close()`` can tell which patches actually got installed.
+        self._config = config
         self._redactor: HttpClientAuthRedactor | None = None
-        if runtime.debug:
-            # The SDK debug setter enables http.client.HTTPConnection.debuglevel
-            # and bumps the urllib3/asana loggers to DEBUG. The only path that
-            # leaks the Authorization header is http.client's wire-level
-            # ``print()`` calls — the SDK's own loggers do not log headers.
-            # Install the redactor AFTER the SDK setup so we wrap whatever
-            # http.client.print is at that point.
-            config.debug = True
-            self._redactor = HttpClientAuthRedactor()
-            self._redactor.install()
-
         self._multibyte_filenames: MultibyteFilenameSupport | None = None
-        if runtime.multibyte_filenames:
-            self._multibyte_filenames = MultibyteFilenameSupport()
-            self._multibyte_filenames.install()
+        # Prior ``http.client.HTTPConnection.debuglevel`` and the prior levels
+        # of the asana/urllib3 loggers, captured by ``open()`` only when this
+        # session turns debug on (the SDK ``debug`` setter raises both).
+        # ``None`` means "this session did not touch the globals", so cleanup
+        # leaves them alone.
+        self._prev_debuglevel: int | None = None
+        self._prev_logger_levels: dict[logging.Logger, int] | None = None
+        self._client = asana.ApiClient(config)
 
-        try:
-            self._config = config
-            self._client = asana.ApiClient(config)
-            # Configuration has no per-request-timeout knob, so wrap
-            # call_api to inject it on every invocation.
-            if runtime.request_timeout is not None:
-                self._install_timeout(runtime.request_timeout)
-        except Exception:
-            # If construction fails after the patches were installed, the
-            # caller never gets a session to call close() on, so undo the
-            # global patches here rather than leaving them leaked for the
-            # rest of the process.
-            if self._redactor is not None:
-                self._redactor.uninstall()
-                self._redactor = None
-            if self._multibyte_filenames is not None:
-                self._multibyte_filenames.uninstall()
-                self._multibyte_filenames = None
-            raise
-
-    def _install_timeout(self, timeout: float) -> None:
-        """Wrap ApiClient.call_api to inject a default _request_timeout."""
-        original = self._client.call_api
-
-        @functools.wraps(original)
-        def call_api_with_timeout(*args: Any, **kwargs: Any) -> Any:
-            kwargs.setdefault("_request_timeout", timeout)
-            return original(*args, **kwargs)
-
-        self._client.call_api = call_api_with_timeout  # type: ignore[method-assign]
+        # ApiClient-instance settings (not Configuration knobs) applied after
+        # construction. ``default_headers`` first, then ``user_agent`` last, so
+        # the dedicated ``--user-agent`` wins over a ``--default-header`` that
+        # also targets ``User-Agent`` (both write ``default_headers['User-Agent']``).
+        if runtime.default_headers:
+            for name, value in runtime.default_headers.items():
+                self._client.set_default_header(name, value)
+        if runtime.user_agent is not None:
+            self._client.user_agent = runtime.user_agent
 
     @property
     def client(self) -> asana.ApiClient:
         return self._client
 
-    def close(self) -> None:
-        """Uninstall any global patches installed for this session
-        (debug redactor, multibyte-filename multipart patch).
+    def open(self) -> None:
+        """Install this session's global side effects: the ``http.client``
+        debuglevel flip plus the ``Authorization`` redactor (under
+        ``--debug``) and the multibyte-filename multipart patch (under
+        ``--multibyte-filenames``). The reverse of :meth:`close`; ``__enter__``
+        calls it so the globals live only for the ``with`` block.
 
-        Safe to call multiple times. Prefer using the session as a
-        context manager (``with AsanaSession(...) as session: ...``)
-        which calls ``close`` automatically.
+        If a later ``install()`` raises after an earlier one already
+        succeeded, every side effect installed so far is reversed (via
+        ``close``) before the error propagates. ``__enter__`` cannot defer this
+        to ``__exit__``: Python skips ``__exit__`` when ``__enter__`` raises.
         """
+        try:
+            if runtime.debug:
+                # ``config.debug = True`` has two process-global side effects:
+                # it flips ``http.client.HTTPConnection.debuglevel`` to 1 (the
+                # wire-level ``print()`` tracing — the only path that can leak
+                # the Authorization header) and it raises the asana/urllib3
+                # loggers to DEBUG. Capture BOTH so ``close()`` restores them;
+                # otherwise debuglevel stays 1 after the redactor is uninstalled
+                # (a later non-debug session would print the raw header) and the
+                # loggers stay at DEBUG for the rest of the process. Install the
+                # redactor AFTER the SDK debug setup so it wraps whatever
+                # ``http.client.print`` is by then; ``close()`` turns tracing
+                # back off before removing the mask so the two are never out of
+                # step (constitution #2).
+                self._prev_debuglevel = http.client.HTTPConnection.debuglevel
+                self._prev_logger_levels = {
+                    lg: lg.level
+                    for lg in self._config.logger.values()  # pyright: ignore[reportAttributeAccessIssue]
+                }
+                self._config.debug = True
+                self._redactor = HttpClientAuthRedactor()
+                self._redactor.install()
+            if runtime.multibyte_filenames:
+                self._multibyte_filenames = MultibyteFilenameSupport()
+                self._multibyte_filenames.install()
+        except Exception:
+            self.close()
+            raise
+
+    def close(self) -> None:
+        """Reverse every global side effect :meth:`open` installed: the
+        ``http.client`` debuglevel flip and the asana/urllib3 logger levels the
+        SDK debug setter raised, the ``Authorization`` redactor, and the
+        multibyte-filename multipart patch.
+
+        Safe to call multiple times, and a no-op if :meth:`open` never ran.
+        Prefer using the session as a context manager
+        (``with AsanaSession(...) as session: ...``) which pairs ``open`` on
+        entry with ``close`` on exit automatically.
+        """
+        # Turn wire-level tracing OFF first — restore the debuglevel (and the
+        # asana/urllib3 logger levels the SDK debug setter raised) — and only
+        # THEN remove the Authorization mask, so there is never a window where
+        # tracing is on without the mask (constitution #2).
+        if self._prev_debuglevel is not None:
+            http.client.HTTPConnection.debuglevel = self._prev_debuglevel
+            self._prev_debuglevel = None
+        if self._prev_logger_levels is not None:
+            for logger, level in self._prev_logger_levels.items():
+                logger.setLevel(level)
+            self._prev_logger_levels = None
         if self._redactor is not None:
             self._redactor.uninstall()
             self._redactor = None
@@ -312,15 +305,14 @@ class AsanaSession:
             self._multibyte_filenames = None
 
     def __enter__(self) -> AsanaSession:
+        self.open()
         return self
 
     def __exit__(self, *exc: Any) -> None:
         self.close()
 
     @classmethod
-    def from_env(
-        cls, *, return_page_iterator: bool = True, page_limit: int | None = None
-    ) -> AsanaSession:
+    def from_env(cls) -> AsanaSession:
         """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
         token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
         if not token:
@@ -328,36 +320,5 @@ class AsanaSession:
                 f"Access token is not set. Pass --access-token or set {ACCESS_TOKEN_ENV}.",
                 err=True,
             )
-            sys.exit(1)
-        return cls(token=token, return_page_iterator=return_page_iterator, page_limit=page_limit)
-
-
-def resolve_workspace(
-    explicit: str | None,
-    *,
-    required: bool = False,
-) -> str | None:
-    """Resolve workspace GID with fallback chain.
-
-    Priority: explicit ``--workspace`` value > ``ASANA_DEFAULT_WORKSPACE``
-    env var (only when *required* is True).
-
-    When workspace is optional (``required=False``), the env-var fallback is
-    **not** used. This prevents the default workspace from being sent
-    alongside other scope parameters (e.g. ``--project`` on ``get-tasks``)
-    that the Asana API accepts in place of workspace.
-
-    If *required* is True and no value is found, exits with an error.
-    """
-    if explicit is not None:
-        return explicit
-    if required:
-        ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
-        if ws:
-            return ws
-        click.echo(
-            f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
-            err=True,
-        )
-        sys.exit(1)
-    return None
+            sys.exit(2)
+        return cls(token=token)

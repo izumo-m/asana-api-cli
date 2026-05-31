@@ -4,8 +4,9 @@ Five cases combining file content (ASCII text / Japanese text / binary)
 with filename variants (ASCII / Japanese). Asana derives the stored
 attachment name from the multipart ``Content-Disposition`` filename.
 
-Non-ASCII filenames require the ``--multibyte-filenames`` global flag,
-which makes the CLI emit the RFC 5987 ``filename*=UTF-8''<percent-encoded>``
+Non-ASCII filenames require the ``--multibyte-filenames`` option (a
+per-command option on the upload command, not a global flag), which makes
+the CLI emit the RFC 5987 ``filename*=UTF-8''<percent-encoded>``
 parameter. The upstream SDK does not emit it (default behavior), so
 without the flag Asana stores the literal Latin-1 of the UTF-8 bytes
 (mojibake). The flag is off by default to preserve strict SDK parity;
@@ -13,13 +14,12 @@ the Japanese-filename test cases below pass it explicitly.
 
 Live record::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest --record-mode=all tests/e2e/test_attachments.py
+    ASANA_PYTEST_WORKSPACE=<gid> \\
+        uv run pytest --live --record tests/e2e/test_attachments.py
 
 Replay::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest tests/e2e/test_attachments.py
+    uv run pytest tests/e2e/test_attachments.py
 """
 
 from __future__ import annotations
@@ -29,10 +29,9 @@ import shutil
 from pathlib import Path
 
 import pytest
+from _cli_runner import make_runner
 
 from asana_api_cli.cli import main
-
-from _cli_runner import make_runner
 
 _DATA_DIR = Path(__file__).parent / "data"
 
@@ -66,17 +65,20 @@ def test_attachment_round_trip(
 
     # UPLOAD — opt in to RFC 5987 filename* encoding when the basename is
     # non-ASCII. ASCII basenames work with the default (SDK parity) path.
+    # ``--multibyte-filenames`` is a command option on the upload command (not
+    # a global), so it goes among the command's own options.
     needs_multibyte = any(ord(c) > 127 for c in upload_name)
-    upload_args = ["attachments", "create-attachment-for-object"]
-    if needs_multibyte:
-        upload_args = ["--multibyte-filenames", *upload_args]
-    code, out, _ = _run(
-        *upload_args,
+    upload_args = [
+        "attachments",
+        "create-attachment-for-object",
         "--parent",
         attachment_parent_task,
         "--file",
         str(upload_path),
-    )
+    ]
+    if needs_multibyte:
+        upload_args.append("--multibyte-filenames")
+    code, out, _ = _run(*upload_args)
     assert code == 0, out
     attachment = json.loads(out)
     attachment_gid = attachment["gid"]

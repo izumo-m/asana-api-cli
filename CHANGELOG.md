@@ -7,6 +7,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-05-31
+
+### Added
+
+- **`--user-agent VALUE`** and **`--default-header NAME=VALUE`** (repeatable) —
+  session-wide global options that set the `ApiClient`'s `user_agent` and
+  default request headers, sent on **every** request (unlike the per-call
+  `--header-params`). On a key collision the session-wide default wins over
+  `--header-params` (the SDK merges defaults on top). Custom headers are **not**
+  redacted in `--debug` output — see [SECURITY.md](SECURITY.md). See
+  [`docs/usage.md`](docs/usage.md#global-options) and
+  [`docs/cli-sdk-mapping.md`](docs/cli-sdk-mapping.md).
+
+- **Structured error handling** — new per-command options `--exception-output
+  {none|json|text|csv|table}` and `--exception-query EXPR` (the error-path twins of
+  `--output` / `--query`, on every command). The SDK exception is
+  always echoed to **stderr** in Python's top-level format (no traceback; for
+  `ApiException` this already includes status / reason / headers / body). The
+  default `none` exits `1` with no envelope, so the response payload (e.g. the
+  412 sync-token body in events polling) is readable from stderr without extra
+  flags. The other formats also render a `{exception, status, reason, body,
+  headers}` envelope on **stdout** and exit `3`; `--exception-query` filters that
+  envelope through `jq`. See [`docs/usage.md`](docs/usage.md#error-output) and
+  [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
+
+- **`--output none`** suppresses the success payload for side-effect-only
+  operations (delete, update) where only the exit code matters. `--query` still
+  runs, so a broken jq expression still surfaces as exit `2`. Symmetric with
+  `--exception-output none`.
+
+- **`--header-params VALUE`** (on every command) sends arbitrary HTTP request
+  headers. Accepts shorthand `'k1=v1,k2=v2,...'`, a JSON object, or
+  `@path/to/file.json` (same format as `--retry-strategy`). **Not redacted in
+  `--debug` output** — see [`SECURITY.md`](SECURITY.md).
+
+### Changed
+
+- **SDK parameters that collide with a built-in flag are exposed as
+  `--sdk-<name>`.** `typeahead-for-workspace`'s SDK `query` (the search string)
+  was shadowed by the built-in `--query` (jq filter) and unreachable; it is now
+  `--sdk-query`, while `--query` keeps its jq meaning on every command. The SDK
+  param's `(opts: <name>)` help label still shows the real name.
+
+- **Per-command options now follow the SDK method, not alphabetical order.**
+  Path / body positionals list in function-signature order (e.g. `update-task`
+  shows `--body` then `--task`), and the remaining options follow the SDK
+  docstring's `:param` order (e.g. `--limit` / `--offset`, then the filters,
+  then `--opt-fields`) instead of an alphabetical scatter — both mirror how the
+  API documents the method.
+
+- **Option `--help` now names the SDK destination.** Every option ends with a
+  label showing where its value lands in `python-asana`: `(Configuration:
+  <name>)` for client config (global flags), `(ApiClient: <name>)` for
+  ApiClient-instance settings (`--user-agent`, `--default-header`), `(args:
+  <name>)` for positional arguments (`--body`, path GIDs, `--workspace` when
+  positional), `(opts: <name>)` for the method's `opts` dict (`--assignee`,
+  `--opt-fields`, ...), `(kwargs: <name>)` for per-call kwargs, and
+  `(asana-api: extension)` for CLI-only flags. (Path GIDs that 2.1.1 labeled
+  `(SDK kwarg: ...)` are now `(args: ...)` — they are positional arguments,
+  not kwargs.)
+
+- **Iteration / per-call controls grouped by SDK scope.** The `Configuration`
+  knobs `--page-limit` and `--return-page-iterator / --no-return-page-iterator`
+  stay **global**. The per-call kwargs `--item-limit`, `--full-payload`,
+  `--header-params`, and `--request-timeout` are now **options on every command**
+  (the SDK accepts them on every method). `--request-timeout` was previously a
+  global flag.
+
+- **`--multibyte-filenames` is now a per-command option on file-upload commands**
+  (e.g. `attachments create-attachment-for-object`), not a global flag — it only
+  ever affected multipart uploads. Still opt-in, off by default.
+
+- **Failure exit codes changed** — `1` / `2` / `3` by error class. See
+  [`docs/usage.md`](docs/usage.md#exit-codes).
+
+- **Nested values in `--output text` / `csv` / `table`** now render as JSON
+  (`{"a":"b"}`) rather than Python `repr` (`{'a': 'b'}`). Same for
+  `--exception-output`.
+
+- **Auto-iteration is driven by the SDK return type.** Paged responses are
+  walked when the SDK returns an iterator, rather than by a per-method
+  pre-judgement in the CLI. Behavior is unchanged for existing methods, and the
+  CLI no longer needs an update when an SDK release changes a method's
+  pagination shape.
+
+- **Deprecation aliases now combine with their replacements.** `--page-size` /
+  `--max-items` no longer error when given alongside `--limit` / `--item-limit`;
+  the replacement wins and the deprecation warning still fires.
+
+- **Documentation reorganized.**
+
+### Removed
+
+- **Removed the inert auth flags** `--username`, `--password`, `--api-key`, and
+  `--api-key-prefix` — Asana authenticates with Bearer tokens only, so they
+  never did anything. Use `--access-token` (or `$ASANA_ACCESS_TOKEN`).
+
+### Fixed
+
+- **`--debug` no longer leaves `http.client` wire-level tracing globally
+  enabled after the session closes.** The SDK's debug setter flips a process
+  global (`http.client.HTTPConnection.debuglevel`); the CLI uninstalled its
+  `Authorization`-masking redactor on exit but left that global on. Harmless
+  for the one-shot CLI (the process exits), but a library that reuses
+  `AsanaSession` across calls could print an unmasked `Authorization` header
+  in a later non-debug session. `AsanaSession.close()` now restores the
+  debuglevel together with the redactor.
+
 ## [3.0.0] - 2026-05-23
 
 ### Breaking changes (v2 → v3)
@@ -250,7 +358,8 @@ Combining a deprecated alias with its replacement (e.g.
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...v3.0.0
 [2.1.1]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.0.0...v2.1.0

@@ -16,26 +16,26 @@ interactions:
     uri: https://app.asana.com/api/1.0/workspaces/${WORKSPACE_GID}/projects?opt_fields=name&limit=100
   response:
     body:
-      string: '{"data":[{"gid":"1214927854047052","name":"pagination-test"}],"next_page":null}'
+      string: '{"data":[{"gid":"${GID:8503325469700806}","name":"pagination-test"},{"gid":"${GID:2750130645330941}","name":"pagination-test-small"}],"next_page":null}'
     headers:
       Connection:
       - keep-alive
       Content-Length:
-      - '79'
+      - '137'
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 21 May 2026 11:58:07 GMT
+      - Sat, 23 May 2026 19:34:18 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Server-Timing:
-      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=298,cdn-upstream-fbl;dur=569,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="1CphsCwwXBrRjWvuLlK3j2iOJhCGMt8qUnF-QVTRF2vMLbAS9pD0xQ==",cdn-downstream-fbl;dur=586
+      - cdn-upstream-layer;desc="REC",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=208,cdn-cache-miss,cdn-pop;desc="NRT20-P8",cdn-rid;desc="ICBhouKyHyawKl__LCIq3TJ9YUPYqR6AuDAwa7l5cgvSd-xW2MOUVQ==",cdn-downstream-fbl;dur=229
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 96bb855a471c299ad9b47a8edfb8199c.cloudfront.net (CloudFront)
+      - 1.1 40be93fbe433bda808d9cf19fff5b0cc.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - 1CphsCwwXBrRjWvuLlK3j2iOJhCGMt8qUnF-QVTRF2vMLbAS9pD0xQ==
+      - ICBhouKyHyawKl__LCIq3TJ9YUPYqR6AuDAwa7l5cgvSd-xW2MOUVQ==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -69,7 +69,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '121'
+      - '56'
       x-frame-options:
       - DENY
       - DENY
@@ -93,7 +93,7 @@ interactions:
       authorization:
       - Bearer ***REDACTED***
     method: GET
-    uri: https://app.asana.com/api/1.0/tasks?project=1214927854047052
+    uri: https://app.asana.com/api/1.0/tasks?project=${GID:8503325469700806}
   response:
     body:
       string: '{"errors":[{"message":"The result is too large. You should use pagination
@@ -107,15 +107,15 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 21 May 2026 11:58:08 GMT
+      - Sat, 23 May 2026 19:34:19 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Via:
-      - 1.1 6be1326d6db5ab44d0c0676d7331a8c6.cloudfront.net (CloudFront)
+      - 1.1 a56ccbbcd3dd18067f76faefb437c740.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - dhzczBTWe1OXKZ14YjhMwLcncc951O1NRLh_a7B7M0HOEstvXAw_bw==
+      - YcYkwLP7jujD8EIK2Mg64dBqZ31bNUm7T98RHw-h6serZINedfkYxA==
       X-Amz-Cf-Pop:
       - NRT20-P8
       X-Cache:
@@ -149,7 +149,7 @@ interactions:
       x-content-type-options:
       - nosniff
       x-envoy-upstream-service-time:
-      - '236'
+      - '326'
       x-frame-options:
       - DENY
       - DENY

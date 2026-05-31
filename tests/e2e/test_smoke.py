@@ -2,12 +2,12 @@
 
 Run live (records / refreshes cassettes)::
 
-    ASANA_PYTEST_ENABLE_E2E=1 ASANA_PYTEST_WORKSPACE=<gid> \\
-        uv run pytest --record-mode=all tests/e2e/test_smoke.py
+    ASANA_PYTEST_WORKSPACE=<gid> \\
+        uv run pytest --live --record tests/e2e/test_smoke.py
 
 Run from cassette (no network)::
 
-    ASANA_PYTEST_ENABLE_E2E=1 uv run pytest tests/e2e/test_smoke.py
+    uv run pytest tests/e2e/test_smoke.py
 """
 
 from __future__ import annotations
@@ -15,10 +15,9 @@ from __future__ import annotations
 import json
 
 import pytest
+from _cli_runner import full_output, make_runner
 
 from asana_api_cli.cli import main
-
-from _cli_runner import full_output, make_runner
 
 
 @pytest.mark.vcr

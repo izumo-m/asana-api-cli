@@ -12,9 +12,9 @@ def test_version_string_format():
 
 
 def test_version_cli(tmp_path):
-    from asana_api_cli.cli import main
-
     from _cli_runner import full_output, make_runner
+
+    from asana_api_cli.cli import main
 
     runner = make_runner()
     result = runner.invoke(main, ["--version"])

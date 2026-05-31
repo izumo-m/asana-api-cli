@@ -18,24 +18,25 @@ uv sync
 uv run pytest
 ```
 
-End-to-end tests under `tests/e2e/` run the CLI against the real Asana API
-and are skipped by default. See [`tests/e2e/README.md`](tests/e2e/README.md)
+End-to-end tests under `tests/e2e/` replay against committed VCR cassettes
+by default (no network or Asana account needed); running them live against
+the real Asana API is opt-in. See [`tests/e2e/README.md`](tests/e2e/README.md)
 for the live / replay workflow and the one-time workspace provisioning step.
 
+## Pre-commit checks
+
+Before creating a git commit, run the checks below for every change category
+that applies and resolve everything reported.
+
+### Python sources (`*.py`) changed
+
+```bash
+uv run basedpyright            # no path args — must scan the whole project
+uv run ruff check --fix .
+uv run ruff format .
+```
+
 ## Code style
-
-- Format and lint with `ruff`:
-
-  ```bash
-  uv run ruff format .
-  uv run ruff check .
-  ```
-
-- Type-check with `basedpyright`:
-
-  ```bash
-  uv run basedpyright
-  ```
 
 - Messages printed to the console (errors, help text, etc.) must be written
   in English.
@@ -58,7 +59,7 @@ See [`docs/development.md`](docs/development.md) for the project layout.
 ## Pull requests
 
 - Keep changes focused and small.
-- Update `README.md` and `CHANGELOG.md` when user-visible behavior changes.
+- Write `README.md` and `CHANGELOG.md` from the user's perspective.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) style for
   commit messages (e.g. `feat:`, `fix:`, `docs:`, `chore:`).
 

@@ -8,14 +8,18 @@ handling for body / workspace / pagination.
 from __future__ import annotations
 
 import re
+from collections import Counter
+from io import StringIO
+from pathlib import Path
 
 import click
 import pytest
 
 from asana_api_cli.cli import (
-    _Operation,
     _GROUP_DESCRIPTIONS,
+    DEFAULT_WORKSPACE_ENV,
     _api_class_to_group,
+    _decls,
     _enumerate_api_classes,
     _escape_help,
     _extract_operation,
@@ -23,13 +27,16 @@ from asana_api_cli.cli import (
     _humanize_class_name,
     _make_command,
     _method_to_command,
+    _Operation,
     _operations_for,
     _parse_params,
     _parse_summary,
     _snake,
+    _static_reserved_flags,
     main,
+    resolve_body,
+    resolve_workspace,
 )
-
 
 # ---------------------------------------------------------------------------
 # Name conversion
@@ -328,19 +335,123 @@ def _option_flags(cmd: click.Command) -> set[str]:
     return flags
 
 
+class TestFlagCollisions:
+    """An SDK arg/opt whose flag collides with a built-in CLI flag is exposed as
+    ``--sdk-<name>`` so the built-in keeps its bare name (``cli._decls`` /
+    ``_reserved_flags``). Real case: ``typeahead-for-workspace``'s ``query`` opt
+    vs the formatter's ``--query`` (jq filter)."""
+
+    def test_no_command_has_duplicate_flags(self) -> None:
+        """Whole-SDK sweep: collision resolution must leave no command with a
+        flag declared twice. Guards future SDK bumps that introduce a new
+        collision (sibling of ``test_sdk_boilerplate`` / ``test_cli_surface``)."""
+        offenders: dict[str, list[str]] = {}
+        for cls in _enumerate_api_classes():
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                flags: list[str] = [
+                    decl
+                    for p in cmd.params
+                    if isinstance(p, click.Option)
+                    for decl in (*p.opts, *p.secondary_opts)
+                ]
+                dups = [f for f, c in Counter(flags).items() if c > 1]
+                if dups:
+                    offenders[f"{cls.__name__}.{op.command_name}"] = dups
+        assert not offenders, f"commands with duplicate flags: {offenders}"
+
+    def test_no_command_has_duplicate_dests(self) -> None:
+        """Sibling of the duplicate-flag sweep, but on the click *dest*
+        (``p.name``). ``_decls`` resolves a flag collision by renaming the SDK
+        flag to ``--sdk-<name>`` while KEEPING its dest = the SDK param name.
+        If a future SDK param's name matches an injected global (e.g. a
+        ``:param ... debug:``), the renamed ``--sdk-debug`` and the global
+        ``--debug`` end up sharing the dest ``debug``: click stores only one in
+        ``ctx.params`` and ``_consume_global_options`` then reads the wrong
+        value, silently corrupting both. The flag sweep above misses this (the
+        flag strings differ), so guard dests explicitly."""
+        offenders: dict[str, list[str]] = {}
+        for cls in _enumerate_api_classes():
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                dests = [p.name for p in cmd.params if isinstance(p, click.Option) and p.name]
+                dups = [d for d, c in Counter(dests).items() if c > 1]
+                if dups:
+                    offenders[f"{cls.__name__}.{op.command_name}"] = dups
+        assert not offenders, f"commands with duplicate option dests: {offenders}"
+
+    def test_typeahead_query_yields_to_sdk_prefix(self) -> None:
+        import asana
+
+        op = _extract_operation(
+            "typeahead_for_workspace", asana.TypeaheadApi.typeahead_for_workspace
+        )
+        assert op is not None
+        cmd = _make_command(asana.TypeaheadApi, op)
+        opts = [p for p in cmd.params if isinstance(p, click.Option)]
+
+        # The jq filter keeps the bare --query.
+        jq = next(p for p in opts if p.name == "jq_query")
+        assert "--query" in jq.opts
+
+        # The SDK search opt is exposed as --sdk-query, but its dest (call path
+        # / help label) stays the real SDK name ``query``.
+        sdk_query = next(p for p in opts if p.name == "query")
+        assert sdk_query.opts == ["--sdk-query"]
+        assert "--query" not in sdk_query.opts
+        assert "(opts: query)" in (sdk_query.help or "")
+
+
+class TestReservedFlags:
+    def test_decls_passes_through_when_no_collision(self) -> None:
+        assert _decls("--task", "task", frozenset()) == ["--task"]
+
+    def test_decls_prefixes_and_preserves_dest_on_collision(self) -> None:
+        assert _decls("--query", "query", frozenset({"--query"})) == ["--sdk-query", "query"]
+
+    def test_static_reserved_covers_each_builtin_family(self) -> None:
+        reserved = _static_reserved_flags()
+        # formatter / kwarg / global (+ a --no- toggle's negative form).
+        for flag in ("--query", "--output", "--item-limit", "--host", "--no-verify-ssl"):
+            assert flag in reserved, f"{flag} missing from reserved set"
+
+    def test_help_and_version_reserved_so_sdk_opts_yield(self) -> None:
+        # --help is click-added at parse time and --version is root-only, so
+        # neither shows up in a leaf's params. They are reserved explicitly so a
+        # future SDK opt named help/version is pushed to --sdk-help/--sdk-version
+        # instead of shadowing click's built-ins.
+        reserved = _static_reserved_flags()
+        assert "--help" in reserved
+        assert "--version" in reserved
+        assert _decls("--help", "help", reserved) == ["--sdk-help", "help"]
+        assert _decls("--version", "version", reserved) == ["--sdk-version", "version"]
+
+
 class TestBuiltCommands:
     def test_get_task_has_task_option(self, get_task_cmd: click.Command) -> None:
         # Path positional ``task_gid`` becomes ``--task`` (gid suffix stripped).
         assert "--task" in _option_flags(get_task_cmd)
 
-    def test_renamed_positional_help_shows_sdk_kwarg(self, get_task_cmd: click.Command) -> None:
-        # When ``task_gid`` is exposed as ``--task``, the original SDK kwarg
-        # name must appear in the help text so users can map the CLI flag back
-        # to the python-asana API.
+    def test_renamed_positional_help_shows_sdk_arg(self, get_task_cmd: click.Command) -> None:
+        # When ``task_gid`` is exposed as ``--task``, the original SDK
+        # positional-arg name must appear in the help — labeled
+        # ``(args: task_gid)`` — so users can map the CLI flag back to the
+        # python-asana API. ``task_gid`` is a positional method argument, not
+        # an ``opts`` entry or a kwarg, hence the ``args`` category.
         task_param = next(
             p for p in get_task_cmd.params if isinstance(p, click.Option) and "--task" in p.opts
         )
-        assert "task_gid" in (task_param.help or "")
+        assert "(args: task_gid)" in (task_param.help or "")
+
+    def test_opts_param_help_shows_opts_label(self, get_tasks_cmd: click.Command) -> None:
+        # Docstring ``opts`` entries are labeled ``(opts: <name>)`` so users
+        # know the value lands in the SDK method's ``opts`` dict.
+        opt_fields = next(
+            p
+            for p in get_tasks_cmd.params
+            if isinstance(p, click.Option) and "--opt-fields" in p.opts
+        )
+        assert "(opts: opt_fields)" in (opt_fields.help or "")
 
     def test_gid_positional_uses_gid_metavar_and_example(self, get_task_cmd: click.Command) -> None:
         # Per issue #15: the SDK descriptions for ``*_gid`` params are
@@ -368,15 +479,20 @@ class TestBuiltCommands:
         )
         assert body_param.metavar == "JSON"
         help_text = body_param.help or ""
-        for needle in ("inline JSON", "@path", "stdin", '"data"'):
+        for needle in ("inline JSON", "@path", "stdin", '"data"', "(args: body)"):
             assert needle in help_text, f"--body help missing {needle!r}; got: {help_text!r}"
 
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
-        # v3 primary pagination flags (1:1 with SDK).
+        # Per-command (docstring opts): --limit / --offset come from the
+        # SDK method's docstring entries.
+        for expected in ("--limit", "--offset"):
+            assert expected in flags, f"missing {expected}"
+        # Per-call kwargs (--item-limit / --full-payload) are per-command
+        # options on every command; --page-limit / --no-return-page-iterator
+        # are Configuration-backed globals injected by CommandWithGlobalOptions.
+        # All four appear here.
         for expected in (
-            "--limit",
-            "--offset",
             "--page-limit",
             "--item-limit",
             "--no-return-page-iterator",
@@ -399,49 +515,81 @@ class TestBuiltCommands:
 
     def test_get_task_no_pagination(self, get_task_cmd: click.Command) -> None:
         flags = _option_flags(get_task_cmd)
-        # Neither v3 primary flags nor v2 deprecation aliases are added on
-        # non-paginatable commands.
+        # Docstring-derived opts (--limit / --offset) and v2 deprecation
+        # aliases are absent on non-paginatable commands (get-task's
+        # docstring declares neither limit/offset, and aliases are gated
+        # by paginatable in _make_command).
         for unexpected in (
             "--limit",
-            "--page-limit",
-            "--item-limit",
-            "--no-return-page-iterator",
-            "--full-payload",
+            "--offset",
             "--all-items",
             "--page-size",
             "--max-items",
         ):
             assert unexpected not in flags, f"{unexpected} should not be on non-paginatable cmd"
+        # Per-call kwargs (--item-limit / --full-payload, per-command) and the
+        # Configuration globals (--page-limit / --no-return-page-iterator) are
+        # present on every command incl. non-paginatable ones — the SDK accepts
+        # the kwargs uniformly (all_params) and the Configuration knobs apply
+        # client-wide.
+        for expected in (
+            "--page-limit",
+            "--item-limit",
+            "--no-return-page-iterator",
+            "--full-payload",
+        ):
+            assert expected in flags, f"{expected} should be present on every cmd"
+
+    def test_per_call_kwargs_are_per_command_not_global(self, get_tasks_cmd: click.Command) -> None:
+        # The boilerplate per-call kwargs (all_params) are method inputs, so
+        # they render as per-command options — present on a command, absent
+        # from the root. (Configuration-backed --page-limit /
+        # --return-page-iterator stay global; asserted above.)
+        cmd_flags = _option_flags(get_tasks_cmd)
+        root_flags = _option_flags(main)
+        for flag in ("--item-limit", "--full-payload", "--header-params", "--request-timeout"):
+            assert flag in cmd_flags, f"{flag} should be a per-command option"
+            assert flag not in root_flags, f"{flag} should not be a root/global option"
 
     def test_output_query_options_present(self, get_tasks_cmd: click.Command) -> None:
         flags = _option_flags(get_tasks_cmd)
         assert "--output" in flags
         assert "--query" in flags
 
-    def test_paginatable_command_has_pagination_epilog(self, get_tasks_cmd: click.Command) -> None:
-        # Per issue #9: the consolidated epilog at the bottom of `--help`
-        # explains the two modes and the SDK kwarg mapping in one place,
-        # so each pagination flag can carry a short self-contained help
-        # line. Spot-check the epilog markers.
-        epilog = get_tasks_cmd.epilog or ""
-        assert "Pagination:" in epilog
-        assert "Iterator mode" in epilog
-        assert "Single payload" in epilog
-        # The "per-page vs total" warning sentence — the most common
-        # newcomer pitfall #9 was meant to address.
-        assert "Per-page size (--limit) and total cap (--item-limit)" in epilog
-        # The SDK-mapping table rows (relies on the leading \b that tells
-        # click's wrap_text not to rewrap).
-        assert 'opts["limit"]' in epilog
-        assert "kwarg item_limit" in epilog
-        assert "kwarg full_payload=True" in epilog
-        # --page-limit must be flagged as equivalent to --limit (CLI users
-        # rarely need the Configuration-level form).
-        assert "same effect as --limit" in epilog
+    def test_option_display_order_follows_sdk_signature(
+        self,
+        tasks_cls: type,
+        tasks_ops: list[_Operation],
+        get_tasks_cmd: click.Command,
+    ) -> None:
+        # The "order CLI options by SDK signature" refactor pins a three-tier
+        # display order in _make_command (see its docstring): path/body
+        # positionals in function-signature order → docstring opts in :param
+        # order → the boilerplate per-call kwargs. Every other test here checks
+        # only set membership (_option_flags returns a set) or the Deprecated
+        # section split, so nothing guarded the actual order; a future re-sort
+        # (the manifest path already name-sorts opts) would pass them all.
+        #
+        # Tier 1 + positionals-before-kwargs: add_dependencies_for_task(self,
+        # body, task_gid) → --body then --task, both before the per-call kwargs.
+        op = next(o for o in tasks_ops if o.method_name == "add_dependencies_for_task")
+        flags = [
+            p.opts[0] for p in _make_command(tasks_cls, op).params if isinstance(p, click.Option)
+        ]
+        assert flags.index("--body") < flags.index("--task") < flags.index("--item-limit")
 
-    def test_non_paginatable_command_has_no_epilog(self, get_task_cmd: click.Command) -> None:
-        # The pagination epilog is only attached when the operation is
-        # paginatable; non-paginatable commands stay clean.
+        # Tier 2 before Tier 3: a docstring opt (--limit) precedes the per-call
+        # kwargs (--item-limit) on get-tasks.
+        gt = [p.opts[0] for p in get_tasks_cmd.params if isinstance(p, click.Option)]
+        assert gt.index("--limit") < gt.index("--item-limit")
+
+    def test_no_pagination_epilog_per_command(
+        self, get_tasks_cmd: click.Command, get_task_cmd: click.Command
+    ) -> None:
+        # In v3.1 the per-command Pagination epilog was removed (the flags
+        # became global and self-document via their own help text). Neither
+        # paginatable nor non-paginatable commands attach an epilog now.
+        assert not (get_tasks_cmd.epilog or "")
         assert not (get_task_cmd.epilog or "")
 
     def test_long_sdk_descriptions_are_not_truncated(self, get_tasks_cmd: click.Command) -> None:
@@ -530,31 +678,14 @@ class TestBuiltCommands:
         assert "[Deprecated v3.0]" not in out
         assert "Removed in a future release" not in out
 
-    def test_pagination_flag_help_is_self_contained(self, get_tasks_cmd: click.Command) -> None:
-        # Per issue #9, the cross-reference soup is gone: no pagination
-        # flag's help text should mention the names of the other
-        # pagination flags. (The interactions are now described once in
-        # the epilog.)
-        pagination_flags = {
-            "--page-limit",
-            "--item-limit",
-            "--full-payload",
-            "--return-page-iterator",
-        }
-        for param in get_tasks_cmd.params:
-            if not isinstance(param, click.Option):
-                continue
-            self_flag = param.opts[0]
-            if self_flag not in pagination_flags:
-                continue
-            help_text = param.help or ""
-            for other_flag in pagination_flags - {self_flag}:
-                # ``--no-return-page-iterator`` is the toggle's secondary
-                # opt of ``--return-page-iterator``; allow self-mention.
-                assert other_flag not in help_text, (
-                    f"{self_flag}'s help mentions {other_flag} "
-                    f"(should be moved to the epilog): {help_text!r}"
-                )
+    # ``test_pagination_flag_help_is_self_contained`` (pre-v3.1) constrained
+    # each per-command pagination flag's help text to avoid naming other
+    # pagination flags — the consolidated per-command epilog (now removed
+    # in v3.1) carried the interaction story instead. With the flags
+    # promoted to global and the epilog gone, the help text IS the only
+    # place to describe equivalences, so cross-references are now both
+    # allowed and expected (e.g. ``--full-payload`` notes equivalence with
+    # ``--no-return-page-iterator``). Test removed.
 
 
 # ---------------------------------------------------------------------------
@@ -603,19 +734,13 @@ class TestRootGroup:
             "--key-file",
             "--assert-hostname",
             "--no-assert-hostname",
-            "--request-timeout",
             "--connection-pool-maxsize",
             "--access-token",
-            "--username",
-            "--password",
-            "--api-key",
-            "--api-key-prefix",
             "--temp-folder-path",
             "--safe-chars-for-path-param",
             "--logger-format",
             "--logger-file",
             "--debug",
-            "--multibyte-filenames",
         ]
         if _SDK_HAS_RETRY_STRATEGY:
             expected_flags.append("--retry-strategy")
@@ -628,6 +753,36 @@ class TestRootGroup:
         for absent in ("--retries", "--timeout", "--ca-cert", "--temp-dir"):
             assert absent not in flags, f"{absent} should be removed"
 
+    def test_inert_auth_options_removed(self) -> None:
+        # --username / --password / --api-key / --api-key-prefix were dropped:
+        # they are inert swagger-codegen Configuration fields with no Asana auth
+        # counterpart (basic auth is unsupported; API keys are deprecated and
+        # being shut off). Only token auth (--access-token) remains.
+        flags = _option_flags(main)
+        for absent in ("--username", "--password", "--api-key", "--api-key-prefix"):
+            assert absent not in flags, f"{absent} should be removed (inert auth)"
+        assert "--access-token" in flags
+
+    def test_multibyte_filenames_scoped_to_upload_command(
+        self,
+        upload_attachment_cmd: click.Command,
+        get_tasks_cmd: click.Command,
+    ) -> None:
+        # --multibyte-filenames moved from a global flag to a per-command
+        # option present only on upload commands (those declaring a ``file``
+        # opt — i.e. the one multipart endpoint). It must be absent from the
+        # root globals and from non-upload commands, and present on the upload
+        # command labeled as an asana-api extension.
+        assert "--multibyte-filenames" not in _option_flags(main)
+        assert "--multibyte-filenames" not in _option_flags(get_tasks_cmd)
+        assert "--multibyte-filenames" in _option_flags(upload_attachment_cmd)
+        param = next(
+            p
+            for p in upload_attachment_cmd.params
+            if isinstance(p, click.Option) and "--multibyte-filenames" in p.opts
+        )
+        assert (param.help or "").rstrip().endswith("(asana-api: extension)")
+
     def test_subgroup_help_resolves(self) -> None:
         # Resolving a subgroup must trigger lazy method introspection.
         ctx = click.Context(main)
@@ -637,3 +792,106 @@ class TestRootGroup:
         cmd_names = set(tasks_group.list_commands(sub_ctx))
         assert "get-tasks" in cmd_names
         assert "create-task" in cmd_names
+
+
+# ---------------------------------------------------------------------------
+# Input resolution (resolve_body / resolve_workspace)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clean_workspace_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every test in this module hermetic against a developer's ambient
+    ``ASANA_DEFAULT_WORKSPACE`` — ``resolve_workspace`` reads it as a fallback,
+    so a stray value would otherwise leak into assertions."""
+    monkeypatch.delenv(DEFAULT_WORKSPACE_ENV, raising=False)
+
+
+class TestResolveBodyInline:
+    def test_plain_json_object(self) -> None:
+        result = resolve_body('{"data": {"name": "Hello"}}')
+        assert result == {"data": {"name": "Hello"}}
+
+    def test_plain_json_array(self) -> None:
+        result = resolve_body("[1, 2, 3]")
+        assert result == [1, 2, 3]
+
+    def test_invalid_json_exits(self) -> None:
+        with pytest.raises(SystemExit):
+            resolve_body("{bad json")
+
+
+class TestResolveBodyFile:
+    def test_reads_file(self, tmp_path: Path) -> None:
+        body_file = tmp_path / "body.json"
+        body_file.write_text('{"data": {"name": "from file"}}')
+        result = resolve_body(f"@{body_file}")
+        assert result == {"data": {"name": "from file"}}
+
+    def test_missing_file_exits(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit):
+            resolve_body(f"@{tmp_path / 'nonexistent.json'}")
+
+    def test_invalid_json_in_file_exits(self, tmp_path: Path) -> None:
+        body_file = tmp_path / "bad.json"
+        body_file.write_text("not json")
+        with pytest.raises(SystemExit):
+            resolve_body(f"@{body_file}")
+
+    def test_non_utf8_file_exits_cleanly(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A binary file (or any non-UTF-8 byte sequence) must produce a
+        clean error message, not a raw ``UnicodeDecodeError`` traceback."""
+        body_file = tmp_path / "binary.bin"
+        body_file.write_bytes(b"\x80\x81\x82")  # invalid UTF-8 start bytes
+        with pytest.raises(SystemExit):
+            resolve_body(f"@{body_file}")
+        err = capsys.readouterr().err
+        assert "not valid UTF-8" in err
+
+
+class TestResolveBodyStdin:
+    def test_reads_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("sys.stdin", StringIO('{"data": {"name": "stdin"}}'))
+        result = resolve_body("-")
+        assert result == {"data": {"name": "stdin"}}
+
+    def test_invalid_stdin_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("sys.stdin", StringIO("not json"))
+        with pytest.raises(SystemExit):
+            resolve_body("-")
+
+
+class TestResolveWorkspaceExplicit:
+    """Explicit --workspace value always wins."""
+
+    def test_returns_explicit_value(self) -> None:
+        assert resolve_workspace("111") == "111"
+
+    def test_explicit_overrides_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        assert resolve_workspace("explicit_ws") == "explicit_ws"
+
+
+class TestResolveWorkspaceEnvFallback:
+    """ASANA_DEFAULT_WORKSPACE env var is used only when required=True."""
+
+    def test_falls_back_to_env_when_required(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        assert resolve_workspace(None, required=True) == "env_ws"
+
+    def test_no_fallback_when_optional(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(DEFAULT_WORKSPACE_ENV, "env_ws")
+        assert resolve_workspace(None) is None
+
+
+class TestResolveWorkspaceNoValue:
+    """No workspace available anywhere."""
+
+    def test_returns_none_when_optional(self) -> None:
+        assert resolve_workspace(None) is None
+
+    def test_exits_when_required(self) -> None:
+        with pytest.raises(SystemExit):
+            resolve_workspace(None, required=True)

@@ -1,7 +1,7 @@
-"""Hybrid parser for structured global option values.
+"""Hybrid parser for structured option values.
 
-Used by `--api-key`, `--api-key-prefix`, and `--retry-strategy` so the
-three options share a single input format. The parser dispatches by the
+Used by `--retry-strategy` and `--header-params` so they share a single
+input format. The parser dispatches by the
 first character of the value:
 
 * ``{...}`` — parse as a JSON object
@@ -17,11 +17,16 @@ When a ``schema`` mapping is supplied, unknown keys are rejected and
 shorthand values are coerced to the declared type. Without a schema the
 result is whatever JSON parsed (for the JSON / file forms) or
 ``dict[str, str]`` for shorthand — which is what the dict-typed
-Configuration options (``api_key`` / ``api_key_prefix``) want.
+``--header-params`` value wants.
 
 Bool values in shorthand accept only ``true`` / ``false`` (case
 insensitive). ``1`` / ``0`` are intentionally rejected so int and bool
 fields cannot be confused by readers of the command line.
+
+The module also hosts :func:`default_header_callback`, a separate
+``NAME=VALUE``-per-occurrence parser for the repeatable ``--default-header``
+global. It is deliberately not the hybrid parser above: header values often
+contain commas, which the ``key=value,key=value`` shorthand would mis-split.
 """
 
 from __future__ import annotations
@@ -32,7 +37,6 @@ from pathlib import Path
 from typing import Any
 
 import click
-
 
 _BOOL_TRUE = {"true"}
 _BOOL_FALSE = {"false"}
@@ -201,3 +205,28 @@ def click_callback(
         return parse_structured_arg(value, schema=schema)
 
     return _cb
+
+
+def default_header_callback(
+    ctx: click.Context, param: click.Parameter, value: tuple[str, ...]
+) -> dict[str, str] | None:
+    """Click ``callback`` for a repeatable ``--default-header NAME=VALUE`` option.
+
+    ``multiple=True`` hands the callback a tuple of raw ``NAME=VALUE`` tokens
+    (empty when the flag was not given). Returns ``None`` for "not given" so the
+    value matches the other globals' unset sentinel, otherwise a ``{name:
+    value}`` dict. Raises ``click.BadParameter`` (Click renders it as exit 2)
+    when a token lacks ``=`` or has an empty name. The value may itself contain
+    ``=`` (only the first is the separator) and is kept verbatim; only the name
+    is trimmed of surrounding whitespace.
+    """
+    if not value:
+        return None
+    headers: dict[str, str] = {}
+    for token in value:
+        name, sep, val = token.partition("=")
+        name = name.strip()
+        if not sep or not name:
+            raise click.BadParameter(f"Expected NAME=VALUE, got {token!r}.", ctx=ctx, param=param)
+        headers[name] = val
+    return headers

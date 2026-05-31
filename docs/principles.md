@@ -12,6 +12,8 @@
 
 5. **Windows is a first-class citizen.** cp932 / UTF-8 / Excel CSV / WSL workflows must work. With no CI, Windows verification is manual.
 
+6. **The `asana-api` CLI is the only supported interface.** Importing `asana_api_cli` as a Python library is not a supported use case. Its module layout, classes, and functions (e.g. `AsanaSession`) are internal implementation details: they carry no stability guarantee, may change at any time without a deprecation period, and such changes are neither announced nor recorded (not in the `CHANGELOG`, not via deprecation warnings). Only the command-line surface — commands, options, output formats, and exit codes — is the product whose compatibility this project manages.
+
 ## Terminology
 
 | Term | Refers to |

@@ -18,11 +18,10 @@ from typing import Any
 import pytest
 
 from asana_api_cli.redactor import (
-    HttpClientAuthRedactor,
     _AUTH_HEADER_RE,
+    HttpClientAuthRedactor,
     _default_mask_token,
 )
-
 
 # ---------------------------------------------------------------------------
 # _default_mask_token

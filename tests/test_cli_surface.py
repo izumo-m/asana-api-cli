@@ -26,7 +26,6 @@ import pytest
 
 from asana_api_cli.cli import introspect_to_manifest
 
-
 FIXTURE = Path(__file__).parent / "fixtures" / "cli_surface.json"
 
 # The snapshot is captured against a specific python-asana version; the

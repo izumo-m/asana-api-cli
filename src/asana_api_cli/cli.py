@@ -18,13 +18,20 @@ Translation rules:
   ``$ASANA_DEFAULT_WORKSPACE`` only when the parameter is required.
 * Methods that accept a ``body`` positional get a required ``--body`` option
   routed through ``resolve_body`` (supports ``@file`` / ``-`` / JSON string).
-* Paginatable methods (those with a ``limit`` doc-param) expose ``--limit``,
-  ``--offset``, ``--page-limit``, ``--item-limit``,
-  ``--return-page-iterator/--no-return-page-iterator``, and ``--full-payload``.
-  Each maps 1:1 to a python-asana SDK input (opts key, ``Configuration``
-  property, or method kwarg) so the CLI works as a thin probe for SDK
-  behavior. v2.x flags ``--all-items``, ``--page-size``, and ``--max-items``
-  are retained as deprecation aliases that warn and forward.
+* Docstring opts (``limit``, ``offset``, ``sync``, ``assignee``, ...) are
+  generated per-command from the SDK docstring — methods that declare
+  them get the corresponding ``--`` flag, others do not. This is the
+  natural per-method category.
+* The boilerplate per-call kwargs ``--item-limit`` / ``--full-payload`` /
+  ``--header-params`` / ``--request-timeout`` (the SDK's ``all_params``) are
+  common per-command options present on every command — they are method
+  inputs, labeled ``(kwargs: ...)``. The ``Configuration`` knobs
+  ``--return-page-iterator/--no-return-page-iterator`` and ``--page-limit``
+  are global flags. Each option's ``--help`` carries an SDK-destination
+  label; see ``_sdk_dest``.
+* ``--all-items``, ``--page-size``, and ``--max-items`` are retained as
+  per-command deprecation aliases (gated by ``paginatable``) that warn
+  and forward to their replacements.
 
 Because the CLI surface tracks whatever ``asana`` package version is
 installed in the active environment, ``pip install -U asana`` is enough to
@@ -33,29 +40,124 @@ pick up newly added SDK methods without releasing a new asana-api-cli.
 
 from __future__ import annotations
 
+import collections.abc
+import functools
 import inspect
+import json
+import os
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
 import asana
 import click
 
 from asana_api_cli.click_ext import (
+    _SDK_HAS_RETRY_STRATEGY,
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
-    _SDK_HAS_RETRY_STRATEGY,
+    _make_global_option_params,
 )
-from asana_api_cli.formatter import formatted
+from asana_api_cli.formatter import formatted, formatter_flag_names
 from asana_api_cli.session import (
     AsanaSession,
-    resolve_body,
-    resolve_workspace,
     runtime,
 )
-from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
+from asana_api_cli.structured_arg import (
+    RETRY_FIELD_SCHEMA,
+    click_callback,
+    default_header_callback,
+)
 from asana_api_cli.version import version_string
+
+# ---------------------------------------------------------------------------
+# Input resolution
+#
+# Turn a raw CLI option value into the argument the SDK call receives, exiting
+# with code 2 (user-input error) on bad input. These are pure invocation-layer
+# helpers — no SDK client / session involved — called only from the command
+# callback below.
+# ---------------------------------------------------------------------------
+
+DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
+
+JsonValue = dict[str, Any] | list[Any] | str | int | float | bool | None
+
+
+def resolve_body(value: str) -> JsonValue:
+    """Parse a body argument as JSON.
+
+    Supports three input forms:
+    - ``@path`` — read JSON from a file
+    - ``-``     — read JSON from stdin
+    - otherwise — parse the string itself as JSON
+    """
+    if value == "-":
+        try:
+            raw = sys.stdin.read()
+        except UnicodeDecodeError as exc:
+            # stdin is reconfigured to UTF-8 at startup (see ``main``), so
+            # non-UTF-8 input from a pipe surfaces here instead of being
+            # silently misdecoded with the locale code page.
+            click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
+            sys.exit(2)
+    elif value.startswith("@"):
+        path = Path(value[1:])
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            click.echo(f"Body file not found: {path}", err=True)
+            sys.exit(2)
+        except UnicodeDecodeError as exc:
+            click.echo(
+                f"Body file {path} is not valid UTF-8: {exc}",
+                err=True,
+            )
+            sys.exit(2)
+        except OSError as exc:
+            click.echo(f"Cannot read body file {path}: {exc}", err=True)
+            sys.exit(2)
+    else:
+        raw = value
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        click.echo(f"Invalid JSON in body: {exc}", err=True)
+        sys.exit(2)
+
+
+def resolve_workspace(
+    explicit: str | None,
+    *,
+    required: bool = False,
+) -> str | None:
+    """Resolve workspace GID with fallback chain.
+
+    Priority: explicit ``--workspace`` value > ``ASANA_DEFAULT_WORKSPACE``
+    env var (only when *required* is True).
+
+    When workspace is optional (``required=False``), the env-var fallback is
+    **not** used. This prevents the default workspace from being sent
+    alongside other scope parameters (e.g. ``--project`` on ``get-tasks``)
+    that the Asana API accepts in place of workspace.
+
+    If *required* is True and no value is found, exits with an error.
+    """
+    if explicit is not None:
+        return explicit
+    if required:
+        ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
+        if ws:
+            return ws
+        click.echo(
+            f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
+            err=True,
+        )
+        sys.exit(2)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -103,9 +205,23 @@ def _humanize_class_name(name: str) -> str:
 # with the trailing ``Api`` stripped. Wording is sourced from
 # ``docs/api-groups.md``, which is the authoritative human-reviewable
 # table; ``test_group_descriptions_match_docs`` asserts the two stay in
-# sync. Each entry is intentionally kept ≤ 45 chars so click's
-# ``make_default_short_help`` (max_length=45) renders it verbatim — no
-# "…" truncation that would otherwise drop the key noun.
+# sync.
+#
+# Length constraint: each entry must fit in ≤ 45 chars. click's
+# ``make_default_short_help`` (max_length=45) renders the Commands table
+# on ``asana-api --help``; longer strings get truncated mid-sentence
+# with "…", routinely dropping the key noun (``organization-wide…``,
+# ``tasks and…``). The same wording also appears verbatim as the
+# group-level ``--help`` header, so the limit keeps both renderings
+# aligned. When tempted to write something richer than 45 chars allows,
+# prefer:
+#   - a stronger, shorter verb (``Trigger and download org-wide
+#     exports`` over ``Request and retrieve organization-wide exports``)
+#   - the Asana resource word over an explanatory paraphrase
+#     (``(deprecated)`` parenthetical over "legacy … prefer X")
+#   - omitting redundant context the section already implies
+#     (``Read who has access to portfolios``, not "List the user
+#     records who have access to a given portfolio")
 #
 # Entries are intentionally kept across SDK versions: if a future SDK
 # removes a group, its description is harmless dead data (and re-engages
@@ -124,7 +240,7 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "CustomFields": "Manage workspace custom fields",
     "CustomTypes": "Read workspace custom object types",
     "Events": "Poll resource change events (sync token)",
-    "Exports": "Initiate bulk exports of project resources",
+    "Exports": "Initiate graph or resource exports",
     "GoalRelationships": "Manage links between goals",
     "Goals": "Manage organizational goals and metrics",
     "Jobs": "Check status of async background jobs",
@@ -132,31 +248,31 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "OrganizationExports": "Trigger and download org-wide exports",
     "PortfolioMemberships": "Read who has access to portfolios",
     "Portfolios": "Manage portfolios (project collections)",
-    "ProjectBriefs": "Manage project brief documents",
+    "ProjectBriefs": "Manage project briefs",
     "ProjectMemberships": "Read who has access to projects",
-    "ProjectPortfolioSettings": "Settings for projects within portfolios",
-    "ProjectStatuses": "Per-project status updates (deprecated)",
-    "ProjectTemplates": "Manage and instantiate project templates",
-    "Projects": "Manage projects (CRUD + members, etc.)",
+    "ProjectPortfolioSettings": "Read/update project-portfolio settings",
+    "ProjectStatuses": "Post project statuses (deprecated)",
+    "ProjectTemplates": "Instantiate or remove project templates",
+    "Projects": "Manage projects, members, and followers",
     "Rates": "Manage per-user billing rates on projects",
     "Reactions": "Read emoji reactions on stories",
-    "Roles": "Manage RBAC roles within a workspace",
+    "Roles": "Manage user roles within a workspace",
     "Rules": "Trigger Asana rule via incoming webhook",
     "Sections": "Manage project sections (board/list)",
-    "StatusUpdates": "Manage status updates on any object",
+    "StatusUpdates": "Post status updates on any object",
     "Stories": "Manage stories (comments + activity)",
     "Tags": "Manage tags applied to tasks",
-    "TaskTemplates": "Manage and instantiate task templates",
-    "Tasks": "Manage tasks (CRUD + lifecycle ops)",
+    "TaskTemplates": "Instantiate or remove task templates",
+    "Tasks": "Manage tasks, subtasks, and dependencies",
     "TeamMemberships": "Read who belongs to teams",
     "Teams": "Manage teams within organizations",
     "TimePeriods": "Read time periods (for goals, reporting)",
     "TimeTrackingCategories": "Manage time-tracking categories",
     "TimeTrackingEntries": "Manage time-tracking entries on tasks",
-    "TimesheetApprovalStatuses": "Manage weekly timesheet approval states",
-    "Typeahead": "Auto-complete search for workspace objects",
+    "TimesheetApprovalStatuses": "Manage weekly timesheet approval statuses",
+    "Typeahead": "Type-ahead lookup of workspace resources",
     "UserTaskLists": "Read a user's My Tasks list",
-    "Users": "Manage user records (`me` = authenticated)",
+    "Users": "Read/update users (`me` = authenticated)",
     "Webhooks": "Manage webhook subscriptions (real-time)",
     "WorkspaceMemberships": "Read workspace members (admin/guest flags)",
     "Workspaces": "Update workspace and manage its users",
@@ -197,29 +313,6 @@ _OPT_HELP_OVERRIDES: dict[tuple[str, str, str], str] = {
 }
 
 
-# Shown at the bottom of ``--help`` on every paginatable command. Centralises
-# the two-mode mental model and the SDK kwarg / Configuration mapping so each
-# pagination flag's own help text can stay one short sentence about *what* the
-# flag does (no cross-references). The leading ``\b`` lines disable click's
-# rewrap on the aligned columns so the alignment survives in the rendered
-# output.
-_PAGINATION_EPILOG = (
-    "\b\n"
-    "Pagination:\n"
-    "  Per-page size (--limit) and total cap (--item-limit) are different.\n"
-    "\n"
-    "  Iterator mode (default): walks every page and prints a flat list.\n"
-    '    --limit         per-page size sent to the server (opts["limit"]; 1-100)\n'
-    "    --page-limit    same effect as --limit, via Configuration (parity)\n"
-    "    --item-limit    stop after this many items total (kwarg item_limit)\n"
-    '    --offset        resume from a server-issued page token (opts["offset"])\n'
-    "\n"
-    "  Single payload: --full-payload (≡ --no-return-page-iterator) makes one\n"
-    "  HTTP call return one {data, next_page} dict (kwarg full_payload=True).\n"
-    "  In this mode --item-limit is silently ignored."
-)
-
-
 def _method_to_command(method_name: str) -> str:
     """get_tasks → 'get-tasks'."""
     return method_name.replace("_", "-")
@@ -248,6 +341,41 @@ def _escape_help(text: str) -> str:
     t = re.sub(r"<[^>]+>", "", text)
     t = re.sub(r"\s+", " ", t).strip()
     return t
+
+
+# SDK-destination labels. Every CLI option's --help ends with a uniform
+# ``(<kind>: <name>)`` suffix naming where its value lands in the python-asana
+# call, so a reader can map the flag back to the SDK. Square brackets are
+# reserved for click's own ``[required]`` / ``[default]`` metadata, so every
+# asana-api label uses parentheses. Six kinds cover the SDK input structure:
+#
+#   (Configuration: <name>)  set on asana.Configuration         (global flags)
+#   (ApiClient: <name>)      set on the ApiClient instance       (user_agent, default_headers)
+#   (args: <name>)           positional method argument          (body / path GID / workspace_gid)
+#   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
+#   (kwargs: <name>)         boilerplate **kwargs every method accepts (all_params)
+#   (asana-api: extension)   no SDK counterpart                  (CLI-only)
+#
+# Configuration globals and the two ApiClient-instance globals (--user-agent /
+# --default-header) carry the literal by hand in both ``main`` and
+# ``_make_global_option_params`` (kept byte-identical between cli.py and
+# click_ext.py by ``test_click_ext.TestHelpTextSync``); the CLI-only formatter
+# flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
+# ``--exception-output`` / ``--exception-query``) live only in ``formatted``. This
+# helper builds every label
+# ``_make_command`` derives at runtime: ``args`` / ``opts`` for path / body /
+# docstring params, ``kwargs`` for the common per-call kwargs, and the
+# extension marker on the deprecated aliases.
+def _sdk_dest(category: str, name: str = "") -> str:
+    if category == "args":
+        return f"(args: {name})"
+    if category == "opts":
+        return f"(opts: {name})"
+    if category == "kwargs":
+        return f"(kwargs: {name})"
+    if category == "extension":
+        return "(asana-api: extension)"
+    raise ValueError(f"unknown SDK-destination category: {category!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +500,57 @@ class _Operation:
 
     @property
     def paginatable(self) -> bool:
+        """True iff the SDK method declares a ``limit`` query parameter.
+
+        Used as the gate for the deprecated alias flags
+        (``--all-items`` / ``--page-size`` / ``--max-items``) which only
+        make sense on endpoints that page. The pagination/iterator control
+        flags themselves are global; this predicate stays only until the
+        deprecated aliases are removed.
+        """
         return any(p.name == "limit" for p in self.opts_params)
+
+    @property
+    def does_upload(self) -> bool:
+        """True iff the SDK method performs a multipart file upload.
+
+        Detected by the presence of a ``file`` opt — a cheap proxy for "the
+        method populates ``local_var_files`` / sends ``multipart/form-data``".
+        The only such method in python-asana is
+        ``attachments create-attachment-for-object``. The proxy is held exact
+        by ``tests/test_sdk_boilerplate.py`` (a source scan of the whole SDK),
+        so a future SDK that adds or renames an upload endpoint trips that
+        guard rather than silently misclassifying the command.
+
+        Gates the per-command ``--multibyte-filenames`` extension flag, which
+        only affects multipart uploads whose filename is non-ASCII.
+        """
+        return any(p.name == "file" for p in self.opts_params)
+
+    @property
+    def workspace_positional(self) -> str | None:
+        """The path positional that is a workspace GID, if any (``workspace_gid``)."""
+        return next((n for n in self.path_positionals if _is_workspace_param(n)), None)
+
+    @property
+    def workspace_opt(self) -> _DocParam | None:
+        """The ``opts`` param that is a workspace filter, if any (``workspace``)."""
+        return next((p for p in self.opts_params if _is_workspace_param(p.name)), None)
+
+    @property
+    def has_workspace(self) -> bool:
+        return self.workspace_positional is not None or self.workspace_opt is not None
+
+    @property
+    def workspace_required(self) -> bool:
+        """Workspace is required exactly when it is a path positional.
+
+        An ``opts`` workspace is always optional — no python-asana method marks
+        a query param ``(required)``. Drives the ``ASANA_DEFAULT_WORKSPACE``
+        env-var fallback: auto-fill only when required.
+        """
+        wo = self.workspace_opt
+        return self.workspace_positional is not None or (wo is not None and wo.required)
 
 
 def _extract_operation(method_name: str, fn: object) -> _Operation | None:
@@ -431,8 +609,220 @@ def _operations_for(api_cls: type) -> list[_Operation]:
 # ---------------------------------------------------------------------------
 
 
+def _make_per_call_kwarg_options() -> list[click.Option]:
+    """Fresh ``click.Option`` instances for the user-facing SDK ``all_params``
+    kwargs, common to every command.
+
+    These are method inputs (the boilerplate ``**kwargs`` every SDK method
+    accepts — see ``tests/test_sdk_boilerplate.py``), so they render as
+    per-command options labeled ``(kwargs: ...)`` rather than global flags.
+    ``--page-limit`` / ``--return-page-iterator`` stay global because they are
+    ``Configuration`` properties, not per-call kwargs. Fresh instances are
+    returned each call because click stores per-command state on Option objects
+    (same reason as ``click_ext._make_global_option_params``).
+    """
+    return [
+        click.Option(
+            ["--item-limit", "item_limit"],
+            type=int,
+            default=None,
+            help=(
+                "Stop after this many items total in iterator mode. Silently "
+                "ignored in --full-payload / --no-return-page-iterator modes. "
+                f"{_sdk_dest('kwargs', 'item_limit')}"
+            ),
+        ),
+        click.Option(
+            ["--full-payload", "full_payload"],
+            is_flag=True,
+            default=False,
+            help=(
+                "Return a single raw payload dict from one HTTP call. "
+                "Equivalent to --no-return-page-iterator. For events get-events "
+                "this yields {data, sync, has_more} so sync tokens stay "
+                f"reachable from shell scripts. {_sdk_dest('kwargs', 'full_payload')}"
+            ),
+        ),
+        click.Option(
+            ["--header-params", "header_params"],
+            default=None,
+            callback=click_callback(),
+            help=(
+                "Custom HTTP request headers merged into the request. VALUE: "
+                "'k1=v1,k2=v2,...', JSON object, or @path. Use cases include "
+                "Asana-Enable/-Disable deprecation opt-in. Not redacted in "
+                f"--debug output — see SECURITY.md. {_sdk_dest('kwargs', 'header_params')}"
+            ),
+        ),
+        click.Option(
+            ["--request-timeout", "request_timeout"],
+            type=float,
+            default=None,
+            help=f"Per-request timeout in seconds. {_sdk_dest('kwargs', '_request_timeout')}",
+        ),
+    ]
+
+
+@functools.cache
+def _static_reserved_flags() -> frozenset[str]:
+    """Built-in CLI flag strings present on (essentially) every command.
+
+    An SDK arg/opt whose derived flag lands in this set is exposed with a
+    ``sdk-`` prefix (see :func:`_decls`) so the built-in keeps its bare name.
+    Derived from the actual option builders (not hand-kept) so it tracks
+    renames / additions automatically. Per-command conditional flags
+    (deprecated aliases, ``--multibyte-filenames``) are added in
+    :func:`_reserved_flags`.
+
+    ``--help`` is added by click at parse time (never in ``cmd.params``) and
+    ``--version`` is root-only, so neither is discoverable by scanning a leaf's
+    params — they are listed explicitly so a future SDK ``help`` / ``version``
+    param is still pushed to ``--sdk-help`` / ``--sdk-version``.
+    """
+    flags: set[str] = {"--help", "--version"}
+    flags |= formatter_flag_names()
+    for params in (_make_per_call_kwarg_options(), _make_global_option_params()):
+        for p in params:
+            flags.update(p.opts)
+            flags.update(getattr(p, "secondary_opts", []))
+    return frozenset(flags)
+
+
+def _reserved_flags(op: _Operation) -> frozenset[str]:
+    """Built-in flags this command occupies (static set + per-command extras)."""
+    flags = set(_static_reserved_flags())
+    if op.paginatable:
+        flags |= {"--all-items", "--page-size", "--max-items"}
+    if op.does_upload:
+        flags.add("--multibyte-filenames")
+    return frozenset(flags)
+
+
+def _decls(flag: str, dest: str, reserved: frozenset[str]) -> list[str]:
+    """Declaration list for an SDK-derived option, ``sdk-`` prefixed on collision.
+
+    If ``flag`` collides with a built-in CLI flag (in ``reserved``), the SDK
+    param yields: it is exposed as ``--sdk-<name>`` with an *explicit* ``dest``
+    equal to the SDK param name, so the call path (which pops by param name) is
+    unchanged and the ``(opts/arg: <name>)`` help label still shows the real
+    name. Otherwise the bare ``[flag]`` is used (dest auto-derives to ``dest``).
+    """
+    if flag in reserved:
+        return [f"--sdk-{flag.removeprefix('--')}", dest]
+    return [flag]
+
+
+def _path_arg_option(name: str, op: _Operation, reserved: frozenset[str]) -> click.Option:
+    """Render a required path positional as ``--<name>`` (``_gid`` stripped).
+
+    For ``*_gid`` params the SDK description is uninformative ("Globally unique
+    identifier for the X", or "The task to operate on."), so we synthesize a
+    help line that says it's a GID, gives an example, and uses ``metavar=GID``
+    so the signature reads ``--task GID`` not ``--task TEXT``. Non-``_gid`` path
+    args (e.g. ``parent`` / ``target``) keep their docstring description.
+    """
+    opt_name = _option_name(name)
+    flag = f"--{opt_name.replace('_', '-')}"
+    kw: dict[str, Any] = {"required": True}
+    if name.endswith("_gid"):
+        thing = opt_name.replace("_", " ")
+        kw["metavar"] = "GID"
+        kw["help"] = f"{thing.capitalize()} GID, e.g. 1234567890. {_sdk_dest('args', name)}"
+    else:
+        dp = op.params.get(name)
+        desc = _escape_help(dp.description) if dp else ""
+        kw["help"] = f"{desc} {_sdk_dest('args', name)}".strip()
+    return click.Option(_decls(flag, opt_name, reserved), **kw)
+
+
+def _body_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
+    """Render the required ``--body`` option with the input-format hint.
+
+    The SDK docstring usually has only a terse "The X to create." line; users
+    also need the input *format* (inline JSON / @path / stdin) and Asana's
+    ``{"data": {...}}`` envelope, so the hint is always appended.
+    """
+    body_format = (
+        'Accepts inline JSON, @path/to/file, or - (stdin). Wrap payload in {"data": {...}}.'
+    )
+    bp = op.params.get("body")
+    sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
+    help_text = f"{sdk_desc} {body_format} {_sdk_dest('args', 'body')}".strip()
+    return click.Option(
+        _decls("--body", "body", reserved), required=True, metavar="JSON", help=help_text
+    )
+
+
+def _workspace_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
+    """Render the unified ``--workspace`` option.
+
+    ``--workspace`` is polymorphic: a positional ``workspace_gid`` on some
+    endpoints, an ``opts['workspace']`` on others. It is labelled for whichever
+    shape this method declares so the SDK destination stays accurate. The
+    env-var fallback (``ASANA_DEFAULT_WORKSPACE``) applies only when the param
+    is required — i.e. a path positional; optional-workspace endpoints (e.g.
+    ``get-tasks``) are deliberately not auto-filled.
+    """
+    wp = op.workspace_positional
+    if wp is not None:
+        label = _sdk_dest("args", wp)
+    else:
+        wo = op.workspace_opt
+        assert wo is not None  # caller invokes this only when a workspace param exists
+        label = _sdk_dest("opts", wo.name)
+    help_text = (
+        "Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)"
+        if op.workspace_required
+        else "Workspace GID (optional; not auto-filled from ASANA_DEFAULT_WORKSPACE)"
+    )
+    return click.Option(
+        _decls("--workspace", "workspace", reserved), default=None, help=f"{help_text} {label}"
+    )
+
+
+def _plain_opt_option(
+    p: _DocParam, api_cls: type, op: _Operation, reserved: frozenset[str]
+) -> click.Option:
+    """Render a docstring ``opts`` param as ``--<name>`` (non-workspace).
+
+    Two special cases: an empty SDK ``:param`` description falls back to
+    ``_OPT_HELP_OVERRIDES`` (a few endpoints, notably the upload ``--file``);
+    and ``--limit`` gets the "per-request — use --item-limit to cap the total"
+    pointer appended on the option line itself (not only the epilog) so a
+    casual Options-table scan still catches the pitfall.
+    """
+    flag = f"--{p.name.replace('_', '-')}"
+    help_text = _escape_help(p.description)
+    if not help_text:
+        help_text = _OPT_HELP_OVERRIDES.get((api_cls.__name__[:-3], op.method_name, p.name), "")
+    if p.name == "limit":
+        help_text = f"{help_text} Use --item-limit to cap the total."
+    help_text = f"{help_text} {_sdk_dest('opts', p.name)}".strip()
+    kw: dict[str, Any] = {"help": help_text}
+    click_type = _click_type(p.py_type)
+    if click_type is not None:
+        kw["type"] = click_type
+    if p.required:
+        kw["required"] = True
+    else:
+        kw["default"] = None
+    return click.Option(_decls(flag, p.name, reserved), **kw)
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
-    """Build a :class:`CommandWithGlobalOptions` for a single SDK method."""
+    """Build a :class:`CommandWithGlobalOptions` for a single SDK method.
+
+    Option display order (mirrors the SDK call contract, then SDK docs):
+
+    1. **Path / body positionals**, in the function-signature order
+       (``op.positional``) — e.g. ``add_dependencies_for_task(self, body,
+       task_gid)`` renders ``--body`` then ``--task``.
+    2. **Opts**, in the SDK docstring's ``:param`` order. python-asana never
+       marks an opt ``(required)`` — required inputs are always positionals —
+       so there is no required/optional split to order by.
+    3. **Boilerplate per-call kwargs** (the SDK ``all_params``), plus the
+       upload / deprecation extensions where they apply.
+    """
     # If the SDK method has no ``opts`` parameter, docstring-derived named
     # arguments cannot be forwarded — they would be silently dropped at call
     # time. python-asana 5.x does not produce this combination today.
@@ -440,159 +830,73 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         f"{api_cls.__name__}.{op.method_name}: docstring declares params but "
         f"the method has no `opts` argument; CLI options would be dropped"
     )
-    path_positionals = op.path_positionals
-    has_body = op.has_body
-    opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
     paginatable = op.paginatable
-
-    ws_opt = next((p for p in opts_params if _is_workspace_param(p.name)), None)
-    ws_positional = next((n for n in path_positionals if _is_workspace_param(n)), None)
-    has_workspace = ws_opt is not None or ws_positional is not None
-    ws_required = ws_positional is not None or (ws_opt is not None and ws_opt.required)
-
-    non_ws_positionals = [n for n in path_positionals if not _is_workspace_param(n)]
-    non_ws_opts = [p for p in opts_params if not _is_workspace_param(p.name)]
+    does_upload = op.does_upload
+    # Built-in flags this command occupies. An SDK arg/opt whose flag collides
+    # with one of these is exposed as ``--sdk-<name>`` (see ``_decls``) so the
+    # built-in keeps its bare name; the SDK param stays reachable + labelled.
+    reserved = _reserved_flags(op)
 
     options: list[click.Option] = []
 
-    # Path positionals → required --options (with ``_gid`` stripped). For
-    # ``*_gid`` params the SDK description is uninformative ("Globally unique
-    # identifier for the X" or worse, "The task to operate on."), so we
-    # synthesize a help line that says it's a GID, gives an example, and
-    # uses ``metavar=GID`` so the option signature itself reads naturally
-    # (``--task GID`` instead of ``--task TEXT``).
-    for name in non_ws_positionals:
-        opt_name = _option_name(name)
-        flag = f"--{opt_name.replace('_', '-')}"
-        opt_kwargs: dict[str, Any] = {"required": True}
-        if name.endswith("_gid"):
-            thing = opt_name.replace("_", " ")
-            opt_kwargs["metavar"] = "GID"
-            opt_kwargs["help"] = f"{thing.capitalize()} GID, e.g. 1234567890. (SDK kwarg: {name})"
+    # Tier 1 — path / body positionals in function-signature order. Each
+    # positional renders by kind: body, the unified workspace, or a plain path
+    # arg. ``--workspace`` is rendered here only when workspace is positional
+    # (required); the optional workspace opt renders in the opts tier below.
+    for name in op.positional:
+        if name == "body":
+            options.append(_body_option(op, reserved))
+        elif _is_workspace_param(name):
+            options.append(_workspace_option(op, reserved))
         else:
-            dp = op.params.get(name)
-            opt_kwargs["help"] = _escape_help(dp.description) if dp else ""
-        options.append(click.Option([flag], **opt_kwargs))
+            options.append(_path_arg_option(name, op, reserved))
 
-    # Unified --workspace option. The env-var fallback only applies when the
-    # endpoint requires a workspace; for optional-workspace endpoints (e.g.
-    # ``get-tasks``) the CLI deliberately does not auto-fill from the env var,
-    # so the help text differs by case.
-    if has_workspace:
-        ws_help = (
-            "Workspace GID (falls back to ASANA_DEFAULT_WORKSPACE)"
-            if ws_required
-            else "Workspace GID (optional; not auto-filled from ASANA_DEFAULT_WORKSPACE)"
-        )
-        options.append(
-            click.Option(
-                ["--workspace"],
-                default=None,
-                help=ws_help,
-            )
-        )
-
-    # body → required --body option. The SDK docstring usually has a short
-    # "The X to create." line which is not enough — users also need to know
-    # the input *format* (inline JSON / @path / stdin) and Asana's
-    # ``{"data": {...}}`` envelope. Always append the format hint so help
-    # is self-contained even when the SDK description is generic.
-    if has_body:
-        body_format = (
-            'Accepts inline JSON, @path/to/file, or - (stdin). Wrap payload in {"data": {...}}.'
-        )
-        bp = op.params.get("body")
-        sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
-        body_help = f"{sdk_desc} {body_format}".strip()
-        options.append(click.Option(["--body"], required=True, metavar="JSON", help=body_help))
-
-    # Remaining opts params (excluding workspace). The SDK-derived help is
-    # used as-is, with two exceptions:
-    #   - When the SDK provides no ``:param:`` docstring (a handful of
-    #     endpoints, notably ``attachments create-attachment-for-object``),
-    #     fall back to ``_OPT_HELP_OVERRIDES`` so the user isn't staring
-    #     at a bare ``--file TEXT``.
-    #   - ``--limit`` reads as if it caps the total but is per-HTTP-request;
-    #     append the pointer on the option line itself (not only in the
-    #     epilog) so a casual Options-table scan still catches the pitfall.
-    for p in non_ws_opts:
-        flag = f"--{p.name.replace('_', '-')}"
-        help_text = _escape_help(p.description)
-        if not help_text:
-            help_text = _OPT_HELP_OVERRIDES.get(
-                (api_cls.__name__[:-3], op.method_name, p.name),
-                "",
-            )
-        if p.name == "limit" and paginatable:
-            help_text = f"{help_text} Use --item-limit to cap the total."
-        kw: dict[str, Any] = {"help": help_text}
-        click_type = _click_type(p.py_type)
-        if click_type is not None:
-            kw["type"] = click_type
-        if p.required:
-            kw["required"] = True
+    # Tier 2 — opts in the SDK docstring's ``:param`` order (``op.opts_params``
+    # preserves it). python-asana never marks an opt ``(required)``, so there is
+    # no required/optional split to sort by. ``introspect_to_manifest`` keeps a
+    # name-sorted canonical order instead — see the note there.
+    for p in op.opts_params:
+        if _is_workspace_param(p.name):
+            options.append(_workspace_option(op, reserved))
         else:
-            kw["default"] = None
-        options.append(click.Option([flag], **kw))
+            options.append(_plain_opt_option(p, api_cls, op, reserved))
 
-    # Pagination options. Each flag's help is a single self-contained
-    # sentence describing *what* it does; the *when / how* (mode
-    # interactions, mutually-exclusive equivalences, SDK kwarg/Configuration
-    # mapping) is consolidated in the pagination epilog at the bottom of
-    # ``--help`` so the flag descriptions don't have to cross-reference
-    # each other.
-    if paginatable:
+    # Tier 3 — boilerplate per-call kwargs (the SDK ``all_params``), common to
+    # every command. ``--page-limit`` / ``--return-page-iterator`` stay global
+    # (they are ``Configuration`` properties). See ``_make_per_call_kwarg_options``.
+    options.extend(_make_per_call_kwarg_options())
+
+    # ``--multibyte-filenames`` is an asana-api extension that toggles the
+    # multipart filename patch (``MultibyteFilenameSupport`` in session.py). It
+    # only affects multipart uploads, so it is exposed solely on upload commands
+    # (``does_upload``) rather than as a global flag. Off by default to preserve
+    # strict SDK parity (the SDK emits ``filename=`` only); see sdk-deviations.md.
+    if does_upload:
         options.append(
             click.Option(
-                ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
-                default=None,
-                help="Toggle the SDK page iterator (default: enabled).",
-            )
-        )
-        options.append(
-            click.Option(
-                ["--page-limit", "page_limit"],
-                type=int,
-                default=None,
-                # Functionally equivalent to --limit for a single CLI call;
-                # --limit goes through opts and --page-limit goes through
-                # Configuration, but the SDK consults Configuration only
-                # when opts has no limit, so they boil down to the same
-                # per-page size. --page-limit exists for SDK parity (every
-                # Configuration property gets a flag) — prefer --limit.
-                help="Same as --limit via Configuration (default: 100).",
-            )
-        )
-        options.append(
-            click.Option(
-                ["--item-limit", "item_limit"],
-                type=int,
-                default=None,
-                help="Stop after this many items total. Iterator mode only.",
-            )
-        )
-        options.append(
-            click.Option(
-                ["--full-payload", "full_payload"],
+                ["--multibyte-filenames", "multibyte_filenames"],
                 is_flag=True,
                 default=False,
-                help="Return one {data, next_page} dict from a single HTTP call.",
+                help=(
+                    "Emit RFC 5987 filename*=UTF-8'' on this multipart upload. "
+                    "Required when the --file name contains non-ASCII characters; "
+                    "off by default to match the underlying SDK behavior. "
+                    f"{_sdk_dest('extension')}"
+                ),
             )
         )
-        # Deprecated v2.x aliases. Each emits a stderr warning at runtime
-        # and forwards to the corresponding v3 flag (or no-ops when the
-        # behavior is now the default). Their help text is intentionally
-        # short — the "Deprecated (v3.0; will be removed)" section heading
-        # (rendered by ``_GlobalOptionsMixin.format_options``) carries the
-        # deprecation status, so each entry only has to say what the v3
-        # replacement is. The option ``name`` (``all_items``, ``page_size``,
-        # ``max_items``) is what ``_DEPRECATED_OPTION_NAMES`` matches on.
+
+    # Deprecated aliases remain per-command (gated by ``paginatable``) until
+    # they are removed. Each emits a stderr warning at runtime and forwards to
+    # its v3 replacement. The option ``name`` (``all_items`` / ``page_size`` /
+    # ``max_items``) is what ``_DEPRECATED_OPTION_NAMES`` matches on.
+    if paginatable:
         options.append(
             click.Option(
                 ["--all-items", "all_items"],
                 is_flag=True,
                 default=False,
-                help="No-op; walking every page is now the default.",
+                help=f"No-op; walking every page is now the default. {_sdk_dest('extension')}",
             )
         )
         options.append(
@@ -600,7 +904,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 ["--page-size", "page_size"],
                 type=int,
                 default=None,
-                help="Alias for --limit.",
+                help=f"Alias for --limit. {_sdk_dest('extension')}",
             )
         )
         options.append(
@@ -608,34 +912,35 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 ["--max-items", "max_items"],
                 type=int,
                 default=None,
-                help="Alias for --item-limit.",
+                help=f"Alias for --item-limit. {_sdk_dest('extension')}",
             )
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Pop all pagination control flags before later code touches kwargs,
-        # so the opts loop and positional extractor see only docstring-derived
-        # parameters. The else branch keeps these names bound for
-        # non-paginatable commands so the listify check below need not
-        # re-guard them.
-        if paginatable:
-            return_page_iterator: bool | None = kwargs.pop("return_page_iterator")
-            page_limit = kwargs.pop("page_limit")
-            item_limit = kwargs.pop("item_limit")
-            full_payload = kwargs.pop("full_payload")
-            all_items = kwargs.pop("all_items")
-            page_size = kwargs.pop("page_size")
-            max_items = kwargs.pop("max_items")
-        else:
-            return_page_iterator = None
-            full_payload = False
-            page_limit = item_limit = page_size = max_items = None
-            all_items = False
-        # Unspecified ⇒ SDK default (True). Tracked as a separate name so
-        # the original tri-state survives for any future logic that needs it.
-        effective_iter = True if return_page_iterator is None else return_page_iterator
+        # Common per-call kwargs (rendered as per-command options above): pop
+        # them into locals so they do not fall through into the opts dict, then
+        # forward to the SDK call below.
+        item_limit = kwargs.pop("item_limit", None)
+        full_payload = kwargs.pop("full_payload", False)
+        header_params = kwargs.pop("header_params", None)
+        request_timeout = kwargs.pop("request_timeout", None)
 
-        # Deprecated v2.x aliases: warn and resolve to the v3 flag.
+        # Per-command extension on upload commands only: pop the toggle (so it
+        # does not leak into the opts dict) and set the runtime flag the session
+        # reads when deciding whether to install MultibyteFilenameSupport. Other
+        # commands never expose it, so their runtime value stays the default.
+        if does_upload:
+            runtime.multibyte_filenames = kwargs.pop("multibyte_filenames", False)
+
+        # Deprecated aliases: pop from kwargs (per-command) and warn. Effective
+        # values fold into local vars without mutating ``runtime``, so the
+        # dispatch state stays scoped to this invocation.
+        all_items = kwargs.pop("all_items", False) if paginatable else False
+        page_size = kwargs.pop("page_size", None) if paginatable else None
+        max_items = kwargs.pop("max_items", None) if paginatable else None
+
+        effective_item_limit = item_limit
+
         if all_items:
             click.echo(
                 "warning: --all-items is deprecated; walking every page is "
@@ -648,91 +953,110 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 "(will be removed in a future release)",
                 err=True,
             )
-            if kwargs.get("limit") is not None:
-                raise click.UsageError(
-                    "--page-size is the deprecated alias of --limit; specify only one"
-                )
-            kwargs["limit"] = page_size
+            # Canonical --limit wins when both are given.
+            if kwargs.get("limit") is None:
+                kwargs["limit"] = page_size
         if max_items is not None:
             click.echo(
                 "warning: --max-items is deprecated; use --item-limit "
                 "instead (will be removed in a future release)",
                 err=True,
             )
-            if item_limit is not None:
-                raise click.UsageError(
-                    "--max-items is the deprecated alias of --item-limit; specify only one"
-                )
-            item_limit = max_items
+            # Canonical --item-limit wins when both are given.
+            if effective_item_limit is None:
+                effective_item_limit = max_items
 
-        if has_body:
+        if op.has_body:
             body_value = kwargs.pop("body")  # click marks --body as required
             parsed_body = resolve_body(body_value)
         else:
             parsed_body = None
 
-        if has_workspace:
+        if op.has_workspace:
             workspace_value = kwargs.pop("workspace", None)
-            resolved_workspace = resolve_workspace(workspace_value, required=ws_required)
+            resolved_workspace = resolve_workspace(workspace_value, required=op.workspace_required)
         else:
             resolved_workspace = None
 
-        if paginatable:
-            session_ctx = AsanaSession.from_env(
-                return_page_iterator=effective_iter,
-                page_limit=page_limit,
-            )
-        else:
-            session_ctx = AsanaSession.from_env()
-
-        with session_ctx as session:
+        with AsanaSession.from_env() as session:
             api = api_cls(session.client)
 
+            # Non-workspace opts pop straight into the opts dict; the workspace
+            # opt is resolved separately (env-var fallback) and added after.
             opts: dict[str, Any] = {}
-            for p in non_ws_opts:
+            for p in op.opts_params:
+                if _is_workspace_param(p.name):
+                    continue
                 value = kwargs.pop(p.name, None)
                 if p.required or value is not None:
                     opts[p.name] = value
-            if ws_opt is not None and resolved_workspace is not None:
-                opts[ws_opt.name] = resolved_workspace
+            workspace_opt = op.workspace_opt
+            if workspace_opt is not None and resolved_workspace is not None:
+                opts[workspace_opt.name] = resolved_workspace
 
-            # Build positional call args. Body comes first, mirroring the
-            # python-asana convention (e.g.
+            # Build positional call args in function-signature order. Body is
+            # always the first positional in python-asana (e.g.
             # ``add_followers_for_task(body, task_gid, opts)``).
             call_args: list[Any] = []
-            if has_body:
+            if op.has_body:
                 call_args.append(parsed_body)
-            for name in path_positionals:
+            for name in op.path_positionals:
                 if _is_workspace_param(name):
                     call_args.append(resolved_workspace)
                 else:
                     call_args.append(kwargs.pop(_option_name(name)))
 
             method = getattr(api, op.method_name)
+            # Forward the common per-call kwargs uniformly. The SDK accepts
+            # ``item_limit`` / ``full_payload`` / ``header_params`` /
+            # ``_request_timeout`` on every method (its ``all_params``), so we
+            # pass them without per-method gating; a method that does not act on
+            # a given kwarg simply ignores it. ``_request_timeout`` propagates
+            # to every page request through the SDK ``PageIterator``.
             method_kwargs: dict[str, Any] = {}
-            if item_limit is not None:
-                method_kwargs["item_limit"] = item_limit
+            if effective_item_limit is not None:
+                method_kwargs["item_limit"] = effective_item_limit
             if full_payload:
                 method_kwargs["full_payload"] = True
+            if header_params is not None:
+                method_kwargs["header_params"] = header_params
+            if request_timeout is not None:
+                method_kwargs["_request_timeout"] = request_timeout
+            # ``method_kwargs`` (the common per-call kwargs) is forwarded in
+            # both branches: methods without an ``opts`` parameter still accept
+            # the boilerplate ``**kwargs`` (their ``all_params``), so dropping
+            # them here would silently no-op --request-timeout / --header-params
+            # / --item-limit / --full-payload on every no-opts endpoint.
             result = (
-                method(*call_args, opts, **method_kwargs) if op.has_opts else method(*call_args)
+                method(*call_args, opts, **method_kwargs)
+                if op.has_opts
+                else method(*call_args, **method_kwargs)
             )
-            # When the SDK returns a PageIterator it lazily issues an HTTP
-            # request per page on iteration. The formatter would otherwise
-            # iterate it after this ``with`` block exits — that is, after
-            # the debug redactor has been uninstalled — leaking Authorization
-            # headers on every page past the first. Consume it here so every
-            # page request lands while the session (and its redactor) is
-            # still live.
-            if paginatable and effective_iter and not full_payload:
+            # Lazy iterator consumption inside the session context.
+            #
+            # Two independent layers:
+            #   - Layer A (session lifecycle, above): every SDK call runs
+            #     inside ``with AsanaSession.from_env() as session:``, which
+            #     keeps the ``HttpClientAuthRedactor`` installed.
+            #   - Layer B (this block): when the SDK returns a lazy iterator
+            #     (PageIterator / EventIterator), iterating it issues one
+            #     HTTP request per page. We must consume the iterator *before*
+            #     leaving Layer A's ``with`` block — otherwise pages 2..N
+            #     are fetched after the redactor is uninstalled and leak
+            #     ``Authorization`` into ``--debug`` log.
+            #
+            # post-judge by return value type: any ``Iterator`` is consumed
+            # here regardless of which endpoint produced it.
+            if isinstance(result, collections.abc.Iterator):
                 result = list(result)
             return result
 
     callback = formatted(inner_callback)
 
-    # ``formatted`` adds --output and --query via click.option decorators; pull
-    # those Option instances out of the wrapped callback (in natural order)
-    # and append them to our options list.
+    # ``formatted`` adds the output-formatting options (--output / --query /
+    # --csv-bom and their error-path twins --exception-output / --exception-query)
+    # via click.option decorators; pull those Option instances out of the
+    # wrapped callback (in natural order) and append them to our options list.
     fmt_params = list(reversed(getattr(callback, "__click_params__", [])))
     options.extend(fmt_params)
 
@@ -742,7 +1066,6 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         params=options,
         callback=callback,
         help=summary,
-        epilog=_PAGINATION_EPILOG if paginatable else None,
     )
 
 
@@ -823,7 +1146,7 @@ def _retry_strategy_option(f: Any) -> Any:
             "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', JSON "
             "object, or @path. See urllib3 Retry docs. List-typed fields "
             "(allowed_methods, status_forcelist, remove_headers_on_redirect) "
-            "require JSON. (Configuration.retry_strategy)"
+            "require JSON. (Configuration: retry_strategy)"
         ),
     )(f)
 
@@ -837,16 +1160,16 @@ def _retry_strategy_option(f: Any) -> Any:
 @click.option(
     "--host",
     default=None,
-    help="Override API base URL (default: https://app.asana.com/api/1.0)",
+    help="Override API base URL (default: https://app.asana.com/api/1.0). (Configuration: host)",
 )
-@click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL")
+@click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL. (Configuration: proxy)")
 @click.option(
     "--verify-ssl/--no-verify-ssl",
     "verify_ssl",
     default=None,
     help=(
         "Verify TLS certificates (default: True). Pass --no-verify-ssl "
-        "to disable (insecure). (Configuration.verify_ssl)"
+        "to disable (insecure). (Configuration: verify_ssl)"
     ),
 )
 @click.option(
@@ -854,21 +1177,21 @@ def _retry_strategy_option(f: Any) -> Any:
     "ssl_ca_cert",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Path to a PEM bundle of trusted CA certs. (Configuration.ssl_ca_cert)",
+    help="Path to a PEM bundle of trusted CA certs. (Configuration: ssl_ca_cert)",
 )
 @click.option(
     "--cert-file",
     "cert_file",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS certificate for mTLS. (Configuration.cert_file)",
+    help="Client TLS certificate for mTLS. (Configuration: cert_file)",
 )
 @click.option(
     "--key-file",
     "key_file",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS private key for mTLS. (Configuration.key_file)",
+    help="Client TLS private key for mTLS. (Configuration: key_file)",
 )
 @click.option(
     "--assert-hostname/--no-assert-hostname",
@@ -877,17 +1200,28 @@ def _retry_strategy_option(f: Any) -> Any:
     help=(
         "Verify the server certificate's hostname matches the request URL "
         "host. Tri-state: unspecified → urllib3 default. "
-        "(Configuration.assert_hostname)"
+        "(Configuration: assert_hostname)"
+    ),
+)
+@click.option(
+    "--user-agent",
+    "user_agent",
+    default=None,
+    help=("Override the User-Agent header the SDK sends on every request. (ApiClient: user_agent)"),
+)
+@click.option(
+    "--default-header",
+    "default_headers",
+    multiple=True,
+    callback=default_header_callback,
+    help=(
+        "Add an HTTP header sent on every request, given as NAME=VALUE; "
+        "repeatable. Unlike per-call --header-params it applies to all "
+        "calls. Not redacted in --debug output — see SECURITY.md. "
+        "(ApiClient: default_headers)"
     ),
 )
 @_retry_strategy_option
-@click.option(
-    "--request-timeout",
-    "request_timeout",
-    type=float,
-    default=None,
-    help="Per-request timeout in seconds. (SDK kwarg: _request_timeout)",
-)
 @click.option(
     "--connection-pool-maxsize",
     "connection_pool_maxsize",
@@ -895,47 +1229,23 @@ def _retry_strategy_option(f: Any) -> Any:
     default=None,
     help=(
         "Max urllib3 connections cached per host (default: cpu_count "
-        "* 5). (Configuration.connection_pool_maxsize)"
+        "* 5). (Configuration: connection_pool_maxsize)"
     ),
 )
 @click.option(
     "--access-token",
     "access_token",
     default=None,
-    help="Asana personal access token (default: $ASANA_ACCESS_TOKEN)",
-)
-@click.option(
-    "--username",
-    "username",
-    default=None,
-    help="Use --access-token. (Configuration.username)",
-)
-@click.option(
-    "--password",
-    "password",
-    default=None,
-    help="Use --access-token. (Configuration.password)",
-)
-@click.option(
-    "--api-key",
-    "api_key",
-    default=None,
-    callback=click_callback(),
-    help="Use --access-token. (Configuration.api_key)",
-)
-@click.option(
-    "--api-key-prefix",
-    "api_key_prefix",
-    default=None,
-    callback=click_callback(),
-    help="Use --access-token. (Configuration.api_key_prefix)",
+    help=(
+        "Asana personal access token (default: $ASANA_ACCESS_TOKEN). (Configuration: access_token)"
+    ),
 )
 @click.option(
     "--temp-folder-path",
     "temp_folder_path",
     default=None,
     type=click.Path(file_okay=False),
-    help="Directory for temporary downloads. (Configuration.temp_folder_path)",
+    help="Directory for temporary downloads. (Configuration: temp_folder_path)",
 )
 @click.option(
     "--safe-chars-for-path-param",
@@ -943,38 +1253,49 @@ def _retry_strategy_option(f: Any) -> Any:
     default=None,
     help=(
         "Extra chars treated as safe when percent-encoding path "
-        "parameters. (Configuration.safe_chars_for_path_param)"
+        "parameters. (Configuration: safe_chars_for_path_param)"
     ),
 )
 @click.option(
     "--logger-format",
     "logger_format",
     default=None,
-    help="Python logging format string. (Configuration.logger_format)",
+    help="Python logging format string. (Configuration: logger_format)",
 )
 @click.option(
     "--logger-file",
     "logger_file",
     default=None,
     type=click.Path(dir_okay=False),
-    help="Path SDK loggers write to. (Configuration.logger_file)",
+    help="Path SDK loggers write to. (Configuration: logger_file)",
 )
 @click.option(
     "--debug",
     is_flag=True,
     default=False,
-    help="Print HTTP request/response to stderr for troubleshooting",
+    help="Print HTTP request/response to stderr for troubleshooting. (Configuration: debug)",
 )
 @click.option(
-    "--multibyte-filenames",
-    "multibyte_filenames",
-    is_flag=True,
-    default=False,
+    "--return-page-iterator/--no-return-page-iterator",
+    "return_page_iterator",
+    default=None,
     help=(
-        "Emit RFC 5987 filename*=UTF-8'' on multipart uploads. Required for "
-        "attachment uploads whose filename contains non-ASCII characters; "
-        "off by default to match the underlying SDK behavior. "
-        "[asana-api extension]"
+        "Toggle the SDK page iterator (default: enabled). With "
+        "--no-return-page-iterator, paginatable endpoints return a "
+        "single {data, next_page} dict from one HTTP call instead of "
+        "auto-walking every page. (Configuration: return_page_iterator)"
+    ),
+)
+@click.option(
+    "--page-limit",
+    "page_limit",
+    type=int,
+    default=None,
+    help=(
+        "Per-page size when the iterator falls back to Configuration "
+        "(default: 100). Equivalent to --limit on paginatable endpoints; "
+        '--limit (per-call opts["limit"]) takes precedence when both '
+        "are set. (Configuration: page_limit)"
     ),
 )
 def main(
@@ -985,24 +1306,22 @@ def main(
     cert_file: str | None,
     key_file: str | None,
     assert_hostname: bool | None,
+    user_agent: str | None,
+    default_headers: dict[str, str] | None,
     # ``retry_strategy_overrides`` and everything after it have ``= None``
     # defaults so the ``--retry-strategy`` decorator can be skipped on
     # python-asana <5.1 without click then trying to call this function
     # without a value for that name.
     retry_strategy_overrides: dict[str, Any] | None = None,
-    request_timeout: float | None = None,
     connection_pool_maxsize: int | None = None,
     access_token: str | None = None,
-    username: str | None = None,
-    password: str | None = None,
-    api_key: dict[str, str] | None = None,
-    api_key_prefix: dict[str, str] | None = None,
     temp_folder_path: str | None = None,
     safe_chars_for_path_param: str | None = None,
     logger_format: str | None = None,
     logger_file: str | None = None,
     debug: bool = False,
-    multibyte_filenames: bool = False,
+    return_page_iterator: bool | None = None,
+    page_limit: int | None = None,
 ) -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
@@ -1030,21 +1349,20 @@ def main(
     runtime.key_file = key_file
     if assert_hostname is not None:
         runtime.assert_hostname = assert_hostname
+    runtime.user_agent = user_agent
+    runtime.default_headers = default_headers
     runtime.retry_strategy_overrides = retry_strategy_overrides
-    runtime.request_timeout = request_timeout
     runtime.connection_pool_maxsize = connection_pool_maxsize
     if access_token:
         runtime.access_token = access_token
-    runtime.username = username
-    runtime.password = password
-    runtime.api_key = api_key
-    runtime.api_key_prefix = api_key_prefix
     runtime.temp_folder_path = temp_folder_path
     runtime.safe_chars_for_path_param = safe_chars_for_path_param
     runtime.logger_format = logger_format
     runtime.logger_file = logger_file
     runtime.debug = debug
-    runtime.multibyte_filenames = multibyte_filenames
+    if return_page_iterator is not None:
+        runtime.return_page_iterator = return_page_iterator
+    runtime.page_limit = page_limit
 
 
 def _register_groups(root: click.Group) -> None:
@@ -1079,7 +1397,13 @@ def introspect_to_manifest() -> dict[str, Any]:
             continue
         commands: list[dict[str, Any]] = []
         for op in ops:
-            opts_params = sorted(op.opts_params, key=lambda p: (not p.required, p.name))
+            # Canonical (name-sorted) order for a stable drift snapshot. This
+            # intentionally differs from the help display order (docstring
+            # order, see ``_make_command``): the manifest's job is to detect
+            # added / removed / renamed / retyped params, so a canonical order
+            # keeps the fixture from churning when an SDK docstring merely
+            # reshuffles its ``:param`` lines.
+            opts_params = sorted(op.opts_params, key=lambda p: p.name)
             commands.append(
                 {
                     "command": op.command_name,
