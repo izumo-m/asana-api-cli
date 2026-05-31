@@ -7,6 +7,7 @@ that ``--debug`` / ``--host`` / ``--access-token`` etc. work at any level.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from typing import Any
 
@@ -21,7 +22,7 @@ from asana_api_cli.click_ext import (
     GroupWithGlobalOptions,
     LazyGroup,
 )
-from asana_api_cli.session import runtime
+from asana_api_cli.session import _Runtime, runtime
 
 
 def _count_option_appearances(output: str, flag: str) -> int:
@@ -43,17 +44,19 @@ def _count_option_appearances(output: str, flag: str) -> int:
 
 
 def _build_cli() -> click.Group:
-    """Build a 3-level CLI mirroring the real ``asana-api`` shape."""
+    """Build a 3-level CLI mirroring the real ``asana-api`` shape.
+
+    Like the real ``main``, the root is a ``LazyGroup`` (a
+    ``GroupWithGlobalOptions``): it appends and consumes the global options from
+    the single ``_global_option_sections`` source, so no global flag is declared
+    here by hand. ``--host`` / ``--debug`` / ``--access-token`` used in these
+    tests are real globals that source provides at every level; the leaf reads
+    them back off ``runtime`` (written by ``_consume_global_options``).
+    """
 
     @click.group(cls=LazyGroup)
-    @click.option("--host", default=None)
-    @click.option("--debug", is_flag=True, default=False)
-    @click.option("--access-token", "access_token", default=None)
-    def root(host: str | None, debug: bool, access_token: str | None) -> None:
-        runtime.host = host
-        runtime.debug = debug
-        if access_token:
-            runtime.access_token = access_token
+    def root() -> None:
+        pass
 
     @root.group("tasks", cls=GroupWithGlobalOptions)
     def tasks() -> None:
@@ -141,9 +144,9 @@ class TestHelpRendering:
     def test_root_help_shows_group_headings_as_top_level_sections(self) -> None:
         result = make_runner().invoke(_build_cli(), ["--help"])
         assert result.exit_code == 0, full_output(result)
-        # _build_cli() declares --access-token (Authentication), --host
-        # (Connection), --debug (Logging / Debug). Only those 3 groups show
-        # up; empty groups are skipped.
+        # The root carries every global (from the single source), so each
+        # non-empty group renders as its own top-level section. Spot-check the
+        # sections the flags used elsewhere in these tests belong to.
         for heading in ("Authentication:", "Connection:", "Logging / Debug:"):
             assert heading in full_output(result), (
                 f"Missing top-level section heading {heading!r} in:\n{full_output(result)}"
@@ -220,6 +223,18 @@ class TestGlobalOptionNamesInventory:
         for name in expected_names:
             assert name in GLOBAL_OPTION_NAMES
 
+        # Reverse direction: every global option name must be an actual
+        # ``_Runtime`` field. ``_apply_global_to_runtime`` applies values with a
+        # bare ``setattr(runtime, name, value)``; ``_Runtime`` is neither frozen
+        # nor slotted, so a name without a matching field would silently create
+        # a stray attribute (a no-op option) rather than erroring. Pinning the
+        # 1:1 here is what lets that ``setattr`` skip name validation.
+        runtime_fields = frozenset(f.name for f in dataclasses.fields(_Runtime))
+        for name in GLOBAL_OPTION_NAMES:
+            assert name in runtime_fields, (
+                f"{name!r} is in GLOBAL_OPTION_NAMES but is not a field of _Runtime"
+            )
+
     def test_every_global_belongs_to_exactly_one_group(self) -> None:
         """Catch the failure mode where a new global is added without a group.
 
@@ -252,54 +267,20 @@ class TestCommandClassChain:
         assert GroupWithGlobalOptions.command_class is CommandWithGlobalOptions
 
 
-class TestHelpTextSync:
-    """The same global options are declared in two places — once on the root
-    ``main`` via ``@click.option`` decorators (cli.py) and once via
-    ``_make_global_option_params()`` so subcommands can also accept them
-    (click_ext.py). The two declarations must stay byte-identical so users
-    see the same wording regardless of which level they read ``--help`` at.
+class TestGlobalOptionsSingleSource:
+    """Global options are declared once, in ``click_ext._global_option_sections``,
+    and appended to every command from that single source (the root group via
+    ``GroupWithGlobalOptions.__init__``, leaf commands via
+    ``CommandWithGlobalOptions.__init__``). There is no second declaration site
+    to drift, but the *wiring* could regress: this asserts the root and a leaf
+    command expose byte-identical global-option signatures — flag spelling,
+    help, default, flag-ness, and type — so a user reads the same wording at any
+    level of the tree. (Replaces the old ``TestHelpTextSync``, which compared two
+    declaration sites that the single source eliminated.)
     """
 
-    def test_cli_and_click_ext_help_strings_match(self) -> None:
+    def test_root_and_leaf_globals_have_identical_signatures(self) -> None:
         from asana_api_cli.cli import main
-        from asana_api_cli.click_ext import _make_global_option_params
-
-        cli_help = {
-            p.name: p.help
-            for p in main.params
-            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
-        }
-        ext_help = {
-            p.name: p.help
-            for p in _make_global_option_params()
-            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
-        }
-        assert cli_help.keys() == ext_help.keys(), (
-            f"cli.py vs click_ext.py option name sets differ:\n"
-            f"  cli only: {sorted(cli_help.keys() - ext_help.keys())}\n"
-            f"  ext only: {sorted(ext_help.keys() - cli_help.keys())}"
-        )
-        mismatched = {
-            name: (cli_help[name], ext_help[name])
-            for name in cli_help
-            if cli_help[name] != ext_help[name]
-        }
-        assert not mismatched, "\n".join(
-            f"{name}: cli={cli!r} ext={ext!r}" for name, (cli, ext) in mismatched.items()
-        )
-
-    def test_cli_and_click_ext_full_signature_match(self) -> None:
-        """Help text alone is not enough: the two declaration sites must also
-        agree on flag spelling, default, flag-ness, and **type** — a
-        ``click.IntRange(min=1)`` or ``click.Path(exists=True, ...)`` that
-        drifts on only one side would make the same flag validate/coerce
-        differently at the root vs. on a subcommand, silently, while the
-        help-text check above still passes. This is what the "byte-identical"
-        claims in cli.py / click_ext.py / docs/architecture.md actually
-        promise, so enforce the whole signature.
-        """
-        from asana_api_cli.cli import main
-        from asana_api_cli.click_ext import _make_global_option_params
 
         def _type_fingerprint(t: click.ParamType) -> tuple[Any, ...]:
             parts: list[Any] = [type(t).__name__]
@@ -320,24 +301,28 @@ class TestHelpTextSync:
                 _type_fingerprint(p.type),
             )
 
-        cli_sig = {
-            p.name: _sig(p)
-            for p in main.params
-            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
-        }
-        ext_sig = {
-            p.name: _sig(p)
-            for p in _make_global_option_params()
-            if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
-        }
-        assert cli_sig.keys() == ext_sig.keys()
-        mismatched = {
-            name: (cli_sig[name], ext_sig[name])
-            for name in cli_sig
-            if cli_sig[name] != ext_sig[name]
-        }
-        assert not mismatched, "\n".join(
-            f"{name}:\n  cli={cli!r}\n  ext={ext!r}" for name, (cli, ext) in mismatched.items()
+        def _global_sigs(cmd: click.Command) -> dict[str | None, tuple[Any, ...]]:
+            return {
+                p.name: _sig(p)
+                for p in cmd.params
+                if isinstance(p, click.Option) and p.name in GLOBAL_OPTION_NAMES
+            }
+
+        # A leaf command appends the globals via CommandWithGlobalOptions; the
+        # root (main, a LazyGroup → GroupWithGlobalOptions) appends them too.
+        leaf = CommandWithGlobalOptions(name="probe")
+        root_sigs = _global_sigs(main)
+        leaf_sigs = _global_sigs(leaf)
+
+        assert set(root_sigs) == GLOBAL_OPTION_NAMES, (
+            "root is missing global options (LazyGroup did not append the source):\n"
+            f"  expected: {sorted(GLOBAL_OPTION_NAMES)}\n"
+            f"  got:      {sorted(n for n in root_sigs if n is not None)}"
+        )
+        assert root_sigs == leaf_sigs, "\n".join(
+            f"{name}:\n  root={root_sigs.get(name)!r}\n  leaf={leaf_sigs.get(name)!r}"
+            for name in set(root_sigs) | set(leaf_sigs)
+            if root_sigs.get(name) != leaf_sigs.get(name)
         )
 
 

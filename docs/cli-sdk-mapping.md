@@ -9,7 +9,8 @@ what each option *does* (behavior, examples), see [`usage.md`](usage.md); for
 
 **Included** — options written by hand in this codebase:
 
-- Global options declared on `cli.py:main` (`@click.option(...)` decorators).
+- Global options declared in `click_ext.py:_global_option_sections` — the single
+  source they are built from and appended to the root group and every subcommand.
 - The `formatted` decorator's options in `formatter.py`.
 - Common per-command options injected by `_make_command` in `cli.py`: the
   boilerplate per-call kwargs (`_make_per_call_kwarg_options`) on **every**
@@ -41,7 +42,7 @@ In the **"SDK destination"** column:
 - *(none)* — no SDK counterpart (CLI-only; cataloged in
   [`sdk-deviations.md`](sdk-deviations.md), behavior in [`usage.md`](usage.md)).
 
-## Global options (`cli.py:main`)
+## Global options (`click_ext.py:_global_option_sections`)
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|

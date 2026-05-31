@@ -134,6 +134,33 @@ class _Runtime:
 runtime = _Runtime()
 
 
+# Configuration knobs applied from ``runtime`` onto ``asana.Configuration`` in
+# ``AsanaSession.__init__``. Each entry is ``(attr, apply_when_truthy)``: the
+# Configuration attribute name matches the ``_Runtime`` field 1:1, and the
+# condition is preserved verbatim from the original per-knob chain — truthy for
+# the path/host-like strings (an empty string is skipped) and "is not None" for
+# the rest (so an explicit ``False`` / ``0`` still applies). ``access_token``
+# (set from the constructor argument), the ``ApiClient``-instance settings
+# (``user_agent`` / ``default_headers``), and ``retry_strategy`` (which
+# transforms the value via ``Retry.new()``) are applied separately, not here.
+_CONFIG_KNOBS: tuple[tuple[str, bool], ...] = (
+    ("return_page_iterator", False),
+    ("page_limit", False),
+    ("host", True),
+    ("proxy", True),
+    ("verify_ssl", False),
+    ("ssl_ca_cert", True),
+    ("temp_folder_path", True),
+    ("logger_format", False),
+    ("logger_file", False),
+    ("cert_file", False),
+    ("key_file", False),
+    ("assert_hostname", False),
+    ("connection_pool_maxsize", False),
+    ("safe_chars_for_path_param", False),
+)
+
+
 class AsanaSession:
     """Session holding an ApiClient from the official asana SDK.
 
@@ -154,41 +181,20 @@ class AsanaSession:
         config = asana.Configuration()
         config.access_token = token
 
-        # Apply runtime values to Configuration.
-        # ``return_page_iterator`` / ``page_limit`` are read from runtime
-        # like the other Configuration knobs. Unspecified ⇒ leave the SDK
-        # default (True / 100) in place.
-        if runtime.return_page_iterator is not None:
-            config.return_page_iterator = runtime.return_page_iterator
-        if runtime.page_limit is not None:
-            config.page_limit = runtime.page_limit
-        if runtime.host:
-            config.host = runtime.host
-        if runtime.proxy:
-            config.proxy = runtime.proxy  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.verify_ssl is not None:
-            # Honor both sides of the toggle: --no-verify-ssl writes False,
-            # --verify-ssl writes True (pinning the SDK default even if the
-            # SDK later changes its own default).
-            config.verify_ssl = runtime.verify_ssl
-        if runtime.ssl_ca_cert:
-            config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.temp_folder_path:
-            config.temp_folder_path = runtime.temp_folder_path  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.logger_format is not None:
-            config.logger_format = runtime.logger_format  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.logger_file is not None:
-            config.logger_file = runtime.logger_file  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.cert_file is not None:
-            config.cert_file = runtime.cert_file  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.key_file is not None:
-            config.key_file = runtime.key_file  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.assert_hostname is not None:
-            config.assert_hostname = runtime.assert_hostname  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.connection_pool_maxsize is not None:
-            config.connection_pool_maxsize = runtime.connection_pool_maxsize  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.safe_chars_for_path_param is not None:
-            config.safe_chars_for_path_param = runtime.safe_chars_for_path_param  # pyright: ignore[reportAttributeAccessIssue]
+        # Apply runtime values to Configuration from the ``_CONFIG_KNOBS`` table
+        # (module level). Each knob's Configuration attribute matches its
+        # ``_Runtime`` field name, and ``apply_when_truthy`` preserves the
+        # original per-knob condition verbatim (truthy for path/host-like
+        # strings, "is not None" otherwise — so an explicit ``verify_ssl=False``
+        # still applies, while an empty ``--ssl-ca-cert`` is skipped). Unspecified
+        # values leave the SDK default in place (e.g. return_page_iterator / page_limit
+        # at True / 100). ``setattr`` keeps the few attributes python-asana does
+        # not type-annotate ignore-free.
+        for attr, apply_when_truthy in _CONFIG_KNOBS:
+            value = getattr(runtime, attr)
+            applies = value if apply_when_truthy else value is not None
+            if applies:
+                setattr(config, attr, value)
         if runtime.retry_strategy_overrides is not None:
             # Start from the SDK's default Retry instance so unspecified
             # fields keep their python-asana defaults (e.g. total=5,
@@ -196,9 +202,8 @@ class AsanaSession:
             # An empty dict (e.g. `--retry-strategy '{}'`) yields a copy
             # with no field overridden — semantically a no-op, but still
             # honored as "user did pass the flag".
-            config.retry_strategy = config.retry_strategy.new(  # pyright: ignore[reportAttributeAccessIssue]
-                **runtime.retry_strategy_overrides
-            )
+            base_retry = config.retry_strategy
+            config.retry_strategy = base_retry.new(**runtime.retry_strategy_overrides)
 
         # Global side effects (the debug redactor, the ``http.client``
         # debuglevel flip, and the multibyte multipart patch) are installed by

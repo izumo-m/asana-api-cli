@@ -559,6 +559,32 @@ class TestHttpHeaderGlobalsReachClient:
         assert "NAME=VALUE" in full_output(result)
 
 
+class TestAccessTokenGuard:
+    """``access_token`` is the one global whose leaf-level propagation is
+    guarded: an empty ``--access-token`` (source COMMANDLINE) must NOT clobber
+    a token set by a higher-priority source, while a non-empty value still
+    reaches ``runtime``. This pins the only non-trivial branch left in
+    ``_apply_global_to_runtime``."""
+
+    def test_empty_access_token_does_not_clobber_runtime(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
+        runtime.access_token = "preset-token"
+        result = make_runner().invoke(cmd, ["--access-token", "", "--task", "T"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.access_token == "preset-token"
+
+    def test_nonempty_access_token_reaches_runtime(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
+        runtime.access_token = "preset-token"
+        result = make_runner().invoke(cmd, ["--access-token", "new-token", "--task", "T"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.access_token == "new-token"
+
+
 class TestDebugRedactorLifecycle:
     """The http.client debug redactor must stay installed for the duration
     of every paginated request, including the lazy per-page HTTP calls made

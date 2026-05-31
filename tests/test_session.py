@@ -330,6 +330,61 @@ class TestAsanaSessionPaginationKwargs:
 
 
 # ---------------------------------------------------------------------------
+# AsanaSession Configuration knobs (the _CONFIG_KNOBS table)
+# ---------------------------------------------------------------------------
+
+
+class TestAsanaSessionConfigKnobs:
+    """Every ``runtime`` Configuration knob reaches ``asana.Configuration`` via
+    the ``_CONFIG_KNOBS`` table in ``AsanaSession.__init__``. The expected
+    (knob -> value) pairs here are written independently of that table, so a
+    dropped or mis-conditioned entry is caught. (``retry_strategy`` has its own
+    end-to-end coverage in ``test_cli_invocation.py:TestRetryStrategyReachesSession``.)
+    """
+
+    def test_runtime_knobs_reach_configuration(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Representative non-default values. Includes the "is not None" knobs
+        # that must still apply an explicit ``False`` (return_page_iterator /
+        # verify_ssl) alongside the path/string knobs.
+        expected: dict[str, Any] = {
+            "return_page_iterator": False,
+            "page_limit": 50,
+            "host": "https://example.test/api",
+            "proxy": "http://127.0.0.1:8080",
+            "verify_ssl": False,
+            "ssl_ca_cert": "/tmp/ca.pem",
+            "temp_folder_path": "/tmp/dl",
+            "logger_format": "%(message)s",
+            "logger_file": "/tmp/sdk.log",
+            "cert_file": "/tmp/client.crt",
+            "key_file": "/tmp/client.key",
+            "assert_hostname": True,
+            "connection_pool_maxsize": 7,
+            "safe_chars_for_path_param": "/:",
+        }
+        for attr, value in expected.items():
+            monkeypatch.setattr(runtime, attr, value)
+        config = AsanaSession(token="x" * 20).client.configuration
+        for attr, value in expected.items():
+            assert getattr(config, attr) == value, f"{attr} did not reach Configuration"
+
+    @pytest.mark.parametrize("attr", ["host", "proxy", "ssl_ca_cert", "temp_folder_path"])
+    def test_truthy_guarded_empty_string_is_skipped(
+        self, attr: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The truthy-guarded knobs must NOT overwrite the SDK default with an
+        # empty string (mirrors the original ``if runtime.X:`` conditions). A
+        # flipped ``apply_when_truthy`` would let "" through. Asserting "value is
+        # not the empty string" works regardless of the knob's own default
+        # (host defaults to a URL; proxy/ssl_ca_cert/temp_folder_path to None).
+        monkeypatch.setattr(runtime, attr, "")
+        config = AsanaSession(token="x" * 20).client.configuration
+        assert getattr(config, attr, None) != "", (
+            f"empty {attr!r} must be skipped, leaving the SDK default"
+        )
+
+
+# ---------------------------------------------------------------------------
 # ApiClient-instance settings (--user-agent / --set-default-header)
 # ---------------------------------------------------------------------------
 

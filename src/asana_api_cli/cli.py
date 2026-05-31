@@ -54,7 +54,6 @@ import asana
 import click
 
 from asana_api_cli.click_ext import (
-    _SDK_HAS_RETRY_STRATEGY,
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
@@ -66,9 +65,7 @@ from asana_api_cli.session import (
     runtime,
 )
 from asana_api_cli.structured_arg import (
-    RETRY_FIELD_SCHEMA,
     click_callback,
-    default_header_callback,
 )
 from asana_api_cli.version import version_string
 
@@ -357,14 +354,14 @@ def _escape_help(text: str) -> str:
 #   (asana-api: extension)   no SDK counterpart                  (CLI-only)
 #
 # Configuration globals and the two ApiClient-instance globals (--user-agent /
-# --set-default-header) carry the literal by hand in both ``main`` and
-# ``_make_global_option_params`` (kept byte-identical between cli.py and
-# click_ext.py by ``test_click_ext.TestHelpTextSync``); the CLI-only formatter
-# flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
-# ``--exception-output`` / ``--exception-query``) live only in ``formatted``. This
-# helper builds every label
-# ``_make_command`` derives at runtime: ``args`` / ``opts`` for path / body /
-# docstring params, ``kwargs`` for the common per-call kwargs, and the
+# --set-default-header) carry the literal in their single declaration in
+# ``click_ext.py:_global_option_sections`` (the one source every command's
+# globals are built from, so the label is identical at the root and at any
+# subcommand); the CLI-only formatter flags (``--output`` / ``--query`` /
+# ``--csv-bom`` and the error-path twins ``--exception-output`` /
+# ``--exception-query``) live only in ``formatted``. This helper builds every
+# label ``_make_command`` derives at runtime: ``args`` / ``opts`` for path /
+# body / docstring params, ``kwargs`` for the common per-call kwargs, and the
 # extension marker on the deprecated aliases.
 def _sdk_dest(category: str, name: str = "") -> str:
     if category == "args":
@@ -1127,202 +1124,16 @@ _ROOT_EPILOG = (
 )
 
 
-def _retry_strategy_option(f: Any) -> Any:
-    """Apply the ``--retry-strategy`` decorator only when the installed
-    python-asana exposes ``Configuration.retry_strategy`` (added in 5.1).
-
-    On older SDKs the flag would crash at apply time, so we hide it
-    entirely — both from ``--help`` and from the parser, so users on
-    5.0.x get a clean ``no such option`` rather than a traceback.
-    """
-    if not _SDK_HAS_RETRY_STRATEGY:
-        return f
-    return click.option(
-        "--retry-strategy",
-        "retry_strategy_overrides",
-        default=None,
-        callback=click_callback(schema=RETRY_FIELD_SCHEMA),
-        help=(
-            "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', JSON "
-            "object, or @path. See urllib3 Retry docs. List-typed fields "
-            "(allowed_methods, status_forcelist, remove_headers_on_redirect) "
-            "require JSON. (Configuration: retry_strategy)"
-        ),
-    )(f)
-
-
-# Root uses LazyGroup so that the manually declared @click.option globals are
-# not duplicated by GroupWithGlobalOptions' auto-append behavior. Subgroups
-# (_ApiGroup) and leaf commands (CommandWithGlobalOptions) still auto-append
-# so global options work at any level of the tree.
+# Root group. ``LazyGroup`` is a ``GroupWithGlobalOptions``, so the root
+# appends and consumes the global Configuration / ApiClient flags from the
+# single ``_global_option_sections`` source in ``click_ext.py`` — exactly the
+# way every subgroup (``_ApiGroup``) and leaf command (``CommandWithGlobalOptions``)
+# does. There is no separate root-level declaration; the flags work at any level
+# of the tree, and ``--retry-strategy`` is gated on the SDK version in that one
+# source.
 @click.group(name="asana-api", cls=LazyGroup, epilog=_ROOT_EPILOG)
 @click.version_option(version_string(), prog_name="asana-api")
-@click.option(
-    "--host",
-    default=None,
-    help="Override API base URL (default: https://app.asana.com/api/1.0). (Configuration: host)",
-)
-@click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL. (Configuration: proxy)")
-@click.option(
-    "--verify-ssl/--no-verify-ssl",
-    "verify_ssl",
-    default=None,
-    help=(
-        "Verify TLS certificates (default: True). Pass --no-verify-ssl "
-        "to disable (insecure). (Configuration: verify_ssl)"
-    ),
-)
-@click.option(
-    "--ssl-ca-cert",
-    "ssl_ca_cert",
-    default=None,
-    type=click.Path(exists=True, dir_okay=False),
-    help="Path to a PEM bundle of trusted CA certs. (Configuration: ssl_ca_cert)",
-)
-@click.option(
-    "--cert-file",
-    "cert_file",
-    default=None,
-    type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS certificate for mTLS. (Configuration: cert_file)",
-)
-@click.option(
-    "--key-file",
-    "key_file",
-    default=None,
-    type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS private key for mTLS. (Configuration: key_file)",
-)
-@click.option(
-    "--assert-hostname/--no-assert-hostname",
-    "assert_hostname",
-    default=None,
-    help=(
-        "Verify the server certificate's hostname matches the request URL "
-        "host. Tri-state: unspecified → urllib3 default. "
-        "(Configuration: assert_hostname)"
-    ),
-)
-@click.option(
-    "--user-agent",
-    "user_agent",
-    default=None,
-    help=("Override the User-Agent header the SDK sends on every request. (ApiClient: user_agent)"),
-)
-@click.option(
-    "--set-default-header",
-    "default_headers",
-    multiple=True,
-    callback=default_header_callback,
-    help=(
-        "Add an HTTP header sent on every request, given as NAME=VALUE; "
-        "repeatable. Unlike per-call --header-params it applies to all "
-        "calls. Not redacted in --debug output — see SECURITY.md. "
-        "(ApiClient: set_default_header)"
-    ),
-)
-@_retry_strategy_option
-@click.option(
-    "--connection-pool-maxsize",
-    "connection_pool_maxsize",
-    type=click.IntRange(min=1),
-    default=None,
-    help=(
-        "Max urllib3 connections cached per host (default: cpu_count "
-        "* 5). (Configuration: connection_pool_maxsize)"
-    ),
-)
-@click.option(
-    "--access-token",
-    "access_token",
-    default=None,
-    help=(
-        "Asana personal access token (default: $ASANA_ACCESS_TOKEN). (Configuration: access_token)"
-    ),
-)
-@click.option(
-    "--temp-folder-path",
-    "temp_folder_path",
-    default=None,
-    type=click.Path(file_okay=False),
-    help="Directory for temporary downloads. (Configuration: temp_folder_path)",
-)
-@click.option(
-    "--safe-chars-for-path-param",
-    "safe_chars_for_path_param",
-    default=None,
-    help=(
-        "Extra chars treated as safe when percent-encoding path "
-        "parameters. (Configuration: safe_chars_for_path_param)"
-    ),
-)
-@click.option(
-    "--logger-format",
-    "logger_format",
-    default=None,
-    help="Python logging format string. (Configuration: logger_format)",
-)
-@click.option(
-    "--logger-file",
-    "logger_file",
-    default=None,
-    type=click.Path(dir_okay=False),
-    help="Path SDK loggers write to. (Configuration: logger_file)",
-)
-@click.option(
-    "--debug",
-    is_flag=True,
-    default=False,
-    help="Print HTTP request/response to stderr for troubleshooting. (Configuration: debug)",
-)
-@click.option(
-    "--return-page-iterator/--no-return-page-iterator",
-    "return_page_iterator",
-    default=None,
-    help=(
-        "Toggle the SDK page iterator (default: enabled). With "
-        "--no-return-page-iterator, paginatable endpoints return a "
-        "single {data, next_page} dict from one HTTP call instead of "
-        "auto-walking every page. (Configuration: return_page_iterator)"
-    ),
-)
-@click.option(
-    "--page-limit",
-    "page_limit",
-    type=int,
-    default=None,
-    help=(
-        "Per-page size when the iterator falls back to Configuration "
-        "(default: 100). Equivalent to --limit on paginatable endpoints; "
-        '--limit (per-call opts["limit"]) takes precedence when both '
-        "are set. (Configuration: page_limit)"
-    ),
-)
-def main(
-    host: str | None,
-    proxy: str | None,
-    verify_ssl: bool | None,
-    ssl_ca_cert: str | None,
-    cert_file: str | None,
-    key_file: str | None,
-    assert_hostname: bool | None,
-    user_agent: str | None,
-    default_headers: dict[str, str] | None,
-    # ``retry_strategy_overrides`` and everything after it have ``= None``
-    # defaults so the ``--retry-strategy`` decorator can be skipped on
-    # python-asana <5.1 without click then trying to call this function
-    # without a value for that name.
-    retry_strategy_overrides: dict[str, Any] | None = None,
-    connection_pool_maxsize: int | None = None,
-    access_token: str | None = None,
-    temp_folder_path: str | None = None,
-    safe_chars_for_path_param: str | None = None,
-    logger_format: str | None = None,
-    logger_file: str | None = None,
-    debug: bool = False,
-    return_page_iterator: bool | None = None,
-    page_limit: int | None = None,
-) -> None:
+def main() -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
     # stream encodings are the locale code page (e.g. cp932 on Japanese
@@ -1331,38 +1142,13 @@ def main(
     # Reconfigure all three to UTF-8 so the same input/output works on every
     # platform. The hasattr guard keeps CliRunner's in-memory streams (used
     # by tests) from blowing up, since StringIO has no reconfigure().
+    #
+    # The global flags are parsed into the root context and written to
+    # ``runtime`` by ``LazyGroup.invoke`` → ``_consume_global_options`` before
+    # this callback runs, so there is nothing to apply here.
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
-
-    runtime.host = host
-    runtime.proxy = proxy
-    # Both verify_ssl and assert_hostname are tri-state toggles (positive /
-    # negative / unset). Guard so the unset case does not clobber a value
-    # set by an earlier code path; symmetry with how the leaf-level
-    # propagation in ``click_ext._consume_global_options`` skips the
-    # default ``None``.
-    if verify_ssl is not None:
-        runtime.verify_ssl = verify_ssl
-    runtime.ssl_ca_cert = ssl_ca_cert
-    runtime.cert_file = cert_file
-    runtime.key_file = key_file
-    if assert_hostname is not None:
-        runtime.assert_hostname = assert_hostname
-    runtime.user_agent = user_agent
-    runtime.default_headers = default_headers
-    runtime.retry_strategy_overrides = retry_strategy_overrides
-    runtime.connection_pool_maxsize = connection_pool_maxsize
-    if access_token:
-        runtime.access_token = access_token
-    runtime.temp_folder_path = temp_folder_path
-    runtime.safe_chars_for_path_param = safe_chars_for_path_param
-    runtime.logger_format = logger_format
-    runtime.logger_file = logger_file
-    runtime.debug = debug
-    if return_page_iterator is not None:
-        runtime.return_page_iterator = return_page_iterator
-    runtime.page_limit = page_limit
 
 
 def _register_groups(root: click.Group) -> None:
