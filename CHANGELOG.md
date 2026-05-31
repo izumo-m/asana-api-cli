@@ -57,12 +57,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Option `--help` now names the SDK destination.** Every option ends with a
   label showing where its value lands in `python-asana`: `(Configuration:
-  <name>)` for client config (global flags), `(SDK arg: <name>)` for positional
-  arguments (`--body`, path GIDs, `--workspace` when positional), `(opts:
-  <name>)` for the method's `opts` dict (`--assignee`, `--opt-fields`, ...),
-  `(kwarg: <name>)` for per-call kwargs, and `(asana-api extension)` for
-  CLI-only flags. (Path GIDs that 2.1.1 labeled `(SDK kwarg: ...)` are now
-  `(SDK arg: ...)` — they are positional arguments, not kwargs.)
+  <name>)` for client config (global flags), `(ApiClient: <name>)` for
+  ApiClient-instance settings (`--user-agent`, `--default-header`), `(args:
+  <name>)` for positional arguments (`--body`, path GIDs, `--workspace` when
+  positional), `(opts: <name>)` for the method's `opts` dict (`--assignee`,
+  `--opt-fields`, ...), `(kwargs: <name>)` for per-call kwargs, and
+  `(asana-api: extension)` for CLI-only flags. (Path GIDs that 2.1.1 labeled
+  `(SDK kwarg: ...)` are now `(args: ...)` — they are positional arguments,
+  not kwargs.)
 
 - **Iteration / per-call controls grouped by SDK scope.** The `Configuration`
   knobs `--page-limit` and `--return-page-iterator / --no-return-page-iterator`
