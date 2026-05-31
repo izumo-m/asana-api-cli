@@ -54,12 +54,12 @@ This masking lives in the CLI, not the SDK. Direct use of the SDK's
 HTTP debug logging from Python leaves the `Authorization` header in
 clear text.
 
-### `--header-params` is not masked
+### Custom request headers are not masked
 
-`--header-params VALUE` lets you inject arbitrary HTTP request headers
-(`k=v` pairs, a JSON object, or `@file`). The `--debug` redactor masks
-**only** the `Authorization` header; any value passed via
-`--header-params` is logged verbatim. If a custom header carries a
-secret — an API key, signing token, or other credential — treat the
-`--debug` log as containing that value in clear text and scrub it
+`--header-params VALUE` (per call) and the session-wide `--user-agent` /
+`--default-header NAME=VALUE` (repeatable) let you inject arbitrary HTTP
+request headers. The `--debug` redactor masks **only** the `Authorization`
+header; any value passed via these flags is logged verbatim. If a custom
+header carries a secret — an API key, signing token, or other credential —
+treat the `--debug` log as containing that value in clear text and scrub it
 before sharing.

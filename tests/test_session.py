@@ -286,3 +286,40 @@ class TestAsanaSessionPaginationKwargs:
     def test_constructor_defaults_match_sdk_defaults(self) -> None:
         with AsanaSession(token="x" * 20) as session:
             assert session.client.configuration.return_page_iterator is True
+
+
+# ---------------------------------------------------------------------------
+# ApiClient-instance settings (--user-agent / --default-header)
+# ---------------------------------------------------------------------------
+
+
+class TestAsanaSessionApiClientHeaders:
+    """``runtime.user_agent`` / ``runtime.default_headers`` are applied to the
+    ``ApiClient`` after construction (they are ApiClient-instance settings, not
+    ``Configuration`` knobs)."""
+
+    def test_user_agent_applied(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "user_agent", "MyApp/1.0")
+        session = AsanaSession(token="x" * 20)
+        assert session.client.user_agent == "MyApp/1.0"
+
+    def test_default_headers_applied(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "default_headers", {"X-Foo": "bar", "X-Baz": "qux"})
+        session = AsanaSession(token="x" * 20)
+        assert session.client.default_headers["X-Foo"] == "bar"
+        assert session.client.default_headers["X-Baz"] == "qux"
+
+    def test_user_agent_wins_over_default_header_user_agent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Both target default_headers['User-Agent']; the dedicated --user-agent
+        # is applied last so it wins (session.py orders the two deliberately).
+        monkeypatch.setattr(runtime, "default_headers", {"User-Agent": "FromHeader"})
+        monkeypatch.setattr(runtime, "user_agent", "FromUserAgent")
+        session = AsanaSession(token="x" * 20)
+        assert session.client.user_agent == "FromUserAgent"
+
+    def test_unset_leaves_sdk_default_user_agent(self) -> None:
+        # No runtime overrides → the SDK's own default User-Agent is untouched.
+        session = AsanaSession(token="x" * 20)
+        assert session.client.user_agent.startswith("Swagger-Codegen")

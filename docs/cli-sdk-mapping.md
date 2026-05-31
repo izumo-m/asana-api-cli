@@ -32,6 +32,9 @@ In the **"SDK destination"** column:
 - *Struct member* — passed into a nested constructor that `Configuration`
   consumes (e.g. `Configuration.retry_strategy` is built from a
   `urllib3.util.retry.Retry`).
+- *Client setter* — assigned on the `ApiClient` **instance** after
+  construction (e.g. `ApiClient.user_agent`, `ApiClient.set_default_header`),
+  not on `Configuration`. Session-wide: rides every request the client makes.
 - *Per-call kwarg* — forwarded through `_make_command` as a method kwarg.
 - *Patch* — a monkey-patch on an SDK-adjacent module, installed while the
   session is open (`AsanaSession.open` → `close`, i.e. for the `with` block).
@@ -49,6 +52,8 @@ In the **"SDK destination"** column:
 | `--cert-file PATH` | `Configuration.cert_file` | Direct property (client TLS cert) |
 | `--key-file PATH` | `Configuration.key_file` | Direct property (client TLS key) |
 | `--assert-hostname / --no-assert-hostname` | `Configuration.assert_hostname` | Direct property; tri-state |
+| `--user-agent VALUE` | `ApiClient.user_agent` | Client setter: assigned on the `ApiClient` after construction in `AsanaSession.__init__` |
+| `--default-header NAME=VALUE` | `ApiClient.set_default_header(name, value)` | Client setter: repeatable, parsed by `structured_arg.default_header_callback`; each pair applied after construction. Session-wide (rides every request) and overrides per-call `--header-params` on a key collision (SDK merges defaults on top); **not redacted in `--debug`** (see [SECURITY.md](../SECURITY.md)) |
 | `--retry-strategy VALUE` | `Configuration.retry_strategy` | Struct member: parsed by `structured_arg` (`RETRY_FIELD_SCHEMA`), applied as `retry_strategy.new(**overrides)` so unspecified fields keep the SDK defaults |
 | `--connection-pool-maxsize N` | `Configuration.connection_pool_maxsize` | Direct property |
 | `--access-token TOKEN` | `Configuration.access_token` | Direct property; default source `$ASANA_ACCESS_TOKEN` |
@@ -155,6 +160,7 @@ metadata.
 | Label | SDK destination |
 |---|---|
 | `(Configuration: <name>)` | property set on `asana.Configuration` (the global flags) |
+| `(ApiClient: <name>)` | setting on the `ApiClient` instance (`user_agent`, `default_headers`) — the client-setter globals |
 | `(args: <name>)` | positional method argument — `body`, a path GID, or `workspace_gid` |
 | `(opts: <name>)` | entry in the method's `opts` dict (a docstring `:param`) |
 | `(kwargs: <name>)` | boilerplate `**kwargs` every method accepts (its `all_params`) |

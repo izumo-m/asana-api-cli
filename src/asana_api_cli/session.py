@@ -114,6 +114,12 @@ class _Runtime:
     connection_pool_maxsize: int | None = None
     safe_chars_for_path_param: str | None = None
     retry_strategy_overrides: dict[str, Any] | None = None
+    # ApiClient-instance settings (not Configuration knobs): applied to the
+    # ``ApiClient`` after construction in ``AsanaSession.__init__`` via
+    # ``user_agent`` / ``set_default_header``. Session-wide — they ride every
+    # request, unlike the per-call ``--header-params`` opt.
+    user_agent: str | None = None
+    default_headers: dict[str, str] | None = None
     # Configuration-backed iterator knobs. The per-call kwargs
     # (full_payload / item_limit / header_params / _request_timeout) are NOT
     # here: they are per-command options forwarded by ``cli.py:_make_command``.
@@ -209,6 +215,16 @@ class AsanaSession:
         # "this session did not touch the global", so cleanup leaves it alone.
         self._prev_debuglevel: int | None = None
         self._client = asana.ApiClient(config)
+
+        # ApiClient-instance settings (not Configuration knobs) applied after
+        # construction. ``default_headers`` first, then ``user_agent`` last, so
+        # the dedicated ``--user-agent`` wins over a ``--default-header`` that
+        # also targets ``User-Agent`` (both write ``default_headers['User-Agent']``).
+        if runtime.default_headers:
+            for name, value in runtime.default_headers.items():
+                self._client.set_default_header(name, value)
+        if runtime.user_agent is not None:
+            self._client.user_agent = runtime.user_agent
 
     @property
     def client(self) -> asana.ApiClient:

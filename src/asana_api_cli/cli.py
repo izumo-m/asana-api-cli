@@ -65,7 +65,11 @@ from asana_api_cli.session import (
     AsanaSession,
     runtime,
 )
-from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
+from asana_api_cli.structured_arg import (
+    RETRY_FIELD_SCHEMA,
+    click_callback,
+    default_header_callback,
+)
 from asana_api_cli.version import version_string
 
 # ---------------------------------------------------------------------------
@@ -343,15 +347,17 @@ def _escape_help(text: str) -> str:
 # ``(<kind>: <name>)`` suffix naming where its value lands in the python-asana
 # call, so a reader can map the flag back to the SDK. Square brackets are
 # reserved for click's own ``[required]`` / ``[default]`` metadata, so every
-# asana-api label uses parentheses. Five kinds cover the SDK input structure:
+# asana-api label uses parentheses. Six kinds cover the SDK input structure:
 #
 #   (Configuration: <name>)  set on asana.Configuration         (global flags)
+#   (ApiClient: <name>)      set on the ApiClient instance       (user_agent, default_headers)
 #   (args: <name>)           positional method argument          (body / path GID / workspace_gid)
 #   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
 #   (kwargs: <name>)         boilerplate **kwargs every method accepts (all_params)
 #   (asana-api: extension)   no SDK counterpart                  (CLI-only)
 #
-# Configuration globals carry the literal by hand in both ``main`` and
+# Configuration globals and the two ApiClient-instance globals (--user-agent /
+# --default-header) carry the literal by hand in both ``main`` and
 # ``_make_global_option_params`` (kept byte-identical between cli.py and
 # click_ext.py by ``test_click_ext.TestHelpTextSync``); the CLI-only formatter
 # flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
@@ -1197,6 +1203,24 @@ def _retry_strategy_option(f: Any) -> Any:
         "(Configuration: assert_hostname)"
     ),
 )
+@click.option(
+    "--user-agent",
+    "user_agent",
+    default=None,
+    help=("Override the User-Agent header the SDK sends on every request. (ApiClient: user_agent)"),
+)
+@click.option(
+    "--default-header",
+    "default_headers",
+    multiple=True,
+    callback=default_header_callback,
+    help=(
+        "Add an HTTP header sent on every request, given as NAME=VALUE; "
+        "repeatable. Unlike per-call --header-params it applies to all "
+        "calls. Not redacted in --debug output — see SECURITY.md. "
+        "(ApiClient: default_headers)"
+    ),
+)
 @_retry_strategy_option
 @click.option(
     "--connection-pool-maxsize",
@@ -1282,6 +1306,8 @@ def main(
     cert_file: str | None,
     key_file: str | None,
     assert_hostname: bool | None,
+    user_agent: str | None,
+    default_headers: dict[str, str] | None,
     # ``retry_strategy_overrides`` and everything after it have ``= None``
     # defaults so the ``--retry-strategy`` decorator can be skipped on
     # python-asana <5.1 without click then trying to call this function
@@ -1323,6 +1349,8 @@ def main(
     runtime.key_file = key_file
     if assert_hostname is not None:
         runtime.assert_hostname = assert_hostname
+    runtime.user_agent = user_agent
+    runtime.default_headers = default_headers
     runtime.retry_strategy_overrides = retry_strategy_overrides
     runtime.connection_pool_maxsize = connection_pool_maxsize
     if access_token:

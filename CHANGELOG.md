@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--user-agent VALUE`** and **`--default-header NAME=VALUE`** (repeatable) —
+  session-wide global options that set the `ApiClient`'s `user_agent` and
+  default request headers, sent on **every** request (unlike the per-call
+  `--header-params`). On a key collision the session-wide default wins over
+  `--header-params` (the SDK merges defaults on top). Custom headers are **not**
+  redacted in `--debug` output — see [SECURITY.md](SECURITY.md). See
+  [`docs/usage.md`](docs/usage.md#global-options) and
+  [`docs/cli-sdk-mapping.md`](docs/cli-sdk-mapping.md).
+
 - **Structured error handling** — new per-command options `--exception-output
   {none|json|text|csv|table}` and `--exception-query EXPR` (the error-path twins of
   `--output` / `--query`, on every command). The SDK exception is

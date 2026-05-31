@@ -56,6 +56,7 @@ Client-wide settings; valid at any point in the command path.
 | Auth | `--access-token` (default `$ASANA_ACCESS_TOKEN`) |
 | Endpoint / network | `--host`, `--proxy`, `--connection-pool-maxsize` |
 | TLS / mTLS | `--verify-ssl` / `--no-verify-ssl`, `--ssl-ca-cert`, `--cert-file`, `--key-file`, `--assert-hostname` / `--no-assert-hostname` |
+| HTTP headers | `--user-agent`, `--default-header NAME=VALUE` (repeatable) |
 | Retry | `--retry-strategy` |
 | Logging / debug | `--debug`, `--logger-format`, `--logger-file` |
 | File handling | `--temp-folder-path`, `--safe-chars-for-path-param` |
@@ -67,6 +68,23 @@ header masked:
 ```bash
 asana-api --debug tasks get-tasks --project <PROJECT_GID>
 ```
+
+`--user-agent` overrides the `User-Agent` header on every request.
+`--default-header NAME=VALUE` (repeatable) adds a header sent on **every**
+request for the session — unlike the per-command [`--header-params`](#per-command-options),
+which applies to a single call:
+
+```bash
+asana-api --user-agent "my-integration/1.0" \
+          --default-header "X-Trace-Id=abc123" \
+          --default-header "Accept-Language=ja" \
+          tasks get-task --task <TASK_GID>
+```
+
+For a header set on both sides, the session-wide `--default-header` wins over a
+per-call `--header-params` of the same name (the SDK merges defaults on top).
+Like `--header-params`, these custom headers are **not** redacted in `--debug`
+output — see [SECURITY.md](../SECURITY.md).
 
 ### Structured values
 

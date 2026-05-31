@@ -13,7 +13,11 @@ from pathlib import Path
 import click
 import pytest
 
-from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, parse_structured_arg
+from asana_api_cli.structured_arg import (
+    RETRY_FIELD_SCHEMA,
+    default_header_callback,
+    parse_structured_arg,
+)
 
 
 class TestJsonForm:
@@ -215,3 +219,42 @@ class TestRetryFieldSchema:
     def test_list_field_in_shorthand_points_to_json(self) -> None:
         with pytest.raises(click.BadParameter, match="JSON form"):
             parse_structured_arg("status_forcelist=429", schema=RETRY_FIELD_SCHEMA)
+
+
+def _default_headers(*tokens: str) -> dict[str, str] | None:
+    """Run ``default_header_callback`` with a real (throwaway) Click context,
+    mirroring how ``multiple=True`` hands it a tuple of raw tokens."""
+    param = click.Option(["--default-header"], multiple=True)
+    ctx = click.Context(click.Command("test"))
+    return default_header_callback(ctx, param, tokens)
+
+
+class TestDefaultHeaderCallback:
+    """``--default-header NAME=VALUE`` (repeatable) parser."""
+
+    def test_not_given_returns_none(self) -> None:
+        # Matches the unset sentinel the other globals use.
+        assert _default_headers() is None
+
+    def test_single_pair(self) -> None:
+        assert _default_headers("X-Foo=bar") == {"X-Foo": "bar"}
+
+    def test_multiple_pairs_accumulate(self) -> None:
+        assert _default_headers("A=1", "B=2") == {"A": "1", "B": "2"}
+
+    def test_value_may_contain_equals(self) -> None:
+        # Only the first '=' is the separator (header values like base64 or
+        # query-ish strings can contain '='), which is exactly why this is a
+        # repeatable option and not the comma-split shorthand parser.
+        assert _default_headers("A=b=c") == {"A": "b=c"}
+
+    def test_name_is_trimmed_value_is_verbatim(self) -> None:
+        assert _default_headers(" X-Foo = bar ") == {"X-Foo": " bar "}
+
+    def test_missing_equals_rejected(self) -> None:
+        with pytest.raises(click.BadParameter, match="NAME=VALUE"):
+            _default_headers("noequals")
+
+    def test_empty_name_rejected(self) -> None:
+        with pytest.raises(click.BadParameter, match="NAME=VALUE"):
+            _default_headers("=value")

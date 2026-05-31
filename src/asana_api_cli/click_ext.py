@@ -32,7 +32,11 @@ import click
 from click.core import ParameterSource
 
 from asana_api_cli.session import runtime
-from asana_api_cli.structured_arg import RETRY_FIELD_SCHEMA, click_callback
+from asana_api_cli.structured_arg import (
+    RETRY_FIELD_SCHEMA,
+    click_callback,
+    default_header_callback,
+)
 
 # ``Configuration.retry_strategy`` was introduced in python-asana 5.1.
 # When wrapping an older SDK the property simply does not exist, so
@@ -57,6 +61,10 @@ GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
     (
         "TLS",
         ["verify_ssl", "ssl_ca_cert", "cert_file", "key_file", "assert_hostname"],
+    ),
+    (
+        "HTTP headers",
+        ["user_agent", "default_headers"],
     ),
     *([("Retry", ["retry_strategy_overrides"])] if _SDK_HAS_RETRY_STRATEGY else []),
     (
@@ -147,6 +155,25 @@ def _make_global_option_params() -> list[click.Option]:
                 "Verify the server certificate's hostname matches the "
                 "request URL host. Tri-state: unspecified → urllib3 "
                 "default. (Configuration: assert_hostname)"
+            ),
+        ),
+        click.Option(
+            ["--user-agent", "user_agent"],
+            default=None,
+            help=(
+                "Override the User-Agent header the SDK sends on every request. "
+                "(ApiClient: user_agent)"
+            ),
+        ),
+        click.Option(
+            ["--default-header", "default_headers"],
+            multiple=True,
+            callback=default_header_callback,
+            help=(
+                "Add an HTTP header sent on every request, given as NAME=VALUE; "
+                "repeatable. Unlike per-call --header-params it applies to all "
+                "calls. Not redacted in --debug output — see SECURITY.md. "
+                "(ApiClient: default_headers)"
             ),
         ),
         *(
@@ -265,6 +292,10 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
         runtime.key_file = value
     elif name == "assert_hostname":
         runtime.assert_hostname = value
+    elif name == "user_agent":
+        runtime.user_agent = value
+    elif name == "default_headers":
+        runtime.default_headers = value
     elif name == "retry_strategy_overrides":
         runtime.retry_strategy_overrides = value
     elif name == "connection_pool_maxsize":

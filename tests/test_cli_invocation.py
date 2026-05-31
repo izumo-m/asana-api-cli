@@ -509,6 +509,49 @@ class TestRetryStrategyReachesSession:
         assert rs.status_forcelist == [429, 500, 502, 503, 504]
 
 
+class TestHttpHeaderGlobalsReachClient:
+    """``--user-agent`` and ``--default-header`` are ApiClient-instance globals;
+    they must reach the ``ApiClient`` that issues the request, and (like every
+    global) be accepted at the leaf-command level."""
+
+    def test_user_agent_reaches_api_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        captured: list[str] = []
+
+        def patched(self_api: Any, *args: Any, **kwargs: Any) -> Any:
+            captured.append(self_api.api_client.user_agent)
+            return {"data": {}}
+
+        monkeypatch.setattr(asana.TasksApi, "get_task", patched)
+        result = make_runner().invoke(cmd, ["--user-agent", "MyApp/2.0", "--task", "T"])
+        assert result.exit_code == 0, full_output(result)
+        assert captured == ["MyApp/2.0"]
+
+    def test_default_headers_reach_api_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        captured: list[dict[str, str]] = []
+
+        def patched(self_api: Any, *args: Any, **kwargs: Any) -> Any:
+            captured.append(dict(self_api.api_client.default_headers))
+            return {"data": {}}
+
+        monkeypatch.setattr(asana.TasksApi, "get_task", patched)
+        result = make_runner().invoke(
+            cmd,
+            ["--default-header", "X-Foo=bar", "--default-header", "X-Baz=qux", "--task", "T"],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert captured[0]["X-Foo"] == "bar"
+        assert captured[0]["X-Baz"] == "qux"
+
+    def test_malformed_default_header_is_usage_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
+        result = make_runner().invoke(cmd, ["--default-header", "noequals", "--task", "T"])
+        assert result.exit_code == 2, full_output(result)
+        assert "NAME=VALUE" in full_output(result)
+
+
 class TestDebugRedactorLifecycle:
     """The http.client debug redactor must stay installed for the duration
     of every paginated request, including the lazy per-page HTTP calls made

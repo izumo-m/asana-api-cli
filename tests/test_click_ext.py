@@ -198,6 +198,11 @@ class TestGlobalOptionNamesInventory:
             "safe_chars_for_path_param",
             "logger_format",
             "logger_file",
+            # ApiClient-instance settings (not Configuration knobs): applied to
+            # the ApiClient after construction. Session-wide, unlike the
+            # per-call --header-params opt.
+            "user_agent",
+            "default_headers",
             # Configuration-backed iterator knobs stay global. The per-call
             # kwargs (item_limit / full_payload / header_params /
             # _request_timeout) are per-command options now, not globals.
