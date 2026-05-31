@@ -6,8 +6,8 @@ Runtime-introspection wrapper around `python-asana`. The CLI command tree is bui
 
 | File | Role |
 |---|---|
-| `cli.py` | Runtime introspection + Click command tree |
-| `session.py` | SDK client (`Configuration` + `ApiClient`); body / workspace resolution; installs the debug redactor and the multibyte-filename patch on context-manager entry (`open`), reverses them on exit (`close`) |
+| `cli.py` | Runtime introspection + Click command tree; body / workspace input resolution |
+| `session.py` | SDK client (`Configuration` + `ApiClient`); installs the debug redactor and the multibyte-filename patch on context-manager entry (`open`), reverses them on exit (`close`) |
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
 | `click_ext.py` | `LazyGroup` for cheap top-level `--help`; mixins propagating global options to subgroups |
 | `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |

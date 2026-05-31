@@ -8,13 +8,11 @@ applying the global configuration passed in from the CLI.
 from __future__ import annotations
 
 import http.client
-import json
 import os
 import sys
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import asana
@@ -24,7 +22,6 @@ from urllib3.fields import RequestField
 from asana_api_cli.redactor import HttpClientAuthRedactor
 
 ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
-DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
 
 
 class MultibyteFilenameSupport:
@@ -85,52 +82,6 @@ class MultibyteFilenameSupport:
 
     def __exit__(self, *exc: Any) -> None:
         self.uninstall()
-
-
-JsonValue = dict[str, Any] | list[Any] | str | int | float | bool | None
-
-
-def resolve_body(value: str) -> JsonValue:
-    """Parse a body argument as JSON.
-
-    Supports three input forms:
-    - ``@path`` — read JSON from a file
-    - ``-``     — read JSON from stdin
-    - otherwise — parse the string itself as JSON
-    """
-    if value == "-":
-        try:
-            raw = sys.stdin.read()
-        except UnicodeDecodeError as exc:
-            # stdin is reconfigured to UTF-8 at startup (see cli.py main),
-            # so non-UTF-8 input from a pipe surfaces here instead of being
-            # silently misdecoded with the locale code page.
-            click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
-            sys.exit(2)
-    elif value.startswith("@"):
-        path = Path(value[1:])
-        try:
-            raw = path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            click.echo(f"Body file not found: {path}", err=True)
-            sys.exit(2)
-        except UnicodeDecodeError as exc:
-            click.echo(
-                f"Body file {path} is not valid UTF-8: {exc}",
-                err=True,
-            )
-            sys.exit(2)
-        except OSError as exc:
-            click.echo(f"Cannot read body file {path}: {exc}", err=True)
-            sys.exit(2)
-    else:
-        raw = value
-
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as exc:
-        click.echo(f"Invalid JSON in body: {exc}", err=True)
-        sys.exit(2)
 
 
 @dataclass
@@ -343,34 +294,3 @@ class AsanaSession:
             )
             sys.exit(2)
         return cls(token=token)
-
-
-def resolve_workspace(
-    explicit: str | None,
-    *,
-    required: bool = False,
-) -> str | None:
-    """Resolve workspace GID with fallback chain.
-
-    Priority: explicit ``--workspace`` value > ``ASANA_DEFAULT_WORKSPACE``
-    env var (only when *required* is True).
-
-    When workspace is optional (``required=False``), the env-var fallback is
-    **not** used. This prevents the default workspace from being sent
-    alongside other scope parameters (e.g. ``--project`` on ``get-tasks``)
-    that the Asana API accepts in place of workspace.
-
-    If *required* is True and no value is found, exits with an error.
-    """
-    if explicit is not None:
-        return explicit
-    if required:
-        ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
-        if ws:
-            return ws
-        click.echo(
-            f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
-            err=True,
-        )
-        sys.exit(2)
-    return None
