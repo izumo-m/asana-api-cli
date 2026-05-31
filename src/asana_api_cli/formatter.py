@@ -311,7 +311,11 @@ def _format_output(
     rows = [{k: _scalar_text(v) for k, v in row.items()} for row in rows]
 
     if output_format == "table":
-        click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
+        # Skip empty data instead of emitting a spurious blank line:
+        # ``tabulate([], ...)`` returns ``""`` and ``click.echo("")`` would
+        # still write a newline. Matches ``_print_csv``'s empty-rows guard.
+        if rows:
+            click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
     elif output_format == "csv":
         _print_csv(rows, with_bom=csv_bom)
 

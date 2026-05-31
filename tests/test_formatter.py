@@ -93,6 +93,13 @@ class TestFormatOutputTable:
         _format_output("plain text", output_format="table", jq_query=None)
         assert capsys.readouterr().out.strip() == "plain text"
 
+    def test_empty_list_produces_no_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # Symmetric with the csv case: an empty result must not emit a spurious
+        # blank line (``tabulate([])`` returns ``""`` and ``click.echo("")``
+        # would still write a newline).
+        _format_output([], output_format="table", jq_query=None)
+        assert capsys.readouterr().out == ""
+
 
 class TestFormatOutputCsv:
     def test_dict_as_csv(self, capsys: pytest.CaptureFixture[str]) -> None:
