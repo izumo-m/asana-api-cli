@@ -18,8 +18,9 @@ uv sync
 uv run pytest
 ```
 
-End-to-end tests under `tests/e2e/` run the CLI against the real Asana API
-and are skipped by default. See [`tests/e2e/README.md`](tests/e2e/README.md)
+End-to-end tests under `tests/e2e/` replay against committed VCR cassettes
+by default (no network or Asana account needed); running them live against
+the real Asana API is opt-in. See [`tests/e2e/README.md`](tests/e2e/README.md)
 for the live / replay workflow and the one-time workspace provisioning step.
 
 ## Pre-commit checks

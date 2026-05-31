@@ -11,8 +11,9 @@ flags switch to live API access; see [Running](#running) below.
 | File | Scope |
 |---|---|
 | `test_smoke.py` | Single-workspace `get-workspace`; list `get-workspaces` (account-shape tolerant). |
-| `test_pagination.py` | Every paginatable-command flag exposed by `tasks get-tasks` (`--limit`, `--offset`, `--page-limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`) and the v2 deprecation aliases. |
+| `test_pagination.py` | Paginatable-command flags on `tasks get-tasks` (`--limit`, `--item-limit`, `--no-return-page-iterator`, `--full-payload`) and the v2 deprecation aliases (`--all-items`, `--page-size`, `--max-items`). |
 | `test_crud.py` | `project` and `task` create → get → update → delete. |
+| `test_batch_api.py` | `batch-api create-batch-request`: 0-actions and 11-actions → parent 400; partial failure (parent 200, one sub-action 404); a create → get → update → delete lifecycle driven through batch calls. Exercises the L3 `cassette_mask` PII hook for `/users/` sub-responses. |
 | `test_attachments.py` | Attachment upload / get / delete across ASCII / Japanese text / binary content and Japanese filenames (the latter via the upload command's `--multibyte-filenames` option). |
 | `test_events.py` | `events get-events` sync-token cycle: 412 bootstrap (`--exception-output json` → envelope on stdout, exit 3) → trigger → poll (`--full-payload`). Exercises the v3.1 `--exception-output` + `--full-payload` combination needed to surface the fresh sync token. |
 | `test_webhooks.py` | `webhooks` group lifecycle: create (workspace subscribe with `project added`/`deleted` filters) → list → get → trigger events (create + delete a project) → assert events arrived at the receiver → delete → list again. **Live only, opt-in** — Asana's `X-Hook-Secret` handshake POST flows Asana → receiver, outside vcrpy's CLI → Asana hook, so cassettes cannot replay it. The fixture spawns a Cloudflare Quick Tunnel (`cloudflared tunnel --url`) and an in-process receiver. |
@@ -108,7 +109,7 @@ plain `uv run pytest tests/e2e/test_cassette_hygiene.py` is the first gate.
 free text, say, needs human eyes):
 
 - real names / email addresses
-- `asanausercontent.com` presigned-URL signatures (`?e=...&t=...`)
+- `asanausercontent.com` presigned-URL signatures (`?e=...&v=...&t=...`)
 - any **bare** 16-digit number — every gid must be wrapped as
   `${GID:...}` (or be a named `${VAR}`); a naked digit run is a red flag
 
@@ -124,9 +125,11 @@ workflows:
   cassettes)
 - `--disable-recording` (vcrpy off entirely — equivalent to `--live`)
 
-Live-mode detection in fixtures considers all three of `--live`,
-`--record-mode != none`, and `--disable-recording`, so the same
-workspace / token requirements apply regardless of which flag you use.
+These native flags must be used **on their own**: combining any of them
+with `--live` / `--record` is rejected as a usage error (both sets would
+drive the same underlying vcrpy options, to possibly different values).
+Whichever set you use, live mode hits the real API, so the same
+workspace / token requirements apply.
 
 ## Account-neutral templating
 
@@ -222,8 +225,8 @@ as JSON. Hits are dispatched by each object's `resource_type` field:
   `["example.invalid"]`
 - `team.name` → bound value
 - `attachment.download_url` / `attachment.view_url` → query string
-  stripped (Asana issues presigned `?e=<expiry>&t=<HMAC>` URLs against
-  `asanausercontent.com`; the token grants read access to the asset
+  stripped (Asana issues presigned `?e=<expiry>&v=<version>&t=<HMAC>` URLs
+  against `asanausercontent.com`; the token grants read access to the asset
   until expiry and must not be committed).
 
 Real `user.name` / `user.email` values that leak into free-text fields

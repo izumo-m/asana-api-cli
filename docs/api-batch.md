@@ -59,7 +59,7 @@ fail** ("parent 200 unless the request itself is malformed").
 
 | Flag             | What stdout contains                                                                                                                       |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| *(default)*      | The outer `data` array unwrapped to a JSON list of `<result>` objects. The SDK routes `/batch` through its page iterator, but `/batch` is single-page — there is no real pagination, and global flags like `--page-limit` / `--item-limit` are inert here. |
+| *(default)*      | The outer `data` array unwrapped to a JSON list of `<result>` objects. The SDK routes `/batch` through its page iterator, but `/batch` is single-page — there is no real pagination, and pagination flags like `--page-limit` (global) / `--item-limit` (per-command) are inert here. |
 | `--full-payload` | Single dict `{"data": [<result>, ...]}` from one HTTP call, matching the Asana-documented shape one-to-one.                                |
 
 The default unwrap is convenient when piping into `jq` (`.[0].body.data.gid`),
