@@ -24,9 +24,7 @@ asana-api workspaces get-workspaces
 asana-api --access-token "2/12345..." workspaces get-workspaces
 ```
 
-No token is needed for `--help` or argument-validation errors. The SDK's inert
-`username` / `password` / `api_key` / `api_key_prefix` fields are **not** exposed
-— see [`sdk-deviations.md`](sdk-deviations.md).
+No token is needed for `--help` or argument-validation errors.
 
 ## Option scopes
 
@@ -271,17 +269,13 @@ esac
 
 In `python-asana` 5.2.4 — the latest version checked, and most likely later
 ones too — uploading a file whose name contains non-ASCII characters (accented
-letters, Japanese, emoji, …) stores a garbled (mojibake) filename on Asana: the
-SDK's multipart request carries only the legacy `filename="…"` parameter and
-omits the RFC 5987 `filename*=` form the server needs to decode them. This is a
-long-standing bug in the SDK — see the
+letters, Japanese, emoji, …) stores a garbled (mojibake) filename on Asana.
+This is a long-standing bug in the SDK — see the
 [Asana forum thread](https://forum.asana.com/t/attachment-names-uploaded-with-asana-api-are-garbled-on-asanaweb/286200)
 (open since 2022, still unresolved).
 
-`--multibyte-filenames` works around the bug. When you pass it to a file-upload
-command (e.g. `attachments create-attachment-for-object`), the CLI patches the
-SDK's multipart encoder so the request *also* sends the RFC 5987
-`filename*=UTF-8''<percent-encoded>` parameter, and the original filename
-round-trips intact. It is off by default to match stock SDK behavior; turn it on
-whenever an attachment's name has any character outside ASCII (plain-ASCII names,
-including symbols, are unaffected).
+`--multibyte-filenames` works around it: pass it to a file-upload command (e.g.
+`attachments create-attachment-for-object`) and `asana-api-cli` applies its own
+patch so the original filename round-trips intact. It is off by default to match
+stock SDK behavior; turn it on whenever an attachment's name has any character
+outside ASCII (plain-ASCII names, including symbols, are unaffected).

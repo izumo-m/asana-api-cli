@@ -41,11 +41,8 @@ group/command/option churn introduced by an SDK bump. Procedure:
 3. `uv run pytest` — failures in `test_cli_surface.py` print the diff.
 4. Review the diff; describe user-visible changes in `CHANGELOG.md`.
 5. Regenerate the fixture (exact command in `tests/test_cli_surface.py`'s module docstring).
-6. Verify Asana auth is still Bearer-token-only. The CLI deliberately does
-   **not** expose `username` / `password` / `api_key` / `api_key_prefix`
-   (inert swagger-codegen Configuration fields; see
-   [`sdk-deviations.md`](sdk-deviations.md)). Confirm the new SDK still wires
-   up only the token scheme:
+6. Verify Asana auth is still Bearer-token-only — confirm the new SDK still
+   wires up only the token scheme:
 
    ```bash
    grep -rh "auth_settings = \[" .venv/lib/python*/site-packages/asana/api/ | sort -u

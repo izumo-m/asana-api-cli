@@ -99,11 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - **Removed the inert auth flags** `--username`, `--password`, `--api-key`, and
-  `--api-key-prefix`. Asana authenticates with Bearer tokens only (personal
-  access token / Service Account / OAuth); these were swagger-codegen
-  `Configuration` fields (HTTP basic auth / deprecated API keys) that Asana
-  never reads, so passing them did nothing. Use `--access-token` (or
-  `$ASANA_ACCESS_TOKEN`). See [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
+  `--api-key-prefix` — Asana authenticates with Bearer tokens only, so they
+  never did anything. Use `--access-token` (or `$ASANA_ACCESS_TOKEN`).
 
 ### Fixed
 

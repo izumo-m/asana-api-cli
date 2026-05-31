@@ -67,9 +67,7 @@ In the **"SDK destination"** column:
 
 `--retry-strategy` and `--header-params` accept a shared structured-value format
 (`k=v` / JSON / `@file`); the syntax is documented in
-[`usage.md`](usage.md#structured-values). The inert auth fields `username` /
-`password` / `api_key` / `api_key_prefix` are **not** exposed — see
-[`sdk-deviations.md`](sdk-deviations.md).
+[`usage.md`](usage.md#structured-values).
 
 ## Common per-command kwargs (`_make_command`)
 

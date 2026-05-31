@@ -188,10 +188,7 @@ workspace resolution, error handling, and exit codes — see
 
 Asana only accepts Bearer-token authentication (personal access token, Service
 Account, or OAuth), so authenticate with `--access-token` or
-`$ASANA_ACCESS_TOKEN`. The SDK's inert `username` / `password` / `api_key` /
-`api_key_prefix` fields (HTTP basic auth / deprecated API keys, which Asana does
-not use) are **not** exposed — see
-[`docs/sdk-deviations.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/sdk-deviations.md).
+`$ASANA_ACCESS_TOKEN`.
 
 ## Development
 
