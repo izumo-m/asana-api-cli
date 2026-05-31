@@ -8,6 +8,7 @@ applying the global configuration passed in from the CLI.
 from __future__ import annotations
 
 import http.client
+import logging
 import os
 import sys
 import urllib.parse
@@ -210,10 +211,13 @@ class AsanaSession:
         self._config = config
         self._redactor: HttpClientAuthRedactor | None = None
         self._multibyte_filenames: MultibyteFilenameSupport | None = None
-        # Prior ``http.client.HTTPConnection.debuglevel``, captured by
-        # ``open()`` only when this session turns debug on. ``None`` means
-        # "this session did not touch the global", so cleanup leaves it alone.
+        # Prior ``http.client.HTTPConnection.debuglevel`` and the prior levels
+        # of the asana/urllib3 loggers, captured by ``open()`` only when this
+        # session turns debug on (the SDK ``debug`` setter raises both).
+        # ``None`` means "this session did not touch the globals", so cleanup
+        # leaves them alone.
         self._prev_debuglevel: int | None = None
+        self._prev_logger_levels: dict[logging.Logger, int] | None = None
         self._client = asana.ApiClient(config)
 
         # ApiClient-instance settings (not Configuration knobs) applied after
@@ -244,21 +248,23 @@ class AsanaSession:
         """
         try:
             if runtime.debug:
-                # ``config.debug = True`` flips the process-global
-                # ``http.client.HTTPConnection.debuglevel`` to 1 and bumps the
-                # urllib3/asana loggers to DEBUG. The only path that leaks the
-                # Authorization header is http.client's wire-level ``print()``
-                # calls — the SDK's own loggers do not log headers. Capture the
-                # prior debuglevel so ``close()`` can restore it; otherwise it
-                # stays 1 after the redactor is uninstalled, and a later
-                # non-debug session in the same process (which installs no
-                # redactor) would print the raw header. Install the redactor
-                # AFTER the SDK debug setup so it wraps whatever
-                # ``http.client.print`` is by then. The restore is paired with
-                # ``redactor.uninstall()`` in ``close()`` so masking and
-                # wire-level tracing are always reversed together
-                # (constitution #2).
+                # ``config.debug = True`` has two process-global side effects:
+                # it flips ``http.client.HTTPConnection.debuglevel`` to 1 (the
+                # wire-level ``print()`` tracing — the only path that can leak
+                # the Authorization header) and it raises the asana/urllib3
+                # loggers to DEBUG. Capture BOTH so ``close()`` restores them;
+                # otherwise debuglevel stays 1 after the redactor is uninstalled
+                # (a later non-debug session would print the raw header) and the
+                # loggers stay at DEBUG for the rest of the process. Install the
+                # redactor AFTER the SDK debug setup so it wraps whatever
+                # ``http.client.print`` is by then; ``close()`` turns tracing
+                # back off before removing the mask so the two are never out of
+                # step (constitution #2).
                 self._prev_debuglevel = http.client.HTTPConnection.debuglevel
+                self._prev_logger_levels = {
+                    lg: lg.level
+                    for lg in self._config.logger.values()  # pyright: ignore[reportAttributeAccessIssue]
+                }
                 self._config.debug = True
                 self._redactor = HttpClientAuthRedactor()
                 self._redactor.install()
@@ -270,24 +276,30 @@ class AsanaSession:
             raise
 
     def close(self) -> None:
-        """Reverse every global side effect :meth:`open` installed: the debug
-        redactor, the multibyte-filename multipart patch, and the
-        ``http.client`` debuglevel flip the SDK's debug setter performed.
+        """Reverse every global side effect :meth:`open` installed: the
+        ``http.client`` debuglevel flip and the asana/urllib3 logger levels the
+        SDK debug setter raised, the ``Authorization`` redactor, and the
+        multibyte-filename multipart patch.
 
         Safe to call multiple times, and a no-op if :meth:`open` never ran.
         Prefer using the session as a context manager
         (``with AsanaSession(...) as session: ...``) which pairs ``open`` on
         entry with ``close`` on exit automatically.
         """
-        if self._redactor is not None:
-            self._redactor.uninstall()
-            self._redactor = None
-        # Restore the wire-level debuglevel the SDK debug setter flipped to 1.
-        # Paired with the redactor uninstall above so tracing is never left on
-        # without the Authorization mask.
+        # Turn wire-level tracing OFF first — restore the debuglevel (and the
+        # asana/urllib3 logger levels the SDK debug setter raised) — and only
+        # THEN remove the Authorization mask, so there is never a window where
+        # tracing is on without the mask (constitution #2).
         if self._prev_debuglevel is not None:
             http.client.HTTPConnection.debuglevel = self._prev_debuglevel
             self._prev_debuglevel = None
+        if self._prev_logger_levels is not None:
+            for logger, level in self._prev_logger_levels.items():
+                logger.setLevel(level)
+            self._prev_logger_levels = None
+        if self._redactor is not None:
+            self._redactor.uninstall()
+            self._redactor = None
         if self._multibyte_filenames is not None:
             self._multibyte_filenames.uninstall()
             self._multibyte_filenames = None

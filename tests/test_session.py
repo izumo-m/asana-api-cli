@@ -8,6 +8,7 @@ live in ``asana_api_cli.cli``; their tests are in ``test_cli.py``.
 from __future__ import annotations
 
 import http.client
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -46,6 +47,19 @@ def _clean_http_client_print() -> Iterator[None]:
         http.client.HTTPConnection.debuglevel = saved_debuglevel
 
 
+@pytest.fixture
+def _restore_logger_levels() -> Iterator[None]:
+    """Snapshot and restore the asana / urllib3 logger levels that the SDK's
+    ``debug`` setter raises to DEBUG."""
+    loggers = [logging.getLogger("asana"), logging.getLogger("urllib3")]
+    saved = [(lg, lg.level) for lg in loggers]
+    try:
+        yield
+    finally:
+        for lg, level in saved:
+            lg.setLevel(level)
+
+
 class TestAsanaSessionSideEffectLifecycle:
     def test_debug_session_installs_on_enter_and_restores_on_exit(
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
@@ -72,6 +86,33 @@ class TestAsanaSessionSideEffectLifecycle:
         # After exit: both reversed together — never tracing-on-without-mask.
         assert http.client.HTTPConnection.debuglevel == 0
         assert "print" not in http.client.__dict__
+
+    def test_debug_session_restores_logger_levels_on_exit(
+        self,
+        _clean_http_client_print: None,
+        _restore_logger_levels: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The SDK ``debug`` setter raises the asana/urllib3 loggers to DEBUG
+        alongside the debuglevel flip. ``close()`` must restore their prior
+        levels — not leave them at DEBUG (a process-wide leak), and not force
+        WARNING as the SDK's own ``debug = False`` would.
+        """
+        asana_logger = logging.getLogger("asana")
+        urllib3_logger = logging.getLogger("urllib3")
+        # Distinct, non-DEBUG sentinels prove exact restoration (not "forced to
+        # WARNING" and not "left at DEBUG").
+        asana_logger.setLevel(logging.WARNING)
+        urllib3_logger.setLevel(logging.ERROR)
+        monkeypatch.setattr(runtime, "debug", True)
+
+        with AsanaSession(token="x" * 20):
+            # The SDK debug setter raised both to DEBUG inside the block.
+            assert asana_logger.level == logging.DEBUG
+            assert urllib3_logger.level == logging.DEBUG
+        # Restored to the exact pre-session levels.
+        assert asana_logger.level == logging.WARNING
+        assert urllib3_logger.level == logging.ERROR
 
     def test_non_debug_session_leaves_debuglevel_untouched(
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
