@@ -123,12 +123,13 @@ class TestResolveWorkspaceNoValue:
 
 
 # ---------------------------------------------------------------------------
-# AsanaSession redactor cleanup
+# AsanaSession side-effect lifecycle (open / close via __enter__ / __exit__)
 #
 # The ``HttpClientAuthRedactor`` itself (helpers, masking, lifecycle,
 # end-to-end with a live HTTP server) is covered in ``test_redactor.py``;
-# the test here only checks that ``AsanaSession.__init__`` reverses the
-# global ``http.client.print`` patch on failure paths.
+# the tests here only check that ``AsanaSession`` installs the global
+# ``http.client`` patches on ``__enter__`` (never at construction) and
+# reverses them on ``__exit__``, including the partial-failure path.
 # ---------------------------------------------------------------------------
 
 
@@ -147,27 +148,30 @@ def _clean_http_client_print() -> Iterator[None]:
         http.client.HTTPConnection.debuglevel = saved_debuglevel
 
 
-class TestAsanaSessionRedactorCleanup:
-    def test_debug_session_restores_debuglevel_on_close(
+class TestAsanaSessionSideEffectLifecycle:
+    def test_debug_session_installs_on_enter_and_restores_on_exit(
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A ``--debug`` session flips the process-global
-        ``http.client.HTTPConnection.debuglevel`` to 1 (via the SDK's debug
-        setter). ``close()`` uninstalls the redactor that masks the
-        ``Authorization`` header, so it must restore the debuglevel too —
-        otherwise a later non-debug session in the same process (which
-        installs no redactor) would print the raw header with wire-level
-        tracing still on (constitution #2).
+        """A ``--debug`` session installs its global side effects on
+        ``__enter__`` and reverses them on ``__exit__`` — never merely on
+        construction. Inside the block, ``http.client`` wire tracing is on
+        (debuglevel 1) AND the ``Authorization`` redactor is installed; on exit
+        both are reversed together, so the process is never left
+        tracing-on-without-mask (constitution #2).
         """
         monkeypatch.setattr(runtime, "debug", True)
         http.client.HTTPConnection.debuglevel = 0
 
         session = AsanaSession(token="x" * 20)
-        # Inside the session: tracing on AND the masking patch installed.
-        assert http.client.HTTPConnection.debuglevel == 1
-        assert "print" in http.client.__dict__
-        session.close()
-        # After close: both reversed together — never tracing-on-without-mask.
+        # Construction alone touches no process globals.
+        assert http.client.HTTPConnection.debuglevel == 0
+        assert "print" not in http.client.__dict__
+
+        with session:
+            # Inside the block: tracing on AND the masking patch installed.
+            assert http.client.HTTPConnection.debuglevel == 1
+            assert "print" in http.client.__dict__
+        # After exit: both reversed together — never tracing-on-without-mask.
         assert http.client.HTTPConnection.debuglevel == 0
         assert "print" not in http.client.__dict__
 
@@ -175,7 +179,7 @@ class TestAsanaSessionRedactorCleanup:
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A session that does not enable debug must not touch the global
-        debuglevel at all (the restore is scoped to sessions that set it)."""
+        debuglevel at all (the install is scoped to sessions that set it)."""
         monkeypatch.setattr(runtime, "debug", False)
         http.client.HTTPConnection.debuglevel = 0
 
@@ -183,16 +187,13 @@ class TestAsanaSessionRedactorCleanup:
             assert http.client.HTTPConnection.debuglevel == 0
         assert http.client.HTTPConnection.debuglevel == 0
 
-    def test_init_failure_uninstalls_redactor(
+    def test_construction_failure_leaves_globals_untouched(
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """If ``ApiClient`` construction raises after the redactor has
-        been installed, ``AsanaSession.__init__`` must uninstall the
-        global ``http.client.print`` patch — and restore the debuglevel
-        the SDK debug setter flipped — before re-raising. The caller never
-        receives a session object, so they cannot call ``close()``
-        themselves — cleanup must happen here or the global state leaks for
-        the lifetime of the process.
+        """Side effects install on ``__enter__``, not at construction, so an
+        ``ApiClient`` construction failure cannot leak a global patch — none
+        has been installed yet. Guards against side-effect install creeping
+        back into ``__init__`` ahead of the ApiClient build.
         """
 
         class _BoomClient:
@@ -206,19 +207,20 @@ class TestAsanaSessionRedactorCleanup:
         pre_print = http.client.__dict__.get("print")
         with pytest.raises(RuntimeError, match="simulated SDK init failure"):
             AsanaSession(token="x" * 20)
-        # http.client.print is exactly what it was before the failed init,
-        # and the debuglevel flip was rolled back too.
+        # Nothing was installed, so http.client is exactly as before.
         assert http.client.__dict__.get("print") is pre_print
         assert http.client.HTTPConnection.debuglevel == 0
 
-    def test_init_failure_in_later_patch_uninstalls_earlier_patch(
+    def test_open_failure_in_later_patch_uninstalls_earlier_patch(
         self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """If a *later* patch's ``install()`` raises after the redactor is
-        already installed, ``__init__`` must still uninstall the redactor
-        before re-raising — every install + the ApiClient construction share
-        one try/except. Guards against a global ``http.client.print`` leak
-        when, e.g., a urllib3 change breaks ``MultibyteFilenameSupport``.
+        """If a *later* ``install()`` raises after the redactor is already
+        installed, ``open()`` must uninstall the redactor (and restore the
+        debuglevel) before re-raising. ``__enter__`` delegates to ``open()``
+        and cannot fall back on ``__exit__`` for this, since Python skips
+        ``__exit__`` when ``__enter__`` raises. Guards a global
+        ``http.client.print`` leak when, e.g., a urllib3 change breaks
+        ``MultibyteFilenameSupport``.
         """
 
         def _boom(_self: MultibyteFilenameSupport) -> None:
@@ -227,12 +229,18 @@ class TestAsanaSessionRedactorCleanup:
         monkeypatch.setattr(MultibyteFilenameSupport, "install", _boom)
         monkeypatch.setattr(runtime, "debug", True)
         monkeypatch.setattr(runtime, "multibyte_filenames", True)
+        http.client.HTTPConnection.debuglevel = 0
 
         pre_print = http.client.__dict__.get("print")
-        with pytest.raises(RuntimeError, match="simulated multibyte patch failure"):
-            AsanaSession(token="x" * 20)
-        # The redactor installed before the failing patch was rolled back.
+        with (
+            pytest.raises(RuntimeError, match="simulated multibyte patch failure"),
+            AsanaSession(token="x" * 20),
+        ):
+            pass
+        # The redactor installed before the failing patch was rolled back,
+        # and the debuglevel flip with it.
         assert http.client.__dict__.get("print") is pre_print
+        assert http.client.HTTPConnection.debuglevel == 0
 
 
 # ---------------------------------------------------------------------------
@@ -340,26 +348,21 @@ class TestMultibyteFilenameSupport:
         assert 'name="parent"' in disposition
         assert "filename*=" not in disposition
 
-    def test_asana_session_init_failure_uninstalls_multibyte_patch(
+    def test_asana_session_installs_patch_on_enter_and_reverses_on_exit(
         self, _clean_request_field: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """If ``ApiClient`` construction raises after the multibyte
-        patch has been installed, ``AsanaSession.__init__`` must
-        uninstall the global ``RequestField.make_multipart`` patch
-        before re-raising — the caller never receives a session object,
-        so they cannot call ``close()`` themselves.
+        """With ``--multibyte-filenames``, ``AsanaSession`` installs the
+        ``RequestField.make_multipart`` patch on ``__enter__`` and removes it
+        on ``__exit__`` — never merely on construction.
         """
-
-        class _BoomClient:
-            def __init__(self, _config: Any) -> None:
-                raise RuntimeError("simulated SDK init failure")
-
-        monkeypatch.setattr("asana_api_cli.session.asana.ApiClient", _BoomClient)
         monkeypatch.setattr(runtime, "multibyte_filenames", True)
-
         original = RequestField.make_multipart
-        with pytest.raises(RuntimeError, match="simulated SDK init failure"):
-            AsanaSession(token="x" * 20)
+
+        session = AsanaSession(token="x" * 20)
+        # Construction alone does not patch make_multipart.
+        assert RequestField.make_multipart is original
+        with session:
+            assert RequestField.make_multipart is not original
         assert RequestField.make_multipart is original
 
 

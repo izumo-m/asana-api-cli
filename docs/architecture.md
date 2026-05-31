@@ -7,7 +7,7 @@ Runtime-introspection wrapper around `python-asana`. The CLI command tree is bui
 | File | Role |
 |---|---|
 | `cli.py` | Runtime introspection + Click command tree |
-| `session.py` | SDK client (`Configuration` + `ApiClient`); body / workspace resolution; installs the debug redactor and the multibyte-filename patch |
+| `session.py` | SDK client (`Configuration` + `ApiClient`); body / workspace resolution; installs the debug redactor and the multibyte-filename patch on context-manager entry (`open`), reverses them on exit (`close`) |
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
 | `click_ext.py` | `LazyGroup` for cheap top-level `--help`; mixins propagating global options to subgroups |
 | `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |
@@ -32,7 +32,7 @@ Every option's `--help` ends with a uniform `(<kind>: <name>)` label naming wher
 
 ## Invocation flow
 
-1. `main` parses global options and writes them into the shared `runtime` singleton; `AsanaSession.__init__` reads them and applies the `Configuration` knobs (host, retry, page_limit, return_page_iterator, ...). Installs the auth redactor on `--debug`; installs the multipart filename patch when `runtime.multibyte_filenames` is set — now driven by the per-command `--multibyte-filenames` flag on upload commands (see step 2), not a global.
+1. `main` parses global options and writes them into the shared `runtime` singleton; `AsanaSession.__init__` reads them, applies the `Configuration` knobs (host, retry, page_limit, return_page_iterator, ...), and builds the `ApiClient` — touching no process globals. Entering the session (`open()`, via `__enter__`) installs the global side effects: the auth redactor on `--debug` and the multipart filename patch when `runtime.multibyte_filenames` is set (driven by the per-command `--multibyte-filenames` flag on upload commands — see step 2, not a global). `close()` (via `__exit__`) reverses them, so the globals live only for the `with` block.
 2. The resolved command invokes the SDK `*Api` method via `_make_command()`, passing the docstring-derived `opts` and the common per-call kwargs (`item_limit` / `full_payload` / `header_params` / `_request_timeout`) — both are per-command options read from the command's own flags. `_request_timeout` reaches every page request through the SDK `PageIterator`. If the SDK returns a lazy iterator (`isinstance(result, collections.abc.Iterator)` check), it is consumed into a list inside the session context so multi-page HTTP requests stay under the auth redactor.
 3. `@formatted` (in `formatter.py`) renders the response, optionally piped through `jq` via `--query`.
 

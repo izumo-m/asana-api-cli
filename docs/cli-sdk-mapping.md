@@ -33,8 +33,8 @@ In the **"SDK destination"** column:
   consumes (e.g. `Configuration.retry_strategy` is built from a
   `urllib3.util.retry.Retry`).
 - *Per-call kwarg* — forwarded through `_make_command` as a method kwarg.
-- *Patch* — a monkey-patch on an SDK-adjacent module, installed for the lifetime
-  of the session.
+- *Patch* — a monkey-patch on an SDK-adjacent module, installed while the
+  session is open (`AsanaSession.open` → `close`, i.e. for the `with` block).
 - *(none)* — no SDK counterpart (CLI-only; cataloged in
   [`sdk-deviations.md`](sdk-deviations.md), behavior in [`usage.md`](usage.md)).
 
@@ -56,7 +56,7 @@ In the **"SDK destination"** column:
 | `--safe-chars-for-path-param S` | `Configuration.safe_chars_for_path_param` | Direct property |
 | `--logger-format FMT` | `Configuration.logger_format` | Direct property |
 | `--logger-file PATH` | `Configuration.logger_file` | Direct property |
-| `--debug` | `Configuration.debug = True` | Direct property; also installs `HttpClientAuthRedactor` (security override, constitution #2 — see [`sdk-deviations.md`](sdk-deviations.md)) |
+| `--debug` | `Configuration.debug = True` | Direct property, but assigned on session entry (`AsanaSession.open`, not `__init__`) because it flips a process-global debuglevel reversed on exit; `HttpClientAuthRedactor` is installed there too, paired so both reverse together (security override, constitution #2 — see [`sdk-deviations.md`](sdk-deviations.md)) |
 | `--return-page-iterator / --no-return-page-iterator` | `Configuration.return_page_iterator` | Via `runtime`, applied in `AsanaSession.__init__`; tri-state |
 | `--page-limit N` | `Configuration.page_limit` | Via `runtime`, applied in `AsanaSession.__init__` |
 
@@ -118,7 +118,7 @@ runtime by `_Operation.does_upload` (the sole such command today is
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
-| `--multibyte-filenames` | *(none)* | *Patch*: installs `MultibyteFilenameSupport` (RFC 5987 `filename*=`), set via `runtime` and applied in `AsanaSession.__init__`. Behavior in [`usage.md`](usage.md#file-uploads); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
+| `--multibyte-filenames` | *(none)* | *Patch*: installs `MultibyteFilenameSupport` (RFC 5987 `filename*=`), set via `runtime` and installed on session entry (`AsanaSession.open`). Behavior in [`usage.md`](usage.md#file-uploads); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
 
 ## Conversion rules
 
