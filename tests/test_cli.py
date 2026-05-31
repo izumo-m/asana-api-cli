@@ -360,6 +360,26 @@ class TestFlagCollisions:
                     offenders[f"{cls.__name__}.{op.command_name}"] = dups
         assert not offenders, f"commands with duplicate flags: {offenders}"
 
+    def test_no_command_has_duplicate_dests(self) -> None:
+        """Sibling of the duplicate-flag sweep, but on the click *dest*
+        (``p.name``). ``_decls`` resolves a flag collision by renaming the SDK
+        flag to ``--sdk-<name>`` while KEEPING its dest = the SDK param name.
+        If a future SDK param's name matches an injected global (e.g. a
+        ``:param ... debug:``), the renamed ``--sdk-debug`` and the global
+        ``--debug`` end up sharing the dest ``debug``: click stores only one in
+        ``ctx.params`` and ``_consume_global_options`` then reads the wrong
+        value, silently corrupting both. The flag sweep above misses this (the
+        flag strings differ), so guard dests explicitly."""
+        offenders: dict[str, list[str]] = {}
+        for cls in _enumerate_api_classes():
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                dests = [p.name for p in cmd.params if isinstance(p, click.Option) and p.name]
+                dups = [d for d, c in Counter(dests).items() if c > 1]
+                if dups:
+                    offenders[f"{cls.__name__}.{op.command_name}"] = dups
+        assert not offenders, f"commands with duplicate option dests: {offenders}"
+
     def test_typeahead_query_yields_to_sdk_prefix(self) -> None:
         import asana
 
