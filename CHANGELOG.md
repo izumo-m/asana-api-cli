@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The session-wide HTTP-header global, added in 3.1.0 as `--default-header`,
+  is now **`--set-default-header`** — matching the SDK method it drives
+  (`ApiClient.set_default_header`) and this project's convention of naming a
+  flag after its SDK destination. If you used `--default-header` with 3.1.0,
+  switch to `--set-default-header`.
+
 ## [3.1.0] - 2026-05-31
 
 ### Added

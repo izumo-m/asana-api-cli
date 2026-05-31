@@ -330,7 +330,7 @@ class TestAsanaSessionPaginationKwargs:
 
 
 # ---------------------------------------------------------------------------
-# ApiClient-instance settings (--user-agent / --default-header)
+# ApiClient-instance settings (--user-agent / --set-default-header)
 # ---------------------------------------------------------------------------
 
 
