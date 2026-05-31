@@ -16,7 +16,7 @@ Both families are deliberately **outside** ``tests/fixtures/cli_surface.json``
 in the manifest). So a bump that adds a new boilerplate kwarg or Configuration
 property would otherwise go unnoticed. These two tests pin both sets so such a
 bump fails loudly and forces a conscious classification — a global flag
-(Configuration) or a common per-command ``(kwarg: ...)`` option, with the
+(Configuration) or a common per-command ``(kwargs: ...)`` option, with the
 matching SDK-destination label (see ``docs/cli-sdk-mapping.md``).
 
 A third guard pins which methods perform a multipart file upload. The CLI
@@ -186,7 +186,7 @@ def test_all_methods_share_expected_all_params() -> None:
         "all_params drifted from EXPECTED_ALL_PARAMS (symmetric diff per method):\n"
         + "\n".join(f"  {name}: {diff}" for name, diff in offenders.items())
         + "\nA new boilerplate kwarg likely needs a common per-command option "
-        "in _make_command with a (kwarg: <name>) label — not a global flag "
+        "in _make_command with a (kwargs: <name>) label — not a global flag "
         "(or removal handling). See docs/cli-sdk-mapping.md."
     )
 

@@ -35,14 +35,14 @@ def formatted(f: Any) -> Any:
             "payload entirely — useful when only the exit code matters "
             "(e.g. side-effect-only operations like delete-task). "
             "Symmetric counterpart of --exception-output 'none' "
-            "(asana-api extension)"
+            "(asana-api: extension)"
         ),
     )
     @click.option(
         "--query",
         "jq_query",
         default=None,
-        help="jq expression to filter output (asana-api extension)",
+        help="jq expression to filter output (asana-api: extension)",
     )
     @click.option(
         "--csv-bom",
@@ -51,7 +51,7 @@ def formatted(f: Any) -> Any:
         default=False,
         help=(
             "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
-            "non-ASCII characters correctly (asana-api extension)"
+            "non-ASCII characters correctly (asana-api: extension)"
         ),
     )
     @click.option(
@@ -67,7 +67,7 @@ def formatted(f: Any) -> Any:
             "(default) then exits 1 with no envelope. json/text/csv/table "
             "additionally render an envelope "
             "(exception/status/reason/body/headers) on stdout and exit 3 "
-            "(asana-api extension)"
+            "(asana-api: extension)"
         ),
     )
     @click.option(
@@ -78,7 +78,7 @@ def formatted(f: Any) -> Any:
             "Apply a jq filter to the error envelope; result is rendered via "
             "--exception-output. Pairing with the default 'none' emits a stderr "
             "warning (the filter would be a no-op) but does not block the call "
-            "(asana-api extension)"
+            "(asana-api: extension)"
         ),
     )
     @functools.wraps(f)
@@ -196,37 +196,17 @@ def _echo_exception_only(e: BaseException) -> None:
 def _handle_exception(
     e: Exception, *, exception_output: str, exception_query: str | None
 ) -> NoReturn:
-    """Render an exception envelope on stdout and exit 3.
+    """Render an exception as an envelope on stdout, then exit 3.
 
-    Only called when ``exception_output`` is one of ``json|text|csv|table``
-    (an envelope format was explicitly requested). ``exception_output`` /
-    ``exception_query`` arrive as the leaf command's per-call option values
-    (the error-path twins of ``--output`` / ``--query``), forwarded by
-    :func:`formatted`. The stderr echo of the exception is done upstream in
-    :func:`formatted` (via :func:`_echo_exception_only`) before this
-    function runs, so both the ``none`` and envelope branches share
-    the same stderr format.
-
-    ApiException carries full HTTP context: 5-field envelope
-    ``{exception, status, reason, body, headers}`` where ``body`` is
-    the UTF-8 decoded response *string* (or null). Other exceptions
-    (urllib3 connection errors, etc.) collapse to the 2-field
-    ``{exception, reason}`` since status/body/headers have no HTTP
-    meaning. The ``exception`` field is always the qualified
-    ``module.qualname`` form. See ``docs/sdk-deviations.md`` for the
-    full schema.
-
-    The envelope lands on **stdout** (not stderr) so that
-    ``exit_code == 3`` paired with stdout-only consumption gives a
-    clean machine-readable error channel — independent of whatever
-    noise urllib3 or other libraries write to stderr. Exit code is
-    ``3`` for the rendered envelope; a malformed ``--exception-query``
-    expression short-circuits with exit ``2`` from inside
-    :func:`_format_output` (user-input error, per
-    ``docs/exit-codes.md``).
+    Only reached for the envelope formats (``json|text|csv|table``); the
+    ``none`` path and the stderr echo are handled upstream in
+    :func:`formatted`. For the envelope schema and exit-code contract see
+    ``docs/usage.md`` ("Error output"); for the rationale,
+    ``docs/sdk-deviations.md``.
     """
     envelope: dict[str, Any]
     if isinstance(e, ApiException):
+        # ApiException carries full HTTP context → 5-field envelope.
         raw_body = e.body
         body_text: str | None
         if isinstance(raw_body, (bytes, bytearray)):
@@ -243,6 +223,7 @@ def _handle_exception(
             "headers": dict(e.headers) if e.headers is not None else None,
         }
     else:
+        # No HTTP context → 2-field envelope.
         envelope = {
             "exception": _qualified_exception_name(e),
             "reason": str(e),
@@ -253,6 +234,7 @@ def _handle_exception(
         output_format=exception_output,
         jq_query=exception_query,
     )
+    # Envelope written to stdout; exit 3 is the API / connection-error code.
     sys.exit(3)
 
 

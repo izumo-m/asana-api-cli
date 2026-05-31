@@ -25,7 +25,7 @@ Translation rules:
 * The boilerplate per-call kwargs ``--item-limit`` / ``--full-payload`` /
   ``--header-params`` / ``--request-timeout`` (the SDK's ``all_params``) are
   common per-command options present on every command — they are method
-  inputs, labeled ``(kwarg: ...)``. The ``Configuration`` knobs
+  inputs, labeled ``(kwargs: ...)``. The ``Configuration`` knobs
   ``--return-page-iterator/--no-return-page-iterator`` and ``--page-limit``
   are global flags. Each option's ``--help`` carries an SDK-destination
   label; see ``_sdk_dest``.
@@ -257,10 +257,10 @@ def _escape_help(text: str) -> str:
 # asana-api label uses parentheses. Five kinds cover the SDK input structure:
 #
 #   (Configuration: <name>)  set on asana.Configuration         (global flags)
-#   (SDK arg: <name>)        positional method argument          (body / path GID / workspace_gid)
+#   (args: <name>)           positional method argument          (body / path GID / workspace_gid)
 #   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
-#   (kwarg: <name>)          boilerplate **kwargs every method accepts (all_params)
-#   (asana-api extension)    no SDK counterpart                  (CLI-only)
+#   (kwargs: <name>)         boilerplate **kwargs every method accepts (all_params)
+#   (asana-api: extension)   no SDK counterpart                  (CLI-only)
 #
 # Configuration globals carry the literal by hand in both ``main`` and
 # ``_make_global_option_params`` (kept byte-identical between cli.py and
@@ -268,18 +268,18 @@ def _escape_help(text: str) -> str:
 # flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
 # ``--exception-output`` / ``--exception-query``) live only in ``formatted``. This
 # helper builds every label
-# ``_make_command`` derives at runtime: ``arg`` / ``opts`` for path / body /
-# docstring params, ``kwarg`` for the common per-call kwargs, and the
+# ``_make_command`` derives at runtime: ``args`` / ``opts`` for path / body /
+# docstring params, ``kwargs`` for the common per-call kwargs, and the
 # extension marker on the deprecated aliases.
 def _sdk_dest(category: str, name: str = "") -> str:
-    if category == "arg":
-        return f"(SDK arg: {name})"
+    if category == "args":
+        return f"(args: {name})"
     if category == "opts":
         return f"(opts: {name})"
-    if category == "kwarg":
-        return f"(kwarg: {name})"
+    if category == "kwargs":
+        return f"(kwargs: {name})"
     if category == "extension":
-        return "(asana-api extension)"
+        return "(asana-api: extension)"
     raise ValueError(f"unknown SDK-destination category: {category!r}")
 
 
@@ -520,7 +520,7 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
 
     These are method inputs (the boilerplate ``**kwargs`` every SDK method
     accepts — see ``tests/test_sdk_boilerplate.py``), so they render as
-    per-command options labeled ``(kwarg: ...)`` rather than global flags.
+    per-command options labeled ``(kwargs: ...)`` rather than global flags.
     ``--page-limit`` / ``--return-page-iterator`` stay global because they are
     ``Configuration`` properties, not per-call kwargs. Fresh instances are
     returned each call because click stores per-command state on Option objects
@@ -534,7 +534,7 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
             help=(
                 "Stop after this many items total in iterator mode. Silently "
                 "ignored in --full-payload / --no-return-page-iterator modes. "
-                f"{_sdk_dest('kwarg', 'item_limit')}"
+                f"{_sdk_dest('kwargs', 'item_limit')}"
             ),
         ),
         click.Option(
@@ -545,7 +545,7 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
                 "Return a single raw payload dict from one HTTP call. "
                 "Equivalent to --no-return-page-iterator. For events get-events "
                 "this yields {data, sync, has_more} so sync tokens stay "
-                f"reachable from shell scripts. {_sdk_dest('kwarg', 'full_payload')}"
+                f"reachable from shell scripts. {_sdk_dest('kwargs', 'full_payload')}"
             ),
         ),
         click.Option(
@@ -556,14 +556,14 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
                 "Custom HTTP request headers merged into the request. VALUE: "
                 "'k1=v1,k2=v2,...', JSON object, or @path. Use cases include "
                 "Asana-Enable/-Disable deprecation opt-in. Not redacted in "
-                f"--debug output — see SECURITY.md. {_sdk_dest('kwarg', 'header_params')}"
+                f"--debug output — see SECURITY.md. {_sdk_dest('kwargs', 'header_params')}"
             ),
         ),
         click.Option(
             ["--request-timeout", "request_timeout"],
             type=float,
             default=None,
-            help=f"Per-request timeout in seconds. {_sdk_dest('kwarg', '_request_timeout')}",
+            help=f"Per-request timeout in seconds. {_sdk_dest('kwargs', '_request_timeout')}",
         ),
     ]
 
@@ -632,11 +632,11 @@ def _path_arg_option(name: str, op: _Operation, reserved: frozenset[str]) -> cli
     if name.endswith("_gid"):
         thing = opt_name.replace("_", " ")
         kw["metavar"] = "GID"
-        kw["help"] = f"{thing.capitalize()} GID, e.g. 1234567890. {_sdk_dest('arg', name)}"
+        kw["help"] = f"{thing.capitalize()} GID, e.g. 1234567890. {_sdk_dest('args', name)}"
     else:
         dp = op.params.get(name)
         desc = _escape_help(dp.description) if dp else ""
-        kw["help"] = f"{desc} {_sdk_dest('arg', name)}".strip()
+        kw["help"] = f"{desc} {_sdk_dest('args', name)}".strip()
     return click.Option(_decls(flag, opt_name, reserved), **kw)
 
 
@@ -652,7 +652,7 @@ def _body_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
     )
     bp = op.params.get("body")
     sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
-    help_text = f"{sdk_desc} {body_format} {_sdk_dest('arg', 'body')}".strip()
+    help_text = f"{sdk_desc} {body_format} {_sdk_dest('args', 'body')}".strip()
     return click.Option(
         _decls("--body", "body", reserved), required=True, metavar="JSON", help=help_text
     )
@@ -670,7 +670,7 @@ def _workspace_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
     """
     wp = op.workspace_positional
     if wp is not None:
-        label = _sdk_dest("arg", wp)
+        label = _sdk_dest("args", wp)
     else:
         wo = op.workspace_opt
         assert wo is not None  # caller invokes this only when a workspace param exists

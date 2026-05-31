@@ -410,13 +410,13 @@ class TestBuiltCommands:
     def test_renamed_positional_help_shows_sdk_arg(self, get_task_cmd: click.Command) -> None:
         # When ``task_gid`` is exposed as ``--task``, the original SDK
         # positional-arg name must appear in the help — labeled
-        # ``(SDK arg: task_gid)`` — so users can map the CLI flag back to the
+        # ``(args: task_gid)`` — so users can map the CLI flag back to the
         # python-asana API. ``task_gid`` is a positional method argument, not
-        # an ``opts`` entry or a kwarg, hence the ``SDK arg`` category.
+        # an ``opts`` entry or a kwarg, hence the ``args`` category.
         task_param = next(
             p for p in get_task_cmd.params if isinstance(p, click.Option) and "--task" in p.opts
         )
-        assert "(SDK arg: task_gid)" in (task_param.help or "")
+        assert "(args: task_gid)" in (task_param.help or "")
 
     def test_opts_param_help_shows_opts_label(self, get_tasks_cmd: click.Command) -> None:
         # Docstring ``opts`` entries are labeled ``(opts: <name>)`` so users
@@ -454,7 +454,7 @@ class TestBuiltCommands:
         )
         assert body_param.metavar == "JSON"
         help_text = body_param.help or ""
-        for needle in ("inline JSON", "@path", "stdin", '"data"', "(SDK arg: body)"):
+        for needle in ("inline JSON", "@path", "stdin", '"data"', "(args: body)"):
             assert needle in help_text, f"--body help missing {needle!r}; got: {help_text!r}"
 
     def test_get_tasks_pagination_options(self, get_tasks_cmd: click.Command) -> None:
@@ -756,7 +756,7 @@ class TestRootGroup:
             for p in upload_attachment_cmd.params
             if isinstance(p, click.Option) and "--multibyte-filenames" in p.opts
         )
-        assert (param.help or "").rstrip().endswith("(asana-api extension)")
+        assert (param.help or "").rstrip().endswith("(asana-api: extension)")
 
     def test_subgroup_help_resolves(self) -> None:
         # Resolving a subgroup must trigger lazy method introspection.

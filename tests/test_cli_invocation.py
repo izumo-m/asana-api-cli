@@ -777,7 +777,7 @@ class TestWorkspaceResolution:
             return_value=_page([]),
         )
         result = make_runner().invoke(cmd, [])
-        # exit 2 = user-input error (workspace missing). docs/exit-codes.md
+        # exit 2 = user-input error (workspace missing). docs/usage.md
         # — CLI does not set exit 1 for user-input errors; exit 1 is
         # reserved for the SDK call exception path (``--exception-output=none``).
         assert result.exit_code == 2
@@ -800,7 +800,7 @@ def _api_exception(status: int, body: str) -> Exception:
 class TestErrorPathExitCodes:
     """End-to-end verification of the v3.1 exit code policy.
 
-    Reference: docs/exit-codes.md. Default ``--exception-output=none``
+    Reference: docs/usage.md. Default ``--exception-output=none``
     catches the SDK exception, writes ``format_exception_only``
     (qualified class + ``__str__``, no traceback) to stderr, and exits
     1. Opting into an envelope format produces a machine-readable
@@ -909,7 +909,7 @@ class TestErrorPathExitCodes:
             cmd,
             ["--exception-output", "json", "--exception-query", "bad((", "--task", "T1"],
         )
-        # exit 2 = user-input error (bad jq syntax). docs/exit-codes.md
+        # exit 2 = user-input error (bad jq syntax). docs/usage.md
         assert result.exit_code == 2
         assert "Invalid jq expression" in full_output(result)
 

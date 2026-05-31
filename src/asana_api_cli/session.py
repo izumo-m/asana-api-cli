@@ -28,23 +28,20 @@ DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
 
 
 class MultibyteFilenameSupport:
-    """Context manager that augments ``urllib3.fields.RequestField`` to
-    emit the RFC 5987 ``filename*=UTF-8''<percent-encoded>`` parameter of
-    ``Content-Disposition`` whenever a multipart field has a non-ASCII
-    filename.
+    """Make multipart uploads round-trip filenames with non-ASCII characters.
 
-    Asana's attachment endpoint requires the ``filename*=`` form to
-    decode non-ASCII filenames correctly; without it the server treats
-    the ``filename="..."`` value as a literal and stores it as mojibake
-    or percent-encoded text. The official ``python-asana`` SDK (via
-    urllib3's default multipart formatter) does not emit ``filename*=`` —
-    this is a long-standing upstream gap (Asana forum discussion since
-    2022-12, unresolved as of 2026-05).
+    In ``python-asana`` 5.2.4 (the latest version checked, and likely later
+    ones too), uploading a file whose name has characters outside ASCII
+    stores a garbled (mojibake) name on Asana: the SDK's multipart encoder
+    emits only ``filename="..."`` and omits the RFC 5987 ``filename*=``
+    parameter the server needs to decode them. This context manager patches
+    ``urllib3.fields.RequestField.make_multipart`` to add
+    ``filename*=UTF-8''<percent-encoded>`` for such names.
 
-    Off by default to preserve strict SDK parity. The CLI enables it
-    when ``--multibyte-filenames`` is passed to an upload command (e.g.
-    ``attachments create-attachment-for-object`` — the flag is exposed
-    only on upload commands); library callers can use it standalone::
+    Off by default to preserve strict SDK parity. The CLI enables it when
+    ``--multibyte-filenames`` is passed to an upload command (e.g.
+    ``attachments create-attachment-for-object``); library callers can use
+    it standalone::
 
         with MultibyteFilenameSupport():
             # urllib3-based uploads in this block emit filename*=

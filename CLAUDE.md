@@ -20,6 +20,7 @@ Python CLI wrapping the `python-asana` SDK. The command tree is built at runtime
 ## Read before working in these areas
 
 - Editing `src/asana_api_cli/*.py` or any CLI surface change → `docs/architecture.md`
+- Changing an option's user-facing behavior (options, output formats, exit codes) → `docs/usage.md`
 - Adding / renaming / changing the SDK mapping of a built-in CLI option → also update `docs/cli-sdk-mapping.md`
 - Publishing to PyPI (`chore: release X.Y.Z`) → `docs/release.md`
 - Bumping the `asana` SDK version → `docs/development.md` §Bumping the asana SDK

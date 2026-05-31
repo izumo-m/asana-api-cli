@@ -505,7 +505,7 @@ class TestHandleApiExceptionQuery:
             _handle_exception(
                 self._make_exception(), exception_output="json", exception_query="bad(("
             )
-        # exit 2 = user-input error (jq syntax). docs/exit-codes.md.
+        # exit 2 = user-input error (jq syntax). docs/usage.md.
         assert exc_info.value.code == 2
         # The error message ("Invalid jq expression: ...") is the one
         # consistently-stderr path: a user-input error that *isn't* the
@@ -824,7 +824,7 @@ class TestFormatOutputExitCodes:
 
     Anchors the exit-code policy: ``_format_output`` never produces
     exit 1 by itself — exit 1 is reserved for the ``--exception-output=none``
-    SDK exception path in :func:`formatted` (see ``docs/exit-codes.md``).
+    SDK exception path in :func:`formatted` (see ``docs/usage.md``).
     """
 
     def test_invalid_jq_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:

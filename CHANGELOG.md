@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   412 sync-token body in events polling) is readable from stderr without extra
   flags. The other formats also render a `{exception, status, reason, body,
   headers}` envelope on **stdout** and exit `3`; `--exception-query` filters that
-  envelope through `jq`. See [`docs/exit-codes.md`](docs/exit-codes.md) and
+  envelope through `jq`. See [`docs/usage.md`](docs/usage.md#error-output) and
   [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 
 - **`--output none`** suppresses the success payload for side-effect-only
@@ -67,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ever affected multipart uploads. Still opt-in, off by default.
 
 - **Failure exit codes changed** — `1` / `2` / `3` by error class. See
-  [`docs/exit-codes.md`](docs/exit-codes.md).
+  [`docs/usage.md`](docs/usage.md#exit-codes).
 
 - **Nested values in `--output text` / `csv` / `table`** now render as JSON
   (`{"a":"b"}`) rather than Python `repr` (`{'a': 'b'}`). Same for

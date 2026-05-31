@@ -165,147 +165,32 @@ asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload
 asana-api tasks get-task --task <TASK_GID>
 
 # Create a task (body is a JSON string)
-asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PID>"]}}'
+asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PROJECT_GID>"]}}'
 
 # Output formats — pair non-JSON formats with `--query '.data'` to unwrap the
 # `{"data": [...]}` envelope into one row per item.
-asana-api tasks get-tasks --project <PID> --query '.data' --output table
-asana-api tasks get-tasks --project <PID> --query '.data' --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output table
+asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output csv
 
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
 # Windows, which otherwise displays non-ASCII characters as garbled text.
-asana-api tasks get-tasks --project <PID> --output csv --csv-bom > tasks.csv
+asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # --output none suppresses the success payload — handy for side-effect-only
 # calls (delete/update) where only the exit code matters. The `--query` pass
 # still runs, so jq syntax errors are caught even when output is silenced.
-asana-api tasks delete-task --task <GID> --output none
+asana-api tasks delete-task --task <TASK_GID> --output none
 ```
 
-See [Pagination](#pagination) for fetching across pages and
-[Global options](#global-options) for `--debug`, `--access-token`, etc.
+For the complete option reference — global options, pagination, output formats,
+workspace resolution, error handling, and exit codes — see
+[`docs/usage.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/usage.md).
 
-## Workspace resolution
-
-A subset of endpoints — those whose SDK signature takes a positional
-`workspace_gid` (e.g. `projects get-projects-for-workspace`,
-`tags create-tag-for-workspace`) — require a workspace. For those
-commands, the CLI resolves it in this order:
-
-1. `--workspace <GID>` on the command
-2. `ASANA_DEFAULT_WORKSPACE` environment variable
-
-For commands where workspace is an optional filter (e.g.
-`tasks get-tasks`, `goals get-goals`), the env-var fallback is
-**not** used — pass `--workspace` explicitly if needed. This avoids
-ambiguity with alternative scope parameters like `--project` that
-the Asana API accepts in place of workspace.
-
-## Pagination
-
-Paginatable commands like `tasks get-tasks` expose every pagination input
-of the `python-asana` SDK as a CLI flag. Each flag maps 1:1 to an SDK
-`Configuration` property, `opts` key, or method kwarg, so you can probe
-SDK behavior from the shell before writing any Python.
-
-| CLI flag | SDK input | Effect |
-|----------|-----------|--------|
-| (none) | — | SDK default: walks every page automatically and outputs a flat JSON list of items |
-| `--limit N` | `opts["limit"]` | Per-page size sent to the server (Asana API requires 1-100) |
-| `--offset <TOKEN>` | `opts["offset"]` | Pagination cursor (the `next_page.offset` from a previous response) |
-| `--page-limit N` | `Configuration.page_limit` | Same as `--limit` via Configuration (default: 100). Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
-| `--item-limit N` | kwarg `item_limit=N` | Stop after N items have been collected. Silently ignored when `--no-return-page-iterator` or `--full-payload` is set |
-| `--return-page-iterator` / `--no-return-page-iterator` | `Configuration.return_page_iterator` | Toggle the SDK page iterator (default: enabled). `--no-return-page-iterator` disables auto-pagination — the command runs one HTTP request and outputs the raw `{data, next_page}` dict |
-| `--full-payload` | kwarg `full_payload=True` | Same effect as `--no-return-page-iterator` (per-call kwarg form) |
-
-```bash
-# Default: walk every page, return a flat list of items
-asana-api tasks get-tasks --project <PID>
-
-# Cap the result to the first 250 items
-asana-api tasks get-tasks --project <PID> --item-limit 250
-
-# Single HTTP call: one page + next_page cursor
-asana-api tasks get-tasks --project <PID> --limit 100 --no-return-page-iterator
-
-# Resume from a cursor
-asana-api tasks get-tasks --project <PID> --offset <TOKEN>
-```
-
-### Deprecated flags (v2.x → v3.0)
-
-The following v2 flags are retained as deprecation aliases. Each emits a
-stderr warning and forwards to the corresponding v3 flag; they will be
-removed in a future release.
-
-| Deprecated | Replacement |
-|------------|-------------|
-| `--all-items` | (no-op; walking every page is now the default) |
-| `--page-size N` | `--limit N` |
-| `--max-items N` | `--item-limit N` |
-
-If both a deprecated alias and its replacement are given (e.g.
-`--page-size 50 --limit 100`), the replacement takes precedence and
-the deprecated value is ignored.
-
-## Global options
-
-Global options work at any level of the command tree, and the later
-one wins when the same option appears more than once:
-
-```bash
-asana-api --debug tasks get-tasks --project <PID>
-asana-api tasks get-tasks --project <PID> --debug
-```
-
-Run `asana-api --help` for the full list with defaults, or see
-[`docs/cli-sdk-mapping.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/cli-sdk-mapping.md)
-for the SDK `Configuration` property each flag maps to.
-
-Coverage at a glance:
-
-- **Auth**: `--access-token` (defaults to `$ASANA_ACCESS_TOKEN`)
-- **Endpoint / network**: `--host`, `--proxy`, `--connection-pool-maxsize`
-- **TLS / mTLS**: `--verify-ssl` / `--no-verify-ssl`, `--ssl-ca-cert`, `--cert-file`, `--key-file`, `--assert-hostname`
-- **Retry**: `--retry-strategy` (shorthand, JSON object, or `@file`)
-- **Logging / debug**: `--debug`, `--logger-format`, `--logger-file`
-- **File handling**: `--temp-folder-path`, `--safe-chars-for-path-param`
-
-`--request-timeout`, `--header-params`, `--item-limit`, and `--full-payload`
-are **not** global: they are per-call SDK kwargs (the method `all_params`),
-exposed as options on every command and forwarded straight to the SDK call.
-
-The output-formatting flags `--output` / `--query` / `--csv-bom` and the
-structured-error flags `--exception-output {none|json|text|csv|table}` /
-`--exception-query EXPR` (see
-[`docs/exit-codes.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/exit-codes.md))
-are likewise **not** global: they are per-command leaf options bound to the
-single SDK call, so they must appear **after** the command path, not before it.
-
-`--multibyte-filenames` is likewise **not** global: it is an asana-api
-extension exposed only on file-upload commands (e.g. `attachments
-create-attachment-for-object`). Pass it when an attachment's filename
-contains non-ASCII characters so the upload sends the RFC 5987 `filename*=`
-parameter; off by default to match the SDK.
-
-A few worth highlighting:
-
-```bash
-# Print HTTP request/response traces to stderr (Authorization masked)
-asana-api --debug tasks get-tasks --project <PID>
-
-# Tune the SDK retry policy from the shell
-asana-api --retry-strategy 'total=5,backoff_factor=1.5' tasks get-tasks --project <PID>
-
-# Catch SDK exceptions as a structured envelope on stdout (exit 3)
-asana-api tasks get-task --task <GID> --exception-output json
-```
-
-Asana only accepts Bearer-token authentication (personal access token,
-Service Account, or OAuth), so authenticate with `--access-token` or
+Asana only accepts Bearer-token authentication (personal access token, Service
+Account, or OAuth), so authenticate with `--access-token` or
 `$ASANA_ACCESS_TOKEN`. The SDK's inert `username` / `password` / `api_key` /
-`api_key_prefix` Configuration fields (HTTP basic auth / deprecated API keys,
-which Asana does not use) are **not** exposed — see
+`api_key_prefix` fields (HTTP basic auth / deprecated API keys, which Asana does
+not use) are **not** exposed — see
 [`docs/sdk-deviations.md`](https://github.com/izumo-m/asana-api-cli/blob/main/docs/sdk-deviations.md).
 
 ## Development
