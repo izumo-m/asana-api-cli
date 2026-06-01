@@ -132,7 +132,7 @@ runtime = _Runtime()
 # Configuration knobs applied from ``runtime`` onto ``asana.Configuration`` in
 # ``AsanaSession.__init__``. Each entry is ``(attr, apply_when_truthy)``: the
 # Configuration attribute name matches the ``_Runtime`` field 1:1, and the
-# condition is preserved verbatim from the original per-knob chain.
+# condition follows each knob's SDK semantics.
 # ``apply_when_truthy`` is True for only the four URL/directory strings where an
 # empty value is meaningless (``host`` / ``proxy`` / ``ssl_ca_cert`` /
 # ``temp_folder_path``, skipped when empty); it is False for every other field —
@@ -181,8 +181,8 @@ class AsanaSession:
 
         # Apply runtime values to Configuration from the ``_CONFIG_KNOBS`` table
         # (module level). Each knob's Configuration attribute matches its
-        # ``_Runtime`` field name, and ``apply_when_truthy`` preserves the
-        # original per-knob condition verbatim (truthy for path/host-like
+        # ``_Runtime`` field name, and ``apply_when_truthy`` encodes each knob's
+        # condition (truthy for path/host-like
         # strings, "is not None" otherwise — so an explicit ``verify_ssl=False``
         # still applies, while an empty ``--ssl-ca-cert`` is skipped). Unspecified
         # values leave the SDK default in place (e.g. return_page_iterator / page_limit
