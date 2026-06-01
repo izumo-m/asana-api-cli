@@ -720,11 +720,10 @@ class TestArgumentForwarding:
 class TestMultibyteFilenamesUploadFlag:
     """``--multibyte-filenames`` is a per-command flag on upload commands only.
 
-    It sets ``runtime.multibyte_filenames``, which ``AsanaSession`` reads to
-    install ``MultibyteFilenameSupport`` (the multipart filename patch) for the
-    duration of the call. These tests observe the patch state *during* the SDK
-    call — not just the post-invocation ``runtime`` value — so an ordering bug
-    (the session reading the flag before the callback sets it) cannot pass.
+    Its callback installs ``MultibyteFilenameSupport`` (the multipart filename
+    patch) via ``ctx.with_resource`` and uninstalls it at command teardown.
+    These tests observe the patch state *during* the SDK call, so an ordering
+    bug (the patch not active when the multipart body is built) cannot pass.
     Mirrors ``TestDebugRedactorLifecycle``. (Absence from the global flags /
     non-upload commands is covered in test_cli.py.)
     """
@@ -770,8 +769,7 @@ class TestMultibyteFilenamesUploadFlag:
         )
         assert result.exit_code == 0, full_output(result)
         assert installed_during is True  # patch was active while the SDK call ran
-        assert cleaned_after is True  # session uninstalled it on exit (no leak)
-        assert runtime.multibyte_filenames is True
+        assert cleaned_after is True  # uninstalled at command teardown (no leak)
 
     def test_absent_flag_does_not_install_patch(self, monkeypatch: pytest.MonkeyPatch) -> None:
         result, installed_during, cleaned_after = self._invoke_capturing_patch_state(
@@ -780,7 +778,6 @@ class TestMultibyteFilenamesUploadFlag:
         assert result.exit_code == 0, full_output(result)
         assert installed_during is False  # no patch installed when the flag is absent
         assert cleaned_after is True
-        assert runtime.multibyte_filenames is False
 
 
 # ---------------------------------------------------------------------------

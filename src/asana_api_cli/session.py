@@ -38,9 +38,9 @@ class MultibyteFilenameSupport:
 
     Off by default to preserve strict SDK parity. The CLI enables it when
     ``--multibyte-filenames`` is passed to an upload command (e.g.
-    ``attachments create-attachment-for-object``); ``AsanaSession`` then holds
-    the patch open for the duration of that command. The context-manager form
-    scopes the patch to a block::
+    ``attachments create-attachment-for-object``): that option's callback enters
+    this context manager via ``ctx.with_resource``, scoping the patch to the
+    command. The context-manager form scopes the patch to a block::
 
         with MultibyteFilenameSupport():
             # urllib3-based uploads in this block emit filename*=
@@ -102,11 +102,6 @@ class _Runtime:
     ssl_ca_cert: str | None = None
     access_token: str | None = None
     temp_folder_path: str | None = None
-    # Set by the upload command's per-command ``--multibyte-filenames`` flag
-    # (``cli.py:_make_command``), not a global option. Kept here because the
-    # session reads it to decide whether to install ``MultibyteFilenameSupport``;
-    # non-upload commands leave it at this default.
-    multibyte_filenames: bool = False
     logger_format: str | None = None
     logger_file: str | None = None
     cert_file: str | None = None
@@ -165,12 +160,11 @@ class AsanaSession:
     """Session holding an ApiClient from the official asana SDK.
 
     Use it as a context manager. The global side effects — the ``--debug``
-    HTTP-log redactor, the ``http.client`` debuglevel flip the SDK's debug
-    setter performs, and the multibyte-filename multipart patch — are
-    installed on ``__enter__`` and reversed on ``__exit__``, so they are in
-    effect only for the duration of the ``with`` block. Constructing a
-    session without entering it builds a plain ApiClient and mutates no
-    process globals.
+    HTTP-log redactor and the ``http.client`` debuglevel flip the SDK's debug
+    setter performs — are installed on ``__enter__`` and reversed on
+    ``__exit__``, so they are in effect only for the duration of the ``with``
+    block. Constructing a session without entering it builds a plain ApiClient
+    and mutates no process globals.
 
     Internal class: reached only through the CLI's
     ``with AsanaSession.from_env() as session:`` and carrying no stability
@@ -205,17 +199,16 @@ class AsanaSession:
             base_retry = config.retry_strategy
             config.retry_strategy = base_retry.new(**runtime.retry_strategy_overrides)
 
-        # Global side effects (the debug redactor, the ``http.client``
-        # debuglevel flip, and the multibyte multipart patch) are installed by
-        # ``open()`` (on ``__enter__``) and reversed by ``close()`` (on
+        # Global side effects (the debug redactor and the ``http.client``
+        # debuglevel flip) are installed by ``open()`` (on ``__enter__``) and
+        # reversed by ``close()`` (on
         # ``__exit__``), so merely constructing a session never mutates process
         # globals. ApiClient construction stays here because it touches no
         # globals — a failure just propagates with nothing to unwind.
-        # Pre-initialize the patch handles to ``None`` so ``open()``'s cleanup
-        # and ``close()`` can tell which patches actually got installed.
+        # Pre-initialize the redactor handle to ``None`` so ``open()``'s cleanup
+        # and ``close()`` can tell whether it actually got installed.
         self._config = config
         self._redactor: HttpClientAuthRedactor | None = None
-        self._multibyte_filenames: MultibyteFilenameSupport | None = None
         # Prior ``http.client.HTTPConnection.debuglevel`` and the prior levels
         # of the asana/urllib3 loggers, captured by ``open()`` only when this
         # session turns debug on (the SDK ``debug`` setter raises both).
@@ -241,10 +234,9 @@ class AsanaSession:
 
     def open(self) -> None:
         """Install this session's global side effects: the ``http.client``
-        debuglevel flip plus the ``Authorization`` redactor (under
-        ``--debug``) and the multibyte-filename multipart patch (under
-        ``--multibyte-filenames``). The reverse of :meth:`close`; ``__enter__``
-        calls it so the globals live only for the ``with`` block.
+        debuglevel flip plus the ``Authorization`` redactor, both under
+        ``--debug``. The reverse of :meth:`close`; ``__enter__`` calls it so the
+        globals live only for the ``with`` block.
 
         If a later ``install()`` raises after an earlier one already
         succeeded, every side effect installed so far is reversed (via
@@ -273,9 +265,6 @@ class AsanaSession:
                 self._config.debug = True
                 self._redactor = HttpClientAuthRedactor()
                 self._redactor.install()
-            if runtime.multibyte_filenames:
-                self._multibyte_filenames = MultibyteFilenameSupport()
-                self._multibyte_filenames.install()
         except Exception:
             self.close()
             raise
@@ -283,8 +272,7 @@ class AsanaSession:
     def close(self) -> None:
         """Reverse every global side effect :meth:`open` installed: the
         ``http.client`` debuglevel flip and the asana/urllib3 logger levels the
-        SDK debug setter raised, the ``Authorization`` redactor, and the
-        multibyte-filename multipart patch.
+        SDK debug setter raised, and the ``Authorization`` redactor.
 
         Safe to call multiple times, and a no-op if :meth:`open` never ran.
         Prefer using the session as a context manager
@@ -305,9 +293,6 @@ class AsanaSession:
         if self._redactor is not None:
             self._redactor.uninstall()
             self._redactor = None
-        if self._multibyte_filenames is not None:
-            self._multibyte_filenames.uninstall()
-            self._multibyte_filenames = None
 
     def __enter__(self) -> AsanaSession:
         self.open()

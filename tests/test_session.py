@@ -150,37 +150,6 @@ class TestAsanaSessionSideEffectLifecycle:
         assert http.client.__dict__.get("print") is pre_print
         assert http.client.HTTPConnection.debuglevel == 0
 
-    def test_open_failure_in_later_patch_uninstalls_earlier_patch(
-        self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """If a *later* ``install()`` raises after the redactor is already
-        installed, ``open()`` must uninstall the redactor (and restore the
-        debuglevel) before re-raising. ``__enter__`` delegates to ``open()``
-        and cannot fall back on ``__exit__`` for this, since Python skips
-        ``__exit__`` when ``__enter__`` raises. Guards a global
-        ``http.client.print`` leak when, e.g., a urllib3 change breaks
-        ``MultibyteFilenameSupport``.
-        """
-
-        def _boom(_self: MultibyteFilenameSupport) -> None:
-            raise RuntimeError("simulated multibyte patch failure")
-
-        monkeypatch.setattr(MultibyteFilenameSupport, "install", _boom)
-        monkeypatch.setattr(runtime, "debug", True)
-        monkeypatch.setattr(runtime, "multibyte_filenames", True)
-        http.client.HTTPConnection.debuglevel = 0
-
-        pre_print = http.client.__dict__.get("print")
-        with (
-            pytest.raises(RuntimeError, match="simulated multibyte patch failure"),
-            AsanaSession(token="x" * 20),
-        ):
-            pass
-        # The redactor installed before the failing patch was rolled back,
-        # and the debuglevel flip with it.
-        assert http.client.__dict__.get("print") is pre_print
-        assert http.client.HTTPConnection.debuglevel == 0
-
 
 # ---------------------------------------------------------------------------
 # MultibyteFilenameSupport
@@ -212,7 +181,7 @@ class TestMultibyteFilenameSupport:
     so that multipart fields whose filename contains non-ASCII characters
     also carry the RFC 5987 ``filename*=UTF-8''<percent-encoded>``
     parameter. Off by default to preserve strict SDK parity; opt-in via
-    ``--multibyte-filenames`` / ``runtime.multibyte_filenames``."""
+    ``--multibyte-filenames``."""
 
     def test_context_manager_installs_and_uninstalls(self, _clean_request_field: None) -> None:
         original = RequestField.make_multipart
@@ -286,23 +255,6 @@ class TestMultibyteFilenameSupport:
         assert disposition is not None
         assert 'name="parent"' in disposition
         assert "filename*=" not in disposition
-
-    def test_asana_session_installs_patch_on_enter_and_reverses_on_exit(
-        self, _clean_request_field: None, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """With ``--multibyte-filenames``, ``AsanaSession`` installs the
-        ``RequestField.make_multipart`` patch on ``__enter__`` and removes it
-        on ``__exit__`` — never merely on construction.
-        """
-        monkeypatch.setattr(runtime, "multibyte_filenames", True)
-        original = RequestField.make_multipart
-
-        session = AsanaSession(token="x" * 20)
-        # Construction alone does not patch make_multipart.
-        assert RequestField.make_multipart is original
-        with session:
-            assert RequestField.make_multipart is not original
-        assert RequestField.make_multipart is original
 
 
 # ---------------------------------------------------------------------------

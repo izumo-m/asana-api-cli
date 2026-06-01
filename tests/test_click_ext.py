@@ -209,8 +209,6 @@ class TestGlobalOptionNamesInventory:
             # Configuration-backed iterator knobs stay global. The per-call
             # kwargs (item_limit / full_payload / header_params /
             # _request_timeout) are per-command options now, not globals.
-            # multibyte_filenames is also no longer global — it is a per-command
-            # option on upload commands (see test_cli.py).
             "return_page_iterator",
             "page_limit",
             # The error output controls (exception_output / exception_query) are NOT

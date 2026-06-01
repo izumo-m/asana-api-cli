@@ -61,7 +61,7 @@ from asana_api_cli.click_ext import (
 from asana_api_cli.formatter import formatted, formatter_flag_names
 from asana_api_cli.session import (
     AsanaSession,
-    runtime,
+    MultibyteFilenameSupport,
 )
 from asana_api_cli.structured_arg import (
     click_callback,
@@ -819,6 +819,16 @@ def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) ->
     return item_limit
 
 
+def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """``--multibyte-filenames`` callback: install the RFC 5987 multipart patch
+    for this command and uninstall it at context teardown. ``with_resource``
+    enters the context manager now (install) and exits it when the command
+    finishes (uninstall), so the patch is scoped to this one invocation.
+    """
+    if value:
+        ctx.with_resource(MultibyteFilenameSupport())
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method.
 
@@ -882,12 +892,16 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # only affects multipart uploads, so it is exposed solely on upload commands
     # (``does_upload``) rather than as a global flag. Off by default to preserve
     # strict SDK parity (the SDK emits ``filename=`` only); see sdk-deviations.md.
+    # Its callback installs the patch and scopes it to this command via
+    # ``ctx.with_resource``; ``expose_value=False`` keeps it out of the opts dict.
     if does_upload:
         options.append(
             click.Option(
                 ["--multibyte-filenames", "multibyte_filenames"],
                 is_flag=True,
                 default=False,
+                callback=_multibyte_filenames_callback,
+                expose_value=False,
                 help=(
                     "Emit RFC 5987 filename*=UTF-8'' on this multipart upload. "
                     "Required when the --file name contains non-ASCII characters; "
@@ -935,13 +949,6 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         full_payload = kwargs.pop("full_payload", False)
         header_params = kwargs.pop("header_params", None)
         request_timeout = kwargs.pop("request_timeout", None)
-
-        # Per-command extension on upload commands only: pop the toggle (so it
-        # does not leak into the opts dict) and set the runtime flag the session
-        # reads when deciding whether to install MultibyteFilenameSupport. Other
-        # commands never expose it, so their runtime value stays the default.
-        if does_upload:
-            runtime.multibyte_filenames = kwargs.pop("multibyte_filenames", False)
 
         # Deprecated aliases (--all-items / --page-size / --max-items): warn and
         # fold into their canonical replacements. Isolated in a helper so their

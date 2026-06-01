@@ -37,8 +37,8 @@ In the **"SDK destination"** column:
   construction (e.g. `ApiClient.user_agent`, `ApiClient.set_default_header`),
   not on `Configuration`. Session-wide: rides every request the client makes.
 - *Per-call kwarg* — forwarded through `_make_command` as a method kwarg.
-- *Patch* — a monkey-patch on an SDK-adjacent module, installed while the
-  session is open (`AsanaSession.open` → `close`, i.e. for the `with` block).
+- *Patch* — a monkey-patch on an SDK-adjacent module, installed via the option's
+  callback (`ctx.with_resource`) and scoped to the command's context teardown.
 - *(none)* — no SDK counterpart (CLI-only; cataloged in
   [`sdk-deviations.md`](sdk-deviations.md), behavior in [`usage.md`](usage.md)).
 
@@ -122,7 +122,7 @@ runtime by `_Operation.does_upload` (the sole such command today is
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
-| `--multibyte-filenames` | *(none)* | *Patch*: installs `MultibyteFilenameSupport` (RFC 5987 `filename*=`), set via `runtime` and installed on session entry (`AsanaSession.open`). Behavior in [`usage.md`](usage.md#file-uploads); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
+| `--multibyte-filenames` | *(none)* | *Patch*: installs `MultibyteFilenameSupport` (RFC 5987 `filename*=`) from its option callback via `ctx.with_resource`, scoped to the command. Behavior in [`usage.md`](usage.md#file-uploads); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
 
 ## Conversion rules
 
