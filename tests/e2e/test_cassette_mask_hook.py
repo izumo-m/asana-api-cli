@@ -10,8 +10,8 @@ teardown for the test has finished.
 
 * U-1..U-4 cover the hook wiring itself.
 * The ``mask_users_in_batch_subresponses`` cases (N-2 / N-3 from the
-  spec, plus a positive baseline) verify that the first L3 helper
-  masks only what it should.
+  spec, a positive baseline, and a non-batch-interaction negative
+  case) verify that the first L3 helper masks only what it should.
 """
 
 from __future__ import annotations

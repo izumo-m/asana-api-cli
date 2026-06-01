@@ -6,9 +6,11 @@ Three concerns live here:
    import path, so ``--help`` and tab completion do not need to import every
    ``*Api`` module up front.
 
-2. ``GroupWithGlobalOptions`` / ``CommandWithGlobalOptions`` — accept the root
-   group's options (``--debug``, ``--access-token``, ...) at any level of the
-   command tree, so ``asana-api tasks get-tasks --debug`` works the same as
+2. ``GroupWithGlobalOptions`` / ``CommandWithGlobalOptions`` — accept the
+   global options (``--debug``, ``--access-token``, ...) — declared once in
+   ``_global_option_sections`` and applied identically to the root group and
+   every subcommand — at any level of the command tree, so
+   ``asana-api tasks get-tasks --debug`` works the same as
    ``asana-api --debug tasks get-tasks``. Values whose source is the command
    line are written to the shared ``runtime`` singleton; defaults are ignored
    so they cannot clobber values already set at a higher level.
@@ -58,10 +60,12 @@ def _global_option_sections() -> list[tuple[str, list[click.Option]]]:
     Each global option is declared here exactly once, grouped by the ``--help``
     section it renders under. The root command and every subcommand draw their
     global options from this one builder (via :func:`_make_global_option_params`),
-    so there is no second declaration site to keep in sync — the wording a user
-    sees is identical at any level of the tree by construction. ``--help``
-    section order and the option order within a section both derive from this
-    list (see :data:`GLOBAL_OPTION_GROUPS`).
+    so there is no second declaration site to keep in sync — every command
+    exposes byte-identical global-option definitions (flag spelling, help,
+    default, flag-ness, type) by construction. (How they *render* differs by
+    level — see :class:`_GlobalOptionsMixin`.) ``--help`` section order and the
+    option order within a section both derive from this list (see
+    :data:`GLOBAL_OPTION_GROUPS`).
 
     Fresh ``click.Option`` instances are returned on every call: click stores
     per-command state on Option objects, so the same instance must not be shared
@@ -235,8 +239,10 @@ def _global_option_sections() -> list[tuple[str, list[click.Option]]]:
                     is_flag=True,
                     default=False,
                     help=(
-                        "Print HTTP request/response to stderr for troubleshooting. "
-                        "(Configuration: debug)"
+                        "Print the SDK's HTTP request/response debug output for "
+                        "troubleshooting, with the Authorization header masked. As the "
+                        "SDK emits it, the wire trace (headers) goes to stdout and the "
+                        "connection/response log to stderr. (Configuration: debug)"
                     ),
                 ),
                 click.Option(
@@ -305,7 +311,7 @@ GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
 
 # Shorter labels used in the compact (non-root) Global Options table.
 # The first column's width is driven by the longest label, so trimming the
-# few longest ones widens the right-hand option column on narrow terminals.
+# longest one widens the right-hand option column on narrow terminals.
 _COMPACT_SECTION_LABELS: dict[str, str] = {
     "Pagination / iteration": "Pagination",
 }
@@ -477,7 +483,7 @@ class _GlobalOptionsMixin:
 
 
 class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):
-    """A ``click.Command`` that also accepts the root group's global options."""
+    """A ``click.Command`` that also accepts the shared global options."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -490,7 +496,7 @@ class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):
 
 
 class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):
-    """A ``click.Group`` that also accepts the root group's global options.
+    """A ``click.Group`` that also accepts the shared global options.
 
     Children created via ``@group.command(...)`` default to
     ``CommandWithGlobalOptions`` so they inherit the same behavior.

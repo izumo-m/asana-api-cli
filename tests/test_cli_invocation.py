@@ -306,7 +306,7 @@ class TestDeprecationAliases:
 
 
 # ---------------------------------------------------------------------------
-# Debug redactor lifecycle across pagination
+# Global option validation
 # ---------------------------------------------------------------------------
 
 
@@ -367,16 +367,18 @@ class TestTriStateToggles:
     explicit True (user passed the positive form), explicit False (user
     passed the negative form), and unset (user passed neither).
 
-    ``main()`` guards the unset case so the runtime singleton is not
-    clobbered with ``None`` over a value an earlier code path may have
-    set. ``AsanaSession`` mirrors the guard so it only writes
-    ``config.<prop>`` when the runtime carries an explicit value.
+    ``_consume_global_options`` (in ``click_ext``) guards the unset case: it
+    writes a global into ``runtime`` only when its parameter source is
+    ``COMMANDLINE``, so an unset toggle (its ``None`` default) never clobbers a
+    value an earlier code path may have set. ``AsanaSession`` mirrors the guard
+    so it only writes ``config.<prop>`` when the runtime carries an explicit
+    value.
 
-    These tests invoke ``main`` with a subcommand path ending in
-    ``--help``: Click runs the root group callback (which writes to
-    ``runtime``) before descending into the subcommand, and the leaf
-    ``--help`` then short-circuits without touching the SDK — exactly
-    what we want for an option-plumbing test.
+    These tests invoke ``main`` with a subcommand path ending in ``--help``:
+    Click runs the root group's invoke (``GroupWithGlobalOptions.invoke`` →
+    ``_consume_global_options``, which writes to ``runtime``) before descending
+    into the subcommand, and the leaf ``--help`` then short-circuits without
+    touching the SDK — exactly what we want for an option-plumbing test.
     """
 
     def test_verify_ssl_explicit_true(self) -> None:
@@ -396,11 +398,12 @@ class TestTriStateToggles:
         assert runtime.verify_ssl is False
 
     def test_verify_ssl_unset_does_not_clobber_existing_runtime_value(self) -> None:
-        """Regression for the round-1 review fix: when ``main()`` runs
-        without either side of the toggle, it must NOT overwrite a value
-        already in ``runtime.verify_ssl`` (set by a higher-priority source).
-        Pre-set to False, invoke main with no toggle on the command line;
-        the guard must leave it intact."""
+        """Regression: when neither side of the toggle is passed,
+        ``_consume_global_options`` must NOT overwrite a value already in
+        ``runtime.verify_ssl`` (set by a higher-priority source) — a ``None``
+        default is not ``COMMANDLINE``-sourced, so the guard skips it. Pre-set
+        to False, invoke main with no toggle on the command line; the guard
+        must leave it intact."""
         from asana_api_cli.cli import main
 
         runtime.verify_ssl = False
@@ -425,8 +428,9 @@ class TestTriStateToggles:
         assert runtime.assert_hostname is False
 
     def test_assert_hostname_unset_does_not_clobber_existing_runtime_value(self) -> None:
-        """Same regression shape as ``verify_ssl`` — round-2 review added
-        the ``is not None`` guard to ``main()`` for symmetry."""
+        """Same regression shape as ``verify_ssl`` — ``_consume_global_options``
+        skips a ``None`` default (not ``COMMANDLINE``-sourced), so an unset
+        toggle never overwrites a pre-existing ``runtime`` value."""
         from asana_api_cli.cli import main
 
         runtime.assert_hostname = True
@@ -585,10 +589,16 @@ class TestAccessTokenGuard:
         assert runtime.access_token == "new-token"
 
 
+# ---------------------------------------------------------------------------
+# Debug redactor lifecycle across pagination
+# ---------------------------------------------------------------------------
+
+
 class TestDebugRedactorLifecycle:
     """The http.client debug redactor must stay installed for the duration
     of every paginated request, including the lazy per-page HTTP calls made
-    while the formatter iterates the SDK's PageIterator."""
+    while ``cli.py:inner_callback`` consumes the SDK's iterator inside the
+    session context."""
 
     def test_all_items_with_debug_keeps_redactor_installed_during_iteration(
         self, monkeypatch: pytest.MonkeyPatch
@@ -877,8 +887,10 @@ class TestErrorPathExitCodes:
     catches the SDK exception, writes ``format_exception_only``
     (qualified class + ``__str__``, no traceback) to stderr, and exits
     1. Opting into an envelope format produces a machine-readable
-    envelope on stdout (exit 3). User-input errors (bad jq,
-    query-without-format) are exit 2.
+    envelope on stdout (exit 3). A bad jq expression is a user-input error
+    (exit 2); pairing ``--exception-query`` with the default
+    ``--exception-output=none`` only warns and still exits 1 (the filter is
+    ignored, so the underlying exception result is preserved).
     """
 
     def test_api_error_default_none_renders_without_traceback(

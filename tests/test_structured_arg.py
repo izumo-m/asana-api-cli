@@ -33,8 +33,8 @@ class TestJsonForm:
 
     def test_only_brace_triggers_json_form(self) -> None:
         # Inputs starting with '[' fall through to shorthand on purpose;
-        # JSON arrays are not a valid Configuration value for any of the
-        # three structured options.
+        # JSON arrays are not a valid Configuration value for either of the
+        # two structured options (--retry-strategy, --header-params).
         with pytest.raises(click.BadParameter, match="Missing '='"):
             parse_structured_arg("[1, 2, 3]")
 
@@ -63,7 +63,7 @@ class TestFileForm:
 
     def test_file_containing_json_array_rejected(self, tmp_path: Path) -> None:
         # The file body must parse to a JSON object; arrays / scalars are
-        # not valid Configuration values for any of the three options.
+        # not valid Configuration values for either of the two options.
         f = tmp_path / "arr.json"
         f.write_text("[1, 2, 3]", encoding="utf-8")
         with pytest.raises(click.BadParameter, match="Expected a JSON object"):

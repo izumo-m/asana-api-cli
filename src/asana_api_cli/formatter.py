@@ -59,8 +59,9 @@ def make_formatter_options() -> list[click.Option]:
                 "always echoed to stderr without traceback frames (for "
                 "ApiException this includes status/reason/headers/body). 'none' "
                 "(default) then exits 1 with no envelope. json/text/csv/table "
-                "additionally render an envelope "
-                "(exception/status/reason/body/headers) on stdout and exit 3 "
+                "additionally render an envelope on stdout and exit 3 — "
+                "{exception, status, reason, body, headers} for ApiException, "
+                "{exception, reason} for other exceptions "
                 "(asana-api: extension)"
             ),
         ),
@@ -254,8 +255,8 @@ def _format_output(
 
     The same renderer powers both the success path (``--output``) and
     the error envelope path (``--exception-output``); both write to
-    stdout, so scripts can consume them uniformly. ``exit_code``
-    (``0`` vs ``3``) is the discriminator.
+    stdout, so scripts can consume them uniformly. The caller's exit code
+    (``0`` for success, ``3`` for the error-envelope path) is the discriminator.
     """
     # ``--query EXPR`` is treated as the equivalent of piping through
     # ``jq 'EXPR'``: jq may yield 0, 1, or many values and each output

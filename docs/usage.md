@@ -57,11 +57,12 @@ Client-wide settings; valid at any point in the command path.
 | HTTP headers | `--user-agent`, `--set-default-header NAME=VALUE` (repeatable) |
 | Retry | `--retry-strategy` |
 | Logging / debug | `--debug`, `--logger-format`, `--logger-file` |
-| File handling | `--temp-folder-path`, `--safe-chars-for-path-param` |
+| Advanced | `--temp-folder-path`, `--safe-chars-for-path-param` |
 | Pagination (client-wide) | `--return-page-iterator` / `--no-return-page-iterator`, `--page-limit` — see [Pagination](#pagination) |
 
-`--debug` prints HTTP request/response traces to stderr with the `Authorization`
-header masked:
+`--debug` turns on the SDK's HTTP debug output, with the `Authorization` header
+masked. Mirroring the SDK, the wire trace (request/response headers) goes to
+stdout and the connection/response log to stderr:
 
 ```bash
 asana-api --debug tasks get-tasks --project <PROJECT_GID>

@@ -364,12 +364,13 @@ class TestFlagCollisions:
         """Sibling of the duplicate-flag sweep, but on the click *dest*
         (``p.name``). ``_decls`` resolves a flag collision by renaming the SDK
         flag to ``--sdk-<name>`` while KEEPING its dest = the SDK param name.
-        If a future SDK param's name matches an injected global (e.g. a
-        ``:param ... debug:``), the renamed ``--sdk-debug`` and the global
-        ``--debug`` end up sharing the dest ``debug``: click stores only one in
-        ``ctx.params`` and ``_consume_global_options`` then reads the wrong
-        value, silently corrupting both. The flag sweep above misses this (the
-        flag strings differ), so guard dests explicitly."""
+        If that dest also belongs to another option on the command, the two
+        distinct flags share one dest: click stores only one in ``ctx.params``
+        and the other option reads the wrong value. E.g. a future SDK opt named
+        ``all_items`` on a paginatable command renders as ``--sdk-all-items``
+        (dest ``all_items``), colliding in dest with the ``--all-items``
+        deprecation alias (also dest ``all_items``). The flag sweep above misses
+        this (the flag strings differ), so guard dests explicitly."""
         offenders: dict[str, list[str]] = {}
         for cls in _enumerate_api_classes():
             for op in _operations_for(cls):
@@ -571,7 +572,8 @@ class TestBuiltCommands:
         # The boilerplate per-call kwargs (all_params) are method inputs, so
         # they render as per-command options — present on a command, absent
         # from the root. (Configuration-backed --page-limit /
-        # --return-page-iterator stay global; asserted above.)
+        # --return-page-iterator are global flags from
+        # click_ext._global_option_sections, present on every command.)
         cmd_flags = _option_flags(get_tasks_cmd)
         root_flags = _option_flags(main)
         for flag in ("--item-limit", "--full-payload", "--header-params", "--request-timeout"):

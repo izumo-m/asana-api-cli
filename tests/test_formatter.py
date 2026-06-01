@@ -157,8 +157,9 @@ class TestFormatOutputCsv:
         assert out.count("\ufeff") == 1
 
     def test_bom_ignored_for_non_csv(self, capsys: pytest.CaptureFixture[str]) -> None:
-        # The flag is wired to every command via the decorator, so passing it
-        # alongside --output json must not corrupt the JSON output.
+        # The flag is wired to every command via ``make_formatter_options()``
+        # (added to each command's params by ``cli._make_command``), so passing
+        # it alongside --output json must not corrupt the JSON output.
         _format_output({"a": 1}, output_format="json", jq_query=None, csv_bom=True)
         out = capsys.readouterr().out
         assert not out.startswith("\ufeff")
@@ -354,8 +355,8 @@ class TestHandleApiException:
     now the leaf command's per-call option values, not global runtime state.
 
     Schema: ``{exception, status, reason, body, headers}`` where ``body``
-    is the UTF-8 decoded response *string* (or null). See
-    ``docs/sdk-deviations.md``.
+    is the UTF-8 decoded response *string* (or null). See ``docs/usage.md``
+    ("Error output").
     """
 
     def _make_exception(

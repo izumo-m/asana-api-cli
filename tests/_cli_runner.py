@@ -8,7 +8,7 @@ folds stderr into stdout and ``result.stderr`` raises ``ValueError``.
 * click <8.2 + ``mix_stderr=True`` (default): ``output`` is ``stdout``
   (with stderr mixed in)
 * click <8.2 + ``mix_stderr=False``: ``output`` is ``stdout`` only
-* click 8.2+: ``output`` is ``stdout + stderr`` combined (always)
+* click 8.2+: ``output`` is ``stdout`` and ``stderr`` interleaved in write order (always)
 
 This module hides both differences so tests can be written once and pass on
 the full declared support range (``click>=8.0``).
@@ -39,11 +39,13 @@ def make_runner() -> CliRunner:
 
 
 def full_output(result: Any) -> str:
-    """``stdout + stderr`` of a ``CliRunner`` ``Result``, on every click version.
+    """``stdout`` then ``stderr`` of a ``CliRunner`` ``Result``, on every click version.
 
-    Mirrors click 8.2+'s ``Result.output`` semantics (which returns the two
-    streams concatenated). Tests that want to assert against everything the
-    CLI emitted — including click's own ``Error: ...`` lines that go to
-    stderr — should use this instead of ``result.output``.
+    Always concatenates stdout before stderr (unlike click 8.2+'s
+    ``Result.output``, which interleaves the two streams in write order) — a
+    fixed order is fine for existence checks like
+    ``assert "x" in full_output(result)``. Tests that want to assert against
+    everything the CLI emitted — including click's own ``Error: ...`` lines that
+    go to stderr — should use this instead of ``result.output``.
     """
     return result.stdout + result.stderr

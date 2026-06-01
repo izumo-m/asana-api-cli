@@ -139,7 +139,7 @@ class HttpClientAuthRedactor:
     ``install()`` / ``uninstall()``::
 
         with HttpClientAuthRedactor():
-            ...  # any HTTP traffic with http.client.debuglevel = 1
+            ...  # any HTTP traffic with http.client.HTTPConnection.debuglevel = 1
 
         r = HttpClientAuthRedactor()
         r.install()

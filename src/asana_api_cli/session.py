@@ -34,7 +34,7 @@ class MultibyteFilenameSupport:
     emits only ``filename="..."`` and omits the RFC 5987 ``filename*=``
     parameter the server needs to decode them. This context manager patches
     ``urllib3.fields.RequestField.make_multipart`` to add
-    ``filename*=UTF-8''<percent-encoded>`` for such names.
+    ``filename*=utf-8''<percent-encoded>`` for such names.
 
     Off by default to preserve strict SDK parity. The CLI enables it when
     ``--multibyte-filenames`` is passed to an upload command (e.g.
@@ -89,7 +89,7 @@ class MultibyteFilenameSupport:
 class _Runtime:
     """Configuration shared globally during a CLI invocation.
 
-    Updated by the ``main`` callback and the global-option mixins in ``click_ext``.
+    Updated by the global-option mixins in ``click_ext`` (``_consume_global_options``).
     Each non-flag scalar defaults to ``None`` so ``AsanaSession`` can tell
     "user did not pass the flag" from "user explicitly chose this value" and
     leave the SDK default in place for the former.
@@ -119,9 +119,9 @@ class _Runtime:
     # Configuration-backed iterator knobs. The per-call kwargs
     # (full_payload / item_limit / header_params / _request_timeout) are NOT
     # here: they are per-command options forwarded by ``cli.py:_make_command``.
-    # The CLI-only output-formatting options (--output / --query and their
-    # error-path twins --exception-output / --exception-query) are likewise not here:
-    # they flow as kwargs through ``formatter.py:formatted``.
+    # The CLI-only output-formatting options (--output / --query / --csv-bom and
+    # their error-path twins --exception-output / --exception-query) are likewise
+    # not here: they flow as kwargs through ``formatter.py:formatted``.
     return_page_iterator: bool | None = None
     page_limit: int | None = None
 
@@ -132,11 +132,14 @@ runtime = _Runtime()
 # Configuration knobs applied from ``runtime`` onto ``asana.Configuration`` in
 # ``AsanaSession.__init__``. Each entry is ``(attr, apply_when_truthy)``: the
 # Configuration attribute name matches the ``_Runtime`` field 1:1, and the
-# condition is preserved verbatim from the original per-knob chain — truthy for
-# the path/host-like strings (an empty string is skipped) and "is not None" for
-# the rest (so an explicit ``False`` / ``0`` still applies). ``access_token``
-# (set from the constructor argument), the ``ApiClient``-instance settings
-# (``user_agent`` / ``default_headers``), and ``retry_strategy`` (which
+# condition is preserved verbatim from the original per-knob chain.
+# ``apply_when_truthy`` is True for only the four URL/directory strings where an
+# empty value is meaningless (``host`` / ``proxy`` / ``ssl_ca_cert`` /
+# ``temp_folder_path``, skipped when empty); it is False for every other field —
+# including the path-like ``cert_file`` / ``key_file`` / ``logger_file`` — which
+# apply on "is not None" (so an explicit ``False`` / ``0`` still applies).
+# ``access_token`` (set from the constructor argument), the ``ApiClient``-instance
+# settings (``user_agent`` / ``default_headers``), and ``retry_strategy`` (which
 # transforms the value via ``Retry.new()``) are applied separately, not here.
 _CONFIG_KNOBS: tuple[tuple[str, bool], ...] = (
     ("return_page_iterator", False),
@@ -160,8 +163,9 @@ class AsanaSession:
     """Session holding an ApiClient from the official asana SDK.
 
     Use it as a context manager. The global side effects — the ``--debug``
-    HTTP-log redactor and the ``http.client`` debuglevel flip the SDK's debug
-    setter performs — are installed on ``__enter__`` and reversed on
+    HTTP-log redactor, the ``http.client`` debuglevel flip, and the asana/urllib3
+    logger levels the SDK's debug setter raises — are installed on ``__enter__``
+    and reversed on
     ``__exit__``, so they are in effect only for the duration of the ``with``
     block. Constructing a session without entering it builds a plain ApiClient
     and mutates no process globals.
@@ -199,9 +203,9 @@ class AsanaSession:
             base_retry = config.retry_strategy
             config.retry_strategy = base_retry.new(**runtime.retry_strategy_overrides)
 
-        # Global side effects (the debug redactor and the ``http.client``
-        # debuglevel flip) are installed by ``open()`` (on ``__enter__``) and
-        # reversed by ``close()`` (on
+        # Global side effects (the debug redactor, the ``http.client`` debuglevel
+        # flip, and the asana/urllib3 logger levels) are installed by ``open()``
+        # (on ``__enter__``) and reversed by ``close()`` (on
         # ``__exit__``), so merely constructing a session never mutates process
         # globals. ApiClient construction stays here because it touches no
         # globals — a failure just propagates with nothing to unwind.
@@ -233,10 +237,11 @@ class AsanaSession:
         return self._client
 
     def open(self) -> None:
-        """Install this session's global side effects: the ``http.client``
-        debuglevel flip plus the ``Authorization`` redactor, both under
-        ``--debug``. The reverse of :meth:`close`; ``__enter__`` calls it so the
-        globals live only for the ``with`` block.
+        """Install this session's global side effects under ``--debug``: the
+        ``http.client`` debuglevel flip, the asana/urllib3 logger levels the SDK
+        debug setter raises, and the ``Authorization`` redactor. The reverse of
+        :meth:`close`; ``__enter__`` calls it so the globals live only for the
+        ``with`` block.
 
         If a later ``install()`` raises after an earlier one already
         succeeded, every side effect installed so far is reversed (via

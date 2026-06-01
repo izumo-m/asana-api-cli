@@ -1,20 +1,20 @@
 # Architecture
 
-Runtime-introspection wrapper around `python-asana`. The CLI command tree is built at import time; no codegen.
+Runtime-introspection wrapper around `python-asana`. API group stubs are registered at import time; each group's commands and options are built lazily on first access. No codegen.
 
 ## Modules (`src/asana_api_cli/`)
 
 | File | Role |
 |---|---|
 | `cli.py` | Runtime introspection + Click command tree; body / workspace input resolution |
-| `session.py` | SDK client (`Configuration` + `ApiClient`); installs the debug redactor on context-manager entry (`open`), reverses it on exit (`close`) |
+| `session.py` | SDK client (`Configuration` + `ApiClient`); on context-manager entry (`open`) installs the `--debug` side effects (the `http.client` debuglevel + asana/urllib3 logger flips and the `Authorization` redactor), reverses them on exit (`close`) |
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
-| `click_ext.py` | `LazyGroup` for cheap top-level `--help`; mixins propagating global options to subgroups |
+| `click_ext.py` | `LazyGroup` for cheap top-level `--help`; the `_GlobalOptionsMixin` mixin and its concrete subclasses propagating global options to subgroups (`GroupWithGlobalOptions`) and leaf commands (`CommandWithGlobalOptions`) |
 | `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |
 | `structured_arg.py` | Hybrid value parser for structured options (`k=v,k=v` / JSON object / `@path`) |
 | `version.py` | `version_string()` used by `--version` |
 
-## Command construction (import time)
+## Command construction (lazy, per group)
 
 `cli.py` walks every `*Api` class on the installed `asana` package and produces:
 

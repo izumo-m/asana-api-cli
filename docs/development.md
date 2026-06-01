@@ -2,7 +2,8 @@
 
 For contributor setup (cloning, `uv sync`, running tests, code style, PR
 rules), see [`CONTRIBUTING.md`](../CONTRIBUTING.md). This document covers
-the internal architecture.
+development and maintenance: installing from source, the project layout, the
+`asana` SDK version-bump workflow, and trying shell completion.
 
 The `asana_api_cli` package is internal to the CLI. Importing it directly
 from Python is possible but unsupported — names and behavior may change
@@ -27,7 +28,9 @@ tests/
     └── cli_surface.json        # Canonical CLI surface for the bundled SDK
 
 tools/
-└── e2e_init.py                 # One-time fixture provisioner for tests/e2e/
+├── e2e_init.py                 # One-time fixture provisioner for tests/e2e/
+├── publish_pypi.sh             # Build (python -m build) + twine upload to PyPI
+└── tag_version.sh              # Create the annotated git tag from the pyproject version
 ```
 
 ## Bumping the `asana` SDK
@@ -48,8 +51,9 @@ group/command/option churn introduced by an SDK bump. Procedure:
    grep -rh "auth_settings = \[" .venv/lib/python*/site-packages/asana/api/ | sort -u
    ```
 
-   If the output is anything other than the single
-   `auth_settings = ['personalAccessToken']` line, the SDK has started
+   If the output names any auth scheme other than `personalAccessToken` (the
+   bundled SDK prints the single line
+   `auth_settings = ['personalAccessToken']  # noqa: E501`), the SDK has started
    wiring up additional auth schemes — revisit whether those Configuration
    fields should now be exposed, and update `docs/sdk-deviations.md`.
    `tests/test_sdk_boilerplate.py` also pins the settable `Configuration`

@@ -272,9 +272,10 @@ class TestGlobalOptionsSingleSource:
     ``CommandWithGlobalOptions.__init__``). There is no second declaration site
     to drift, but the *wiring* could regress: this asserts the root and a leaf
     command expose byte-identical global-option signatures — flag spelling,
-    help, default, flag-ness, and type — so a user reads the same wording at any
-    level of the tree. (Replaces the old ``TestHelpTextSync``, which compared two
-    declaration sites that the single source eliminated.)
+    help, default, flag-ness, and type. The rendered help still differs by level
+    (full at the root, a compact name-only table on subcommands); only the
+    definitions are pinned identical here. (Replaces the old ``TestHelpTextSync``,
+    which compared two declaration sites that the single source eliminated.)
     """
 
     def test_root_and_leaf_globals_have_identical_signatures(self) -> None:

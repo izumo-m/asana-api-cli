@@ -1,5 +1,7 @@
 """Tests for asana_api_cli.session — the AsanaSession side-effect lifecycle,
-MultibyteFilenameSupport, and pagination knobs.
+MultibyteFilenameSupport, the pagination knobs, the ``_CONFIG_KNOBS``
+Configuration table, and the ApiClient-instance settings (``--user-agent`` /
+``--set-default-header``).
 
 The input-resolution helpers (``resolve_body`` / ``resolve_workspace``) now
 live in ``asana_api_cli.cli``; their tests are in ``test_cli.py``.
@@ -26,9 +28,10 @@ from asana_api_cli.session import (
 #
 # The ``HttpClientAuthRedactor`` itself (helpers, masking, lifecycle,
 # end-to-end with a live HTTP server) is covered in ``test_redactor.py``;
-# the tests here only check that ``AsanaSession`` installs the global
-# ``http.client`` patches on ``__enter__`` (never at construction) and
-# reverses them on ``__exit__``, including the partial-failure path.
+# the tests here check that ``AsanaSession`` installs all its global side
+# effects (the ``http.client`` debuglevel/print patch and the asana/urllib3
+# logger levels raised by the SDK ``debug`` setter) on ``__enter__`` (never at
+# construction) and reverses them on ``__exit__``.
 # ---------------------------------------------------------------------------
 
 
@@ -68,8 +71,8 @@ class TestAsanaSessionSideEffectLifecycle:
         ``__enter__`` and reverses them on ``__exit__`` — never merely on
         construction. Inside the block, ``http.client`` wire tracing is on
         (debuglevel 1) AND the ``Authorization`` redactor is installed; on exit
-        both are reversed together, so the process is never left
-        tracing-on-without-mask (constitution #2).
+        both are reversed in order (tracing off first, mask removed last), so the
+        process is never left tracing-on-without-mask (constitution #2).
         """
         monkeypatch.setattr(runtime, "debug", True)
         http.client.HTTPConnection.debuglevel = 0
@@ -83,7 +86,8 @@ class TestAsanaSessionSideEffectLifecycle:
             # Inside the block: tracing on AND the masking patch installed.
             assert http.client.HTTPConnection.debuglevel == 1
             assert "print" in http.client.__dict__
-        # After exit: both reversed together — never tracing-on-without-mask.
+        # After exit: both reversed in order (tracing off first, mask last) —
+        # never tracing-on-without-mask.
         assert http.client.HTTPConnection.debuglevel == 0
         assert "print" not in http.client.__dict__
 

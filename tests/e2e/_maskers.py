@@ -25,6 +25,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+# ``_bindings`` lives in ``tests/e2e/conftest.py``, which pytest imports as the
+# package-qualified module ``e2e.conftest`` (the bare top-level ``conftest`` is
+# the project-root ``tests/conftest.py``, a different file).
+from e2e.conftest import _bindings
+
 
 def _decode(value: Any) -> str | None:
     """Return *value* as ``str`` whether it came in as ``bytes`` or ``str``."""
@@ -54,12 +59,6 @@ def mask_users_in_batch_subresponses(cassette_dict: Any) -> None:
     zipped index-wise: a sub-response at position ``i`` belongs to the
     action at position ``i``, per Asana's documented contract.
     """
-    # Imported lazily to avoid a circular import. pytest loads
-    # ``tests/e2e/conftest.py`` as the package-qualified module
-    # ``e2e.conftest`` (the top-level ``conftest`` is the project-root
-    # ``tests/conftest.py``, a different file).
-    from e2e.conftest import _bindings
-
     name_bind = _bindings().get("USER_NAME")
     if not name_bind:
         return

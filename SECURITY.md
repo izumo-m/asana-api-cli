@@ -46,9 +46,13 @@ environment variable. Treat this token as a secret:
 
 ## Debug output
 
-`asana-api --debug` writes HTTP request/response traces to stderr.
-The CLI masks only the request `Authorization` header (which carries
-the personal access token); everything else is shown verbatim.
+`asana-api --debug` turns on the SDK's HTTP debug output. Mirroring the
+SDK, the `http.client` wire trace (request and response headers) goes to
+stdout and the SDK / urllib3 debug log (connection, status line, response
+body) to stderr. The CLI masks only the request `Authorization` header in
+the stdout wire trace (it carries the personal access token); everything
+else — on either stream — is shown verbatim, so scrub both streams before
+sharing.
 
 This masking lives in the CLI, not the SDK. Direct use of the SDK's
 HTTP debug logging from Python leaves the `Authorization` header in

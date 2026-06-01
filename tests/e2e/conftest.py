@@ -338,7 +338,7 @@ def _mask_sync_tokens(obj: Any) -> Any:
     the synthetic in the recorded URL).
 
     The 32-hex prefix is sha256'd back to 32 hex chars; the ``:N`` /
-    ``%3A:N`` suffix is preserved so the "same prefix family" relation
+    ``%3AN`` suffix is preserved so the "same prefix family" relation
     (Asana increments ``N`` between polls on one subscription) stays
     visible in the cassette.
     """
@@ -393,17 +393,18 @@ def _auto_hash_gids(cassette_dict: Any) -> Any:
 # function and stores a bare (arg-less) mark on it instead, so
 # ``@pytest.mark.cassette_mask(fn)`` silently does nothing.
 #
-# Three masking layers run at cassette serialize time:
+# Three masking layers cover recorded responses (L2 at record time; L1/L3 at
+# serialize time):
 #
 #   L1 — universal value/format pass: ``${VAR}`` templating,
 #        ``_auto_hash_gids``, ``_mask_sync_tokens``.
 #   L2 — schema-aware response hook: ``_before_record_response`` /
 #        ``_mask_object`` dispatch on ``resource_type``.
-#   L3 — per-test/API hook (this list): when L2 cannot fire because the
-#        response lacks ``resource_type`` (e.g. a ``/batch`` sub-response
-#        whose action did not request that field) the test attaches an
-#        API-specific masker that mutates the parsed cassette dict in
-#        place before L1 runs.
+#   L3 — per-test/API hook (this list): when L2's ``resource_type``-keyed
+#        masking cannot reach the PII because the response lacks
+#        ``resource_type`` (e.g. a ``/batch`` sub-response whose action did
+#        not request that field) the test attaches an API-specific masker
+#        that mutates the parsed cassette dict in place before L1 runs.
 _active_maskers: list[Callable[[Any], None]] = []
 
 
@@ -599,9 +600,8 @@ def pagination_small_project_gid(workspace_gid: str) -> Generator[str, None, Non
     """Discover the ``pagination-test-small`` project gid.
 
     Same template-binding mechanism as ``pagination_project_gid`` but for
-    the small fixture (50 tasks) used to test the ``--full-payload`` /
-    ``--no-return-page-iterator`` success path against Asana's
-    unpaginated-response cap (1000 items).
+    the small fixture (50 tasks) used to test the ``--full-payload`` success
+    path against Asana's unpaginated-response cap (1000 items).
     """
     gid = _discover_project_gid(workspace_gid, PAGINATION_SMALL_PROJECT_NAME)
     _dynamic_bindings["PAGINATION_SMALL_PROJECT_GID"] = gid

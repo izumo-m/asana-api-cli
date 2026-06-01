@@ -29,8 +29,10 @@ produce them are in [Conversion rules](#conversion-rules).
 
 In the **"SDK destination"** column:
 
-- *Direct property* — assigned to a field on `asana.Configuration` once, during
-  session construction (`session.py:AsanaSession.__init__`).
+- *Direct property* — assigned to a field on `asana.Configuration` during
+  session construction (`session.py:AsanaSession.__init__`), except `--debug`,
+  which is applied on session entry (`AsanaSession.open`) because it has
+  process-global side effects reversed on exit (see its row below).
 - *Struct member* — passed into a nested constructor that `Configuration`
   consumes (e.g. `Configuration.retry_strategy` is built from a
   `urllib3.util.retry.Retry`).

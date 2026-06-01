@@ -277,9 +277,11 @@ def _group_short_help(class_name: str) -> str:
 
 
 # Hand-written help text for endpoint-local options whose SDK ``:param:``
-# docstring is empty. The triple ``(class_name, method_name, param_name)``
-# is the key because bare param names (``file``, ``parent``, ``name``)
-# would collide across endpoints. Sourced from Asana's developer
+# docstring is empty. The key is ``(group_class, method_name, param_name)``
+# where ``group_class`` is the ``*Api`` class name with the ``Api`` suffix
+# stripped (e.g. ``"Attachments"``, not ``"AttachmentsApi"`` — the lookup uses
+# ``api_cls.__name__[:-3]``); bare param names (``file``, ``parent``, ``name``)
+# would otherwise collide across endpoints. Sourced from Asana's developer
 # reference. Lookup is conditional — only used when the SDK provides no
 # description — so an SDK that later fills in a description silently wins
 # over the override (which is fine, the SDK text is authoritative).
@@ -432,7 +434,7 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
             p.description = p.description.replace("(required)", "").strip()
 
     # `_PARAM_RE` already drops the SDK's `:param async_req bool` line (no
-    # colon after the type, so the regex never matches). Kept as a guard in
+    # colon after the name, so the regex never matches). Kept as a guard in
     # case the SDK docstring format changes to the colon form.
     params.pop("async_req", None)
     return params
@@ -535,11 +537,13 @@ class _Operation:
 
     @property
     def workspace_required(self) -> bool:
-        """Workspace is required exactly when it is a path positional.
+        """Workspace is required when it is a path positional.
 
         An ``opts`` workspace is always optional — no python-asana method marks
-        a query param ``(required)``. Drives the ``ASANA_DEFAULT_WORKSPACE``
-        env-var fallback: auto-fill only when required.
+        a query param ``(required)`` — so the return's second branch
+        (``wo.required``) is a defensive guard that does not fire on today's SDK.
+        Drives the ``ASANA_DEFAULT_WORKSPACE`` env-var fallback: auto-fill only
+        when required.
         """
         wo = self.workspace_opt
         return self.workspace_positional is not None or (wo is not None and wo.required)
@@ -676,7 +680,7 @@ def _decls(flag: str, dest: str, reserved: frozenset[str]) -> list[str]:
     If ``flag`` collides with a built-in CLI flag (in ``reserved``), the SDK
     param yields: it is exposed as ``--sdk-<name>`` with an *explicit* ``dest``
     equal to the SDK param name, so the call path (which pops by param name) is
-    unchanged and the ``(opts/arg: <name>)`` help label still shows the real
+    unchanged and the ``(opts/args: <name>)`` help label still shows the real
     name. Otherwise the bare ``[flag]`` is used (dest auto-derives to ``dest``).
     """
     if flag in reserved:
@@ -842,6 +846,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
        so there is no required/optional split to order by.
     3. **Boilerplate per-call kwargs** (the SDK ``all_params``), plus the
        upload / deprecation extensions where they apply.
+    4. **Output-formatting options** (``--output`` / ``--query`` / ``--csv-bom``
+       / ``--exception-output`` / ``--exception-query``) from
+       ``make_formatter_options``, appended last.
     """
     # If the SDK method has no ``opts`` parameter, docstring-derived named
     # arguments cannot be forwarded — they would be silently dropped at call
@@ -893,7 +900,8 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # (``does_upload``) rather than as a global flag. Off by default to preserve
     # strict SDK parity (the SDK emits ``filename=`` only); see sdk-deviations.md.
     # Its callback installs the patch and scopes it to this command via
-    # ``ctx.with_resource``; ``expose_value=False`` keeps it out of the opts dict.
+    # ``ctx.with_resource``; ``expose_value=False`` keeps it out of
+    # ``inner_callback``'s ``**kwargs``.
     if does_upload:
         options.append(
             click.Option(
@@ -1026,7 +1034,8 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             # Two independent layers:
             #   - Layer A (session lifecycle, above): every SDK call runs
             #     inside ``with AsanaSession.from_env() as session:``, which
-            #     keeps the ``HttpClientAuthRedactor`` installed.
+            #     keeps the ``HttpClientAuthRedactor`` installed when ``--debug``
+            #     is active.
             #   - Layer B (this block): when the SDK returns a lazy iterator
             #     (PageIterator / EventIterator), iterating it issues one
             #     HTTP request per page. We must consume the iterator *before*
@@ -1135,8 +1144,9 @@ def main() -> None:
     # by tests) from blowing up, since StringIO has no reconfigure().
     #
     # The global flags are parsed into the root context and written to
-    # ``runtime`` by ``LazyGroup.invoke`` → ``_consume_global_options`` before
-    # this callback runs, so there is nothing to apply here.
+    # ``runtime`` by ``GroupWithGlobalOptions.invoke`` → ``_consume_global_options``
+    # (inherited by ``LazyGroup``) before this callback runs, so there is nothing
+    # to apply here.
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
