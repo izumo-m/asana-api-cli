@@ -785,6 +785,44 @@ def _plain_opt_option(
     return click.Option(_decls(flag, p.name, reserved), **kw)
 
 
+def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) -> int | None:
+    """Resolve the deprecated pagination aliases and return the effective item
+    limit. Pops ``all_items`` / ``page_size`` / ``max_items`` from ``kwargs``
+    (absent on non-paginatable commands), warns on stderr, and folds
+    ``page_size`` into ``kwargs["limit"]`` / ``max_items`` into the item limit,
+    with the canonical ``--limit`` / ``--item-limit`` winning when both are given.
+    """
+    all_items = kwargs.pop("all_items", False)
+    page_size = kwargs.pop("page_size", None)
+    max_items = kwargs.pop("max_items", None)
+
+    if all_items:
+        click.echo(
+            "warning: --all-items is deprecated; walking every page is "
+            "now the default (will be removed in a future release)",
+            err=True,
+        )
+    if page_size is not None:
+        click.echo(
+            "warning: --page-size is deprecated; use --limit instead "
+            "(will be removed in a future release)",
+            err=True,
+        )
+        # Canonical --limit wins when both are given.
+        if kwargs.get("limit") is None:
+            kwargs["limit"] = page_size
+    if max_items is not None:
+        click.echo(
+            "warning: --max-items is deprecated; use --item-limit "
+            "instead (will be removed in a future release)",
+            err=True,
+        )
+        # Canonical --item-limit wins when both are given.
+        if item_limit is None:
+            item_limit = max_items
+    return item_limit
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method.
 
@@ -909,39 +947,10 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         if does_upload:
             runtime.multibyte_filenames = kwargs.pop("multibyte_filenames", False)
 
-        # Deprecated aliases: pop from kwargs (per-command) and warn. Effective
-        # values fold into local vars without mutating ``runtime``, so the
-        # dispatch state stays scoped to this invocation.
-        all_items = kwargs.pop("all_items", False) if paginatable else False
-        page_size = kwargs.pop("page_size", None) if paginatable else None
-        max_items = kwargs.pop("max_items", None) if paginatable else None
-
-        effective_item_limit = item_limit
-
-        if all_items:
-            click.echo(
-                "warning: --all-items is deprecated; walking every page is "
-                "now the default (will be removed in a future release)",
-                err=True,
-            )
-        if page_size is not None:
-            click.echo(
-                "warning: --page-size is deprecated; use --limit instead "
-                "(will be removed in a future release)",
-                err=True,
-            )
-            # Canonical --limit wins when both are given.
-            if kwargs.get("limit") is None:
-                kwargs["limit"] = page_size
-        if max_items is not None:
-            click.echo(
-                "warning: --max-items is deprecated; use --item-limit "
-                "instead (will be removed in a future release)",
-                err=True,
-            )
-            # Canonical --item-limit wins when both are given.
-            if effective_item_limit is None:
-                effective_item_limit = max_items
+        # Deprecated aliases (--all-items / --page-size / --max-items): warn and
+        # fold into their canonical replacements. Isolated in a helper so their
+        # eventual removal does not touch this hot-path closure.
+        effective_item_limit = _apply_deprecated_aliases(kwargs, item_limit)
 
         if op.has_body:
             body_value = kwargs.pop("body")  # click marks --body as required
