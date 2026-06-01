@@ -58,7 +58,7 @@ from asana_api_cli.click_ext import (
     GroupWithGlobalOptions,
     LazyGroup,
 )
-from asana_api_cli.formatter import formatted, formatter_flag_names
+from asana_api_cli.formatter import formatted, formatter_flag_names, make_formatter_options
 from asana_api_cli.session import (
     AsanaSession,
     MultibyteFilenameSupport,
@@ -354,7 +354,7 @@ def _escape_help(text: str) -> str:
 # globals are built from, so the label is identical at the root and at any
 # subcommand); the CLI-only formatter flags (``--output`` / ``--query`` /
 # ``--csv-bom`` and the error-path twins ``--exception-output`` /
-# ``--exception-query``) live only in ``formatted``. This helper builds every
+# ``--exception-query``) live in ``formatter.py:make_formatter_options``. This helper builds every
 # label ``_make_command`` derives at runtime: ``args`` / ``opts`` for path /
 # body / docstring params, ``kwargs`` for the common per-call kwargs, and the
 # extension marker on the deprecated aliases.
@@ -1042,12 +1042,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
 
     callback = formatted(inner_callback)
 
-    # ``formatted`` adds the output-formatting options (--output / --query /
-    # --csv-bom and their error-path twins --exception-output / --exception-query)
-    # via click.option decorators; pull those Option instances out of the
-    # wrapped callback (in natural order) and append them to our options list.
-    fmt_params = list(reversed(getattr(callback, "__click_params__", [])))
-    options.extend(fmt_params)
+    # The output-formatting options (--output / --query / --csv-bom and their
+    # error-path twins --exception-output / --exception-query) are declared by
+    # ``make_formatter_options``; ``callback`` (wrapped by ``formatted``) consumes
+    # their parsed values as kwargs.
+    options.extend(make_formatter_options())
 
     summary = _escape_help(op.summary or f"Call {api_cls.__name__}.{op.method_name}")
     return CommandWithGlobalOptions(

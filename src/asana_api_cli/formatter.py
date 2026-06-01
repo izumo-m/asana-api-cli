@@ -14,73 +14,80 @@ from asana.rest import ApiException
 from tabulate import tabulate
 
 
-def formatted(f: Any) -> Any:
-    """Decorator that adds the output-formatting options and renders the result.
+def make_formatter_options() -> list[click.Option]:
+    """Fresh ``click.Option`` instances for the output-formatting flags consumed
+    by :func:`formatted`: the success path ``--output`` / ``--query`` /
+    ``--csv-bom`` and the error path ``--exception-output`` / ``--exception-query``.
+    Returned in display order. Fresh instances each call because click stores
+    per-command state on Option objects (same reason as
+    ``cli._make_per_call_kwarg_options``).
+    """
+    return [
+        click.Option(
+            ["--output", "output_format"],
+            type=click.Choice(["json", "table", "csv", "text", "none"], case_sensitive=False),
+            default="json",
+            help=(
+                "Output format (default: json). 'none' suppresses the success "
+                "payload entirely — useful when only the exit code matters "
+                "(e.g. side-effect-only operations like delete-task). "
+                "Symmetric counterpart of --exception-output 'none' "
+                "(asana-api: extension)"
+            ),
+        ),
+        click.Option(
+            ["--query", "jq_query"],
+            default=None,
+            help="jq expression to filter output (asana-api: extension)",
+        ),
+        click.Option(
+            ["--csv-bom", "csv_bom"],
+            is_flag=True,
+            default=False,
+            help=(
+                "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
+                "non-ASCII characters correctly (asana-api: extension)"
+            ),
+        ),
+        click.Option(
+            ["--exception-output", "exception_output"],
+            type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
+            default="none",
+            show_default=True,
+            help=(
+                "How to surface exceptions from the SDK call. The exception is "
+                "always echoed to stderr without traceback frames (for "
+                "ApiException this includes status/reason/headers/body). 'none' "
+                "(default) then exits 1 with no envelope. json/text/csv/table "
+                "additionally render an envelope "
+                "(exception/status/reason/body/headers) on stdout and exit 3 "
+                "(asana-api: extension)"
+            ),
+        ),
+        click.Option(
+            ["--exception-query", "exception_query"],
+            default=None,
+            help=(
+                "Apply a jq filter to the error envelope; result is rendered via "
+                "--exception-output. Pairing with the default 'none' emits a stderr "
+                "warning (the filter would be a no-op) but does not block the call "
+                "(asana-api: extension)"
+            ),
+        ),
+    ]
 
-    Success path: ``--output`` / ``--query`` / ``--csv-bom``. Error path:
-    ``--exception-output`` / ``--exception-query`` — the symmetric counterparts that
-    format an exception raised by the wrapped SDK call. Both pairs are
-    per-command (leaf) options bound to the single method invocation, not
-    global flags: a CLI run dispatches exactly one leaf command, so the error
-    controls live next to their success twins and flow through as kwargs.
+
+def formatted(f: Any) -> Any:
+    """Decorator that renders the result of the wrapped SDK call.
+
+    The output-formatting options it consumes — the success path ``--output`` /
+    ``--query`` / ``--csv-bom`` and the error path ``--exception-output`` /
+    ``--exception-query`` — are declared by :func:`make_formatter_options` and
+    added to each command's params by ``cli.py:_make_command``; this wrapper
+    receives their parsed values as keyword arguments. They are per-command
+    (leaf) options bound to the single method invocation, not global flags.
     """
 
-    @click.option(
-        "--output",
-        "output_format",
-        type=click.Choice(["json", "table", "csv", "text", "none"], case_sensitive=False),
-        default="json",
-        help=(
-            "Output format (default: json). 'none' suppresses the success "
-            "payload entirely — useful when only the exit code matters "
-            "(e.g. side-effect-only operations like delete-task). "
-            "Symmetric counterpart of --exception-output 'none' "
-            "(asana-api: extension)"
-        ),
-    )
-    @click.option(
-        "--query",
-        "jq_query",
-        default=None,
-        help="jq expression to filter output (asana-api: extension)",
-    )
-    @click.option(
-        "--csv-bom",
-        "csv_bom",
-        is_flag=True,
-        default=False,
-        help=(
-            "Prepend a UTF-8 BOM to CSV output so Excel on Windows renders "
-            "non-ASCII characters correctly (asana-api: extension)"
-        ),
-    )
-    @click.option(
-        "--exception-output",
-        "exception_output",
-        type=click.Choice(["none", "json", "text", "csv", "table"], case_sensitive=False),
-        default="none",
-        show_default=True,
-        help=(
-            "How to surface exceptions from the SDK call. The exception is "
-            "always echoed to stderr without traceback frames (for "
-            "ApiException this includes status/reason/headers/body). 'none' "
-            "(default) then exits 1 with no envelope. json/text/csv/table "
-            "additionally render an envelope "
-            "(exception/status/reason/body/headers) on stdout and exit 3 "
-            "(asana-api: extension)"
-        ),
-    )
-    @click.option(
-        "--exception-query",
-        "exception_query",
-        default=None,
-        help=(
-            "Apply a jq filter to the error envelope; result is rendered via "
-            "--exception-output. Pairing with the default 'none' emits a stderr "
-            "warning (the filter would be a no-op) but does not block the call "
-            "(asana-api: extension)"
-        ),
-    )
     @functools.wraps(f)
     def wrapper(
         *args: Any,
@@ -136,18 +143,16 @@ def formatted(f: Any) -> Any:
 
 
 def formatter_flag_names() -> frozenset[str]:
-    """Flag strings declared by :func:`formatted` (``--output`` / ``--query`` /
-    ``--csv-bom`` / ``--exception-output`` / ``--exception-query``).
+    """Flag strings declared by :func:`make_formatter_options` (``--output`` /
+    ``--query`` / ``--csv-bom`` / ``--exception-output`` / ``--exception-query``).
 
-    Derived from the decorator itself (not a hand-kept list) so it cannot drift
+    Derived from the option builder (not a hand-kept list) so it cannot drift
     from the actual options — including when those flags are later renamed.
     ``cli.py`` uses it to detect when an SDK arg/opt name collides with one of
-    these built-in flags. The throwaway callable is never invoked; only its
-    attached ``__click_params__`` is read.
+    these built-in flags.
     """
-    params = getattr(formatted(lambda **_: None), "__click_params__", [])
     flags: set[str] = set()
-    for p in params:
+    for p in make_formatter_options():
         flags.update(p.opts)
         flags.update(getattr(p, "secondary_opts", []))
     return frozenset(flags)

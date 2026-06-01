@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 import click
 import pytest
@@ -17,7 +17,20 @@ from asana_api_cli.formatter import (
     _scalar_text,
     _to_rows,
     formatted,
+    make_formatter_options,
 )
+
+
+def _formatted_command(fn: Any, name: str = "cmd") -> click.Command:
+    """Build a command wrapping ``fn`` with ``formatted`` plus the formatter
+    options, mirroring how ``cli.py:_make_command`` wires them: the options are
+    declared by ``make_formatter_options`` and added to the command's params,
+    while ``formatted`` supplies only the rendering wrapper."""
+    # cast: ``list`` is invariant, so list[Option] is not list[Parameter] to the
+    # type checker even though Option is a Parameter.
+    params = cast("list[click.Parameter]", make_formatter_options())
+    return click.Command(name, params=params, callback=formatted(fn))
+
 
 # ---------------------------------------------------------------------------
 # _to_rows
@@ -643,15 +656,14 @@ class TestFormattedDecoratorStderrEcho:
     exception by stripping it from the stdout envelope."""
 
     def test_exception_query_cannot_hide_raw_exception(self) -> None:
-        @click.command()
-        @formatted
         def cmd() -> Any:
             exc = ApiException(status=500, reason="Internal Server Error")
             exc.body = "<html>oops</html>"  # type: ignore[assignment]
             raise exc
 
         result = make_runner().invoke(
-            cmd, ["--exception-output", "json", "--exception-query", ".status"]
+            _formatted_command(cmd),
+            ["--exception-output", "json", "--exception-query", ".status"],
         )
         assert result.exit_code == 3
         # Stdout: only ``.status`` after the jq filter.
@@ -668,12 +680,10 @@ class TestFormattedDecoratorReraisesClickExceptions:
     bubble up to Click's own handler — *not* be wrapped in an envelope."""
 
     def _run(self, raise_exc: Exception) -> Any:
-        @click.command()
-        @formatted
         def cmd() -> Any:
             raise raise_exc
 
-        return make_runner().invoke(cmd)
+        return make_runner().invoke(_formatted_command(cmd))
 
     def test_click_usage_error_propagates(self) -> None:
         result = self._run(click.UsageError("bad usage"))
@@ -706,13 +716,11 @@ class TestFormattedDecoratorReraisesClickExceptions:
 
 class TestFormattedDecorator:
     def _make_cli(self, return_value: Any) -> click.Command:
-        @click.command()
-        @formatted
         def cmd() -> Any:
             """Test command."""
             return return_value
 
-        return cmd
+        return _formatted_command(cmd)
 
     def test_json_output(self) -> None:
         runner = make_runner()
@@ -766,14 +774,12 @@ class TestFormattedDecorator:
         ``none`` branch. Regression guard against the echo being lost
         from the envelope path."""
 
-        @click.command()
-        @formatted
         def cmd() -> Any:
             """Raise API error."""
             raise ApiException(status=403, reason="Forbidden")
 
         runner = make_runner()
-        result = runner.invoke(cmd, ["--exception-output", "json"])
+        result = runner.invoke(_formatted_command(cmd), ["--exception-output", "json"])
         assert result.exit_code == 3
         env = json.loads(result.stdout)
         assert env["exception"] == "asana.rest.ApiException"
@@ -794,13 +800,11 @@ class TestNoneDefault:
     body in events polling) stays visible without traceback noise."""
 
     def test_api_exception_renders_without_traceback(self) -> None:
-        @click.command()
-        @formatted
         def cmd() -> Any:
             raise ApiException(status=403, reason="Forbidden")
 
         runner = make_runner()
-        result = runner.invoke(cmd)
+        result = runner.invoke(_formatted_command(cmd))
         assert result.exit_code == 1
         # Nothing rendered to stdout — no envelope.
         assert result.stdout == ""
@@ -812,13 +816,11 @@ class TestNoneDefault:
         assert "Traceback (most recent call last)" not in result.stderr
 
     def test_generic_exception_renders_without_traceback(self) -> None:
-        @click.command()
-        @formatted
         def cmd() -> Any:
             raise RuntimeError("boom")
 
         runner = make_runner()
-        result = runner.invoke(cmd)
+        result = runner.invoke(_formatted_command(cmd))
         assert result.exit_code == 1
         assert result.stdout == ""
         assert "RuntimeError: boom" in result.stderr

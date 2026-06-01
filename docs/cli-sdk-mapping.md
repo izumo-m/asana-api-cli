@@ -11,7 +11,8 @@ what each option *does* (behavior, examples), see [`usage.md`](usage.md); for
 
 - Global options declared in `click_ext.py:_global_option_sections` — the single
   source they are built from and appended to the root group and every subcommand.
-- The `formatted` decorator's options in `formatter.py`.
+- The output-formatter options declared by `formatter.py:make_formatter_options`
+  (injected per command by `_make_command`); `formatter.py:formatted` renders the result.
 - Common per-command options injected by `_make_command` in `cli.py`: the
   boilerplate per-call kwargs (`_make_per_call_kwarg_options`) on **every**
   command, the pagination deprecation aliases on paginatable commands only, and
@@ -86,7 +87,7 @@ The `--limit` / `--offset` flags are docstring-derived (per-method) and appear
 only on commands whose SDK method declares them — same category as `--sync` /
 `--assignee` / other per-method opts.
 
-## Output formatter options (`formatter.py:formatted`)
+## Output formatter options (`formatter.py:make_formatter_options`)
 
 CLI-only — no SDK destination. Behavior in
 [`usage.md`](usage.md#output-formatting) and [`usage.md`](usage.md#error-output);
