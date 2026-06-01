@@ -843,8 +843,8 @@ class TestResolveBodyInline:
         result = resolve_body("[1, 2, 3]")
         assert result == [1, 2, 3]
 
-    def test_invalid_json_exits(self) -> None:
-        with pytest.raises(SystemExit):
+    def test_invalid_json_raises(self) -> None:
+        with pytest.raises(click.BadParameter, match="invalid JSON"):
             resolve_body("{bad json")
 
 
@@ -855,27 +855,23 @@ class TestResolveBodyFile:
         result = resolve_body(f"@{body_file}")
         assert result == {"data": {"name": "from file"}}
 
-    def test_missing_file_exits(self, tmp_path: Path) -> None:
-        with pytest.raises(SystemExit):
+    def test_missing_file_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(click.BadParameter, match="file not found"):
             resolve_body(f"@{tmp_path / 'nonexistent.json'}")
 
-    def test_invalid_json_in_file_exits(self, tmp_path: Path) -> None:
+    def test_invalid_json_in_file_raises(self, tmp_path: Path) -> None:
         body_file = tmp_path / "bad.json"
         body_file.write_text("not json")
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter, match="invalid JSON"):
             resolve_body(f"@{body_file}")
 
-    def test_non_utf8_file_exits_cleanly(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_non_utf8_file_raises_cleanly(self, tmp_path: Path) -> None:
         """A binary file (or any non-UTF-8 byte sequence) must produce a
-        clean error message, not a raw ``UnicodeDecodeError`` traceback."""
+        clean ``BadParameter``, not a raw ``UnicodeDecodeError`` traceback."""
         body_file = tmp_path / "binary.bin"
         body_file.write_bytes(b"\x80\x81\x82")  # invalid UTF-8 start bytes
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter, match="not valid UTF-8"):
             resolve_body(f"@{body_file}")
-        err = capsys.readouterr().err
-        assert "not valid UTF-8" in err
 
 
 class TestResolveBodyStdin:
@@ -884,9 +880,9 @@ class TestResolveBodyStdin:
         result = resolve_body("-")
         assert result == {"data": {"name": "stdin"}}
 
-    def test_invalid_stdin_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_invalid_stdin_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("sys.stdin", StringIO("not json"))
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter, match="invalid JSON"):
             resolve_body("-")
 
 
@@ -919,6 +915,6 @@ class TestResolveWorkspaceNoValue:
     def test_returns_none_when_optional(self) -> None:
         assert resolve_workspace(None) is None
 
-    def test_exits_when_required(self) -> None:
-        with pytest.raises(SystemExit):
+    def test_raises_when_required(self) -> None:
+        with pytest.raises(click.BadParameter, match="required"):
             resolve_workspace(None, required=True)

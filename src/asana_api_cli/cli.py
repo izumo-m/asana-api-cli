@@ -71,10 +71,10 @@ from asana_api_cli.version import version_string
 # ---------------------------------------------------------------------------
 # Input resolution
 #
-# Turn a raw CLI option value into the argument the SDK call receives, exiting
-# with code 2 (user-input error) on bad input. These are pure invocation-layer
-# helpers — no SDK client / session involved — called only from the command
-# callback below.
+# Turn a raw CLI option value into the argument the SDK call receives, raising
+# ``click.BadParameter`` (exit code 2, user-input error) on bad input. These are
+# pure invocation-layer helpers — no SDK client / session involved — called only
+# from the command callback below.
 # ---------------------------------------------------------------------------
 
 DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
@@ -97,32 +97,30 @@ def resolve_body(value: str) -> JsonValue:
             # stdin is reconfigured to UTF-8 at startup (see ``main``), so
             # non-UTF-8 input from a pipe surfaces here instead of being
             # silently misdecoded with the locale code page.
-            click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
-            sys.exit(2)
+            raise click.BadParameter(
+                f"stdin is not valid UTF-8: {exc}", param_hint="--body"
+            ) from exc
     elif value.startswith("@"):
         path = Path(value[1:])
         try:
             raw = path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            click.echo(f"Body file not found: {path}", err=True)
-            sys.exit(2)
+        except FileNotFoundError as exc:
+            raise click.BadParameter(f"file not found: {path}", param_hint="--body") from exc
         except UnicodeDecodeError as exc:
-            click.echo(
-                f"Body file {path} is not valid UTF-8: {exc}",
-                err=True,
-            )
-            sys.exit(2)
+            raise click.BadParameter(
+                f"file {path} is not valid UTF-8: {exc}", param_hint="--body"
+            ) from exc
         except OSError as exc:
-            click.echo(f"Cannot read body file {path}: {exc}", err=True)
-            sys.exit(2)
+            raise click.BadParameter(
+                f"cannot read file {path}: {exc}", param_hint="--body"
+            ) from exc
     else:
         raw = value
 
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        click.echo(f"Invalid JSON in body: {exc}", err=True)
-        sys.exit(2)
+        raise click.BadParameter(f"invalid JSON: {exc}", param_hint="--body") from exc
 
 
 def resolve_workspace(
@@ -140,7 +138,7 @@ def resolve_workspace(
     alongside other scope parameters (e.g. ``--project`` on ``get-tasks``)
     that the Asana API accepts in place of workspace.
 
-    If *required* is True and no value is found, exits with an error.
+    If *required* is True and no value is found, raises ``click.BadParameter``.
     """
     if explicit is not None:
         return explicit
@@ -148,11 +146,9 @@ def resolve_workspace(
         ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
         if ws:
             return ws
-        click.echo(
-            f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
-            err=True,
+        raise click.BadParameter(
+            f"required (or set {DEFAULT_WORKSPACE_ENV})", param_hint="--workspace"
         )
-        sys.exit(2)
     return None
 
 
