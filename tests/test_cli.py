@@ -338,8 +338,8 @@ def _option_flags(cmd: click.Command) -> set[str]:
 class TestFlagCollisions:
     """An SDK arg/opt whose flag collides with a built-in CLI flag is exposed as
     ``--sdk-<name>`` so the built-in keeps its bare name (``cli._decls`` /
-    ``_reserved_flags``). Real case: ``typeahead-for-workspace``'s ``query`` opt
-    vs the formatter's ``--query`` (jq filter)."""
+    ``_static_reserved_flags``). Real case: ``typeahead-for-workspace``'s
+    ``query`` opt vs the formatter's ``--query`` (jq filter)."""
 
     def test_no_command_has_duplicate_flags(self) -> None:
         """Whole-SDK sweep: collision resolution must leave no command with a
@@ -409,11 +409,38 @@ class TestReservedFlags:
     def test_decls_prefixes_and_preserves_dest_on_collision(self) -> None:
         assert _decls("--query", "query", frozenset({"--query"})) == ["--sdk-query", "query"]
 
-    def test_static_reserved_covers_each_builtin_family(self) -> None:
+    def test_static_reserved_covers_each_own_flag_family(self) -> None:
         reserved = _static_reserved_flags()
-        # formatter / kwarg / global (+ a --no- toggle's negative form).
-        for flag in ("--query", "--output", "--item-limit", "--host", "--no-verify-ssl"):
+        # asana-api's own flags: help/version, formatter, and the extensions.
+        for flag in (
+            "--help",
+            "--version",
+            "--query",
+            "--output",
+            "--all-items",
+            "--multibyte-filenames",
+        ):
             assert flag in reserved, f"{flag} missing from reserved set"
+
+    def test_static_reserved_excludes_sdk_derived_flags(self) -> None:
+        # globals (Configuration/ApiClient) and per-call kwargs (all_params) are
+        # SDK-derived, not asana-api's own — they stay out of the reserved set, so
+        # an opt/arg clashing with one is caught by the duplicate-flag sweep above
+        # rather than silently --sdk-'d.
+        reserved = _static_reserved_flags()
+        assert "--host" not in reserved  # global (Configuration)
+        assert "--item-limit" not in reserved  # per-call kwarg (all_params)
+
+    def test_extension_flags_yield_to_sdk_prefix_uniformly(self) -> None:
+        # The pagination aliases / upload toggle are reserved unconditionally, so a
+        # colliding SDK param maps to --sdk-<name> on every command, not only on
+        # paginatable / upload ones.
+        reserved = _static_reserved_flags()
+        assert _decls("--all-items", "all_items", reserved) == ["--sdk-all-items", "all_items"]
+        assert _decls("--multibyte-filenames", "multibyte_filenames", reserved) == [
+            "--sdk-multibyte-filenames",
+            "multibyte_filenames",
+        ]
 
     def test_help_and_version_reserved_so_sdk_opts_yield(self) -> None:
         # --help is click-added at parse time and --version is root-only, so

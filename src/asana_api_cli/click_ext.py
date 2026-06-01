@@ -278,9 +278,8 @@ def _make_global_option_params() -> list[click.Option]:
     """Flatten the single global-option source into a flat option list.
 
     Every command (the root group, each subgroup, and each leaf) appends a fresh
-    copy of this list to its own params so the globals are accepted at any level;
-    ``cli.py:_static_reserved_flags`` also reads it to learn which built-in flags
-    an SDK-derived option must not collide with. See :func:`_global_option_sections`.
+    copy of this list to its own params so the globals are accepted at any level.
+    See :func:`_global_option_sections`.
     """
     return [opt for _, opts in _global_option_sections() for opt in opts]
 

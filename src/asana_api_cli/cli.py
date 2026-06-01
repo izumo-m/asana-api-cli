@@ -57,7 +57,6 @@ from asana_api_cli.click_ext import (
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
-    _make_global_option_params,
 )
 from asana_api_cli.formatter import formatted, formatter_flag_names
 from asana_api_cli.session import (
@@ -662,36 +661,16 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
 
 @functools.cache
 def _static_reserved_flags() -> frozenset[str]:
-    """Built-in CLI flag strings present on (essentially) every command.
-
-    An SDK arg/opt whose derived flag lands in this set is exposed with a
-    ``sdk-`` prefix (see :func:`_decls`) so the built-in keeps its bare name.
-    Derived from the actual option builders (not hand-kept) so it tracks
-    renames / additions automatically. Per-command conditional flags
-    (deprecated aliases, ``--multibyte-filenames``) are added in
-    :func:`_reserved_flags`.
-
-    ``--help`` is added by click at parse time (never in ``cmd.params``) and
-    ``--version`` is root-only, so neither is discoverable by scanning a leaf's
-    params — they are listed explicitly so a future SDK ``help`` / ``version``
-    param is still pushed to ``--sdk-help`` / ``--sdk-version``.
+    """All asana-api own flags (no SDK counterpart). An SDK arg/opt whose
+    derived flag collides with one is exposed as ``--sdk-<name>``
+    (:func:`_decls`) so the built-in keeps its bare name. ``--help`` /
+    ``--version`` are listed explicitly because neither appears in a leaf's
+    params.
     """
     flags: set[str] = {"--help", "--version"}
     flags |= formatter_flag_names()
-    for params in (_make_per_call_kwarg_options(), _make_global_option_params()):
-        for p in params:
-            flags.update(p.opts)
-            flags.update(getattr(p, "secondary_opts", []))
-    return frozenset(flags)
-
-
-def _reserved_flags(op: _Operation) -> frozenset[str]:
-    """Built-in flags this command occupies (static set + per-command extras)."""
-    flags = set(_static_reserved_flags())
-    if op.paginatable:
-        flags |= {"--all-items", "--page-size", "--max-items"}
-    if op.does_upload:
-        flags.add("--multibyte-filenames")
+    # pagination aliases + upload toggle; keep in sync with _make_command
+    flags |= {"--all-items", "--page-size", "--max-items", "--multibyte-filenames"}
     return frozenset(flags)
 
 
@@ -829,10 +808,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     )
     paginatable = op.paginatable
     does_upload = op.does_upload
-    # Built-in flags this command occupies. An SDK arg/opt whose flag collides
-    # with one of these is exposed as ``--sdk-<name>`` (see ``_decls``) so the
-    # built-in keeps its bare name; the SDK param stays reachable + labelled.
-    reserved = _reserved_flags(op)
+    # asana-api's own flags (reserved uniformly across commands). An SDK arg/opt
+    # whose flag collides with one is exposed as ``--sdk-<name>`` (see
+    # ``_decls``) so the own flag keeps its bare name; the SDK param stays
+    # reachable + labelled.
+    reserved = _static_reserved_flags()
 
     options: list[click.Option] = []
 

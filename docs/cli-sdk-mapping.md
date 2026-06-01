@@ -139,9 +139,9 @@ How the CLI surface is derived from the SDK at runtime:
   the SDK's uniform `all_params` `**kwargs` become common per-command options.
   An SDK bump that adds either fails `tests/test_sdk_boilerplate.py`, forcing a
   conscious classification.
-- **Collision.** When a runtime-derived SDK arg/opt name would collide with a
-  built-in flag, it is exposed as `--sdk-<name>` (the built-in keeps its bare
-  name; the label still shows the real SDK name) — e.g.
+- **Collision.** When a runtime-derived SDK arg/opt name would collide with one
+  of asana-api's own (non-SDK) flags, it is exposed as `--sdk-<name>` (the own
+  flag keeps its bare name; the label still shows the real SDK name) — e.g.
   `typeahead-for-workspace --sdk-query`. `tests/test_cli.py::TestFlagCollisions`
   fails on any duplicate flag.
 - **Parity.** Every built-in non-extension flag matches the SDK input name 1:1
