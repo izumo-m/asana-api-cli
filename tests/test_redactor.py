@@ -42,7 +42,8 @@ class TestDefaultMaskToken:
         assert _default_mask_token("0123456789abcdef") == "...abcdef"
 
     def test_short_token_full_redact(self) -> None:
-        # len < 16 → full redact, so leak ratio stays at most 37.5%.
+        # len < 16 → full redact (0% leaked). Redacting below the threshold is
+        # what caps the worst-case (at-threshold) leak ratio at 6/16 = 37.5%.
         assert _default_mask_token("abc") == "<REDACTED>"
         assert _default_mask_token("0123456789abcde") == "<REDACTED>"  # 15 chars
         assert _default_mask_token("") == "<REDACTED>"

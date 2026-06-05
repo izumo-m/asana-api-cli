@@ -6,9 +6,11 @@ Three concerns live here:
    import path, so ``--help`` and tab completion do not need to import every
    ``*Api`` module up front.
 
-2. ``GroupWithGlobalOptions`` / ``CommandWithGlobalOptions`` — accept the root
-   group's options (``--debug``, ``--access-token``, ...) at any level of the
-   command tree, so ``asana-api tasks get-tasks --debug`` works the same as
+2. ``GroupWithGlobalOptions`` / ``CommandWithGlobalOptions`` — accept the
+   global options (``--debug``, ``--access-token``, ...) — declared once in
+   ``_global_option_sections`` and applied identically to the root group and
+   every subcommand — at any level of the command tree, so
+   ``asana-api tasks get-tasks --debug`` works the same as
    ``asana-api --debug tasks get-tasks``. Values whose source is the command
    line are written to the shared ``runtime`` singleton; defaults are ignored
    so they cannot clobber values already set at a higher level.
@@ -41,9 +43,9 @@ from asana_api_cli.structured_arg import (
 # ``Configuration.retry_strategy`` was introduced in python-asana 5.1.
 # When wrapping an older SDK the property simply does not exist, so
 # exposing ``--retry-strategy`` would crash at apply time. Detect once at
-# import and gate every retry-strategy touchpoint (option declaration on
-# the root, mirror in ``_make_global_option_params``, the "Retry" group
-# under ``GLOBAL_OPTION_GROUPS``). The runtime applier in ``session.py``
+# import and gate the single retry-strategy touchpoint: the "Retry" section
+# in ``_global_option_sections`` (from which the flag, the help grouping, and
+# ``GLOBAL_OPTION_NAMES`` all derive). The runtime applier in ``session.py``
 # already checks ``runtime.retry_strategy_overrides is not None`` so its
 # code path is naturally dead when the flag is hidden. We instantiate
 # ``Configuration()`` because ``retry_strategy`` is an instance attribute
@@ -52,33 +54,255 @@ from asana_api_cli.structured_arg import (
 _SDK_HAS_RETRY_STRATEGY: bool = hasattr(asana.Configuration(), "retry_strategy")
 
 
+def _global_option_sections() -> list[tuple[str, list[click.Option]]]:
+    """The single source of truth for the global Configuration / ApiClient knobs.
+
+    Each global option is declared here exactly once, grouped by the ``--help``
+    section it renders under. The root command and every subcommand draw their
+    global options from this one builder (via :func:`_make_global_option_params`),
+    so there is no second declaration site to keep in sync — every command
+    exposes byte-identical global-option definitions (flag spelling, help,
+    default, flag-ness, type) by construction. (How they *render* differs by
+    level — see :class:`_GlobalOptionsMixin`.) ``--help`` section order and the
+    option order within a section both derive from this list (see
+    :data:`GLOBAL_OPTION_GROUPS`).
+
+    Fresh ``click.Option`` instances are returned on every call: click stores
+    per-command state on Option objects, so the same instance must not be shared
+    across commands.
+
+    ``--retry-strategy`` is present only when the installed python-asana exposes
+    ``Configuration.retry_strategy`` (added in 5.1); on older SDKs the whole
+    section is omitted (see :data:`_SDK_HAS_RETRY_STRATEGY`).
+    """
+    return [
+        (
+            "Authentication",
+            [
+                click.Option(
+                    ["--access-token", "access_token"],
+                    default=None,
+                    help=(
+                        "Asana personal access token (default: $ASANA_ACCESS_TOKEN). "
+                        "(Configuration: access_token)"
+                    ),
+                ),
+            ],
+        ),
+        (
+            "Connection",
+            [
+                click.Option(
+                    ["--host"],
+                    default=None,
+                    help=(
+                        "Override API base URL (default: https://app.asana.com/api/1.0). "
+                        "(Configuration: host)"
+                    ),
+                ),
+                click.Option(
+                    ["--proxy"],
+                    default=None,
+                    help="HTTP/HTTPS proxy URL. (Configuration: proxy)",
+                ),
+                click.Option(
+                    ["--connection-pool-maxsize", "connection_pool_maxsize"],
+                    type=click.IntRange(min=1),
+                    default=None,
+                    help=(
+                        "Max urllib3 connections cached per host (default: "
+                        "cpu_count * 5). (Configuration: connection_pool_maxsize)"
+                    ),
+                ),
+            ],
+        ),
+        (
+            "TLS",
+            [
+                click.Option(
+                    ["--verify-ssl/--no-verify-ssl", "verify_ssl"],
+                    default=None,
+                    help=(
+                        "Verify TLS certificates (default: True). Pass "
+                        "--no-verify-ssl to disable (insecure). "
+                        "(Configuration: verify_ssl)"
+                    ),
+                ),
+                click.Option(
+                    ["--ssl-ca-cert", "ssl_ca_cert"],
+                    default=None,
+                    type=click.Path(exists=True, dir_okay=False),
+                    help="Path to a PEM bundle of trusted CA certs. (Configuration: ssl_ca_cert)",
+                ),
+                click.Option(
+                    ["--cert-file", "cert_file"],
+                    default=None,
+                    type=click.Path(exists=True, dir_okay=False),
+                    help="Client TLS certificate for mTLS. (Configuration: cert_file)",
+                ),
+                click.Option(
+                    ["--key-file", "key_file"],
+                    default=None,
+                    type=click.Path(exists=True, dir_okay=False),
+                    help="Client TLS private key for mTLS. (Configuration: key_file)",
+                ),
+                click.Option(
+                    ["--assert-hostname/--no-assert-hostname", "assert_hostname"],
+                    default=None,
+                    help=(
+                        "Verify the server certificate's hostname matches the "
+                        "request URL host. Tri-state: unspecified → urllib3 "
+                        "default. (Configuration: assert_hostname)"
+                    ),
+                ),
+            ],
+        ),
+        (
+            "HTTP headers",
+            [
+                click.Option(
+                    ["--user-agent", "user_agent"],
+                    default=None,
+                    help=(
+                        "Override the User-Agent header the SDK sends on every request. "
+                        "(ApiClient: user_agent)"
+                    ),
+                ),
+                click.Option(
+                    ["--set-default-header", "default_headers"],
+                    multiple=True,
+                    callback=default_header_callback,
+                    help=(
+                        "Add an HTTP header sent on every request, given as NAME=VALUE; "
+                        "repeatable. Unlike per-call --header-params it applies to all "
+                        "calls. Not redacted in --debug output — see SECURITY.md. "
+                        "(ApiClient: set_default_header)"
+                    ),
+                ),
+            ],
+        ),
+        *(
+            [
+                (
+                    "Retry",
+                    [
+                        click.Option(
+                            ["--retry-strategy", "retry_strategy_overrides"],
+                            default=None,
+                            callback=click_callback(schema=RETRY_FIELD_SCHEMA),
+                            help=(
+                                "Override urllib3 Retry fields. VALUE: "
+                                "'k1=v1,k2=v2,...', JSON object, or @path. See "
+                                "urllib3 Retry docs. List-typed fields "
+                                "(allowed_methods, status_forcelist, "
+                                "remove_headers_on_redirect) require JSON. "
+                                "(Configuration: retry_strategy)"
+                            ),
+                        ),
+                    ],
+                ),
+            ]
+            if _SDK_HAS_RETRY_STRATEGY
+            else []
+        ),
+        (
+            "Pagination / iteration",
+            [
+                click.Option(
+                    ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
+                    default=None,
+                    help=(
+                        "Toggle the SDK page iterator (default: enabled). With "
+                        "--no-return-page-iterator, paginatable endpoints return a "
+                        "single {data, next_page} dict from one HTTP call instead of "
+                        "auto-walking every page. (Configuration: return_page_iterator)"
+                    ),
+                ),
+                click.Option(
+                    ["--page-limit", "page_limit"],
+                    type=int,
+                    default=None,
+                    help=(
+                        "Per-page size when the iterator falls back to Configuration "
+                        "(default: 100). Equivalent to --limit on paginatable endpoints; "
+                        '--limit (per-call opts["limit"]) takes precedence when both '
+                        "are set. (Configuration: page_limit)"
+                    ),
+                ),
+            ],
+        ),
+        (
+            "Logging / Debug",
+            [
+                click.Option(
+                    ["--debug"],
+                    is_flag=True,
+                    default=False,
+                    help=(
+                        "Print the SDK's HTTP request/response debug output for "
+                        "troubleshooting, with the Authorization header masked. As the "
+                        "SDK emits it, the wire trace (headers) goes to stdout and the "
+                        "connection/response log to stderr. (Configuration: debug)"
+                    ),
+                ),
+                click.Option(
+                    ["--logger-format", "logger_format"],
+                    default=None,
+                    help="Python logging format string. (Configuration: logger_format)",
+                ),
+                click.Option(
+                    ["--logger-file", "logger_file"],
+                    default=None,
+                    type=click.Path(dir_okay=False),
+                    help="Path SDK loggers write to. (Configuration: logger_file)",
+                ),
+            ],
+        ),
+        (
+            "Advanced",
+            [
+                click.Option(
+                    ["--temp-folder-path", "temp_folder_path"],
+                    default=None,
+                    type=click.Path(file_okay=False),
+                    help="Directory for temporary downloads. (Configuration: temp_folder_path)",
+                ),
+                click.Option(
+                    ["--safe-chars-for-path-param", "safe_chars_for_path_param"],
+                    default=None,
+                    help=(
+                        "Extra chars treated as safe when percent-encoding path "
+                        "parameters. (Configuration: safe_chars_for_path_param)"
+                    ),
+                ),
+            ],
+        ),
+    ]
+
+
+def _make_global_option_params() -> list[click.Option]:
+    """Flatten the single global-option source into a flat option list.
+
+    Every command (the root group, each subgroup, and each leaf) appends a fresh
+    copy of this list to its own params so the globals are accepted at any level.
+    See :func:`_global_option_sections`.
+    """
+    return [opt for _, opts in _global_option_sections() for opt in opts]
+
+
+# Derived from the single source above. ``GLOBAL_OPTION_GROUPS`` maps each
+# ``--help`` section to the option ``name``s (dests) it contains, in render
+# order; ``GLOBAL_OPTION_NAMES`` is the flat set used to recognize a global
+# option anywhere in the tree.
+def _opt_dest(opt: click.Option) -> str:
+    """The dest of a global option. Every global option has one (click derives
+    it from the flags), so the ``None`` case is unreachable — narrow for typing."""
+    assert opt.name is not None
+    return opt.name
+
+
 GLOBAL_OPTION_GROUPS: list[tuple[str, list[str]]] = [
-    ("Authentication", ["access_token"]),
-    (
-        "Connection",
-        ["host", "proxy", "connection_pool_maxsize"],
-    ),
-    (
-        "TLS",
-        ["verify_ssl", "ssl_ca_cert", "cert_file", "key_file", "assert_hostname"],
-    ),
-    (
-        "HTTP headers",
-        ["user_agent", "default_headers"],
-    ),
-    *([("Retry", ["retry_strategy_overrides"])] if _SDK_HAS_RETRY_STRATEGY else []),
-    (
-        "Pagination / iteration",
-        [
-            "return_page_iterator",
-            "page_limit",
-        ],
-    ),
-    (
-        "Logging / Debug",
-        ["debug", "logger_format", "logger_file"],
-    ),
-    ("Advanced", ["temp_folder_path", "safe_chars_for_path_param"]),
+    (section, [_opt_dest(opt) for opt in opts]) for section, opts in _global_option_sections()
 ]
 
 GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
@@ -87,7 +311,7 @@ GLOBAL_OPTION_NAMES: frozenset[str] = frozenset(
 
 # Shorter labels used in the compact (non-root) Global Options table.
 # The first column's width is driven by the longest label, so trimming the
-# few longest ones widens the right-hand option column on narrow terminals.
+# longest one widens the right-hand option column on narrow terminals.
 _COMPACT_SECTION_LABELS: dict[str, str] = {
     "Pagination / iteration": "Pagination",
 }
@@ -100,228 +324,28 @@ _COMPACT_SECTION_LABELS: dict[str, str] = {
 _DEPRECATED_OPTION_NAMES: frozenset[str] = frozenset({"all_items", "page_size", "max_items"})
 
 
-def _make_global_option_params() -> list[click.Option]:
-    """Build fresh ``click.Option`` instances mirroring the root group's globals.
-
-    Kept in sync with the ``@click.option`` decorators on ``main`` in
-    ``cli.py``. Fresh instances are returned each call because click stores
-    per-command state on Option objects.
-    """
-    return [
-        click.Option(
-            ["--host"],
-            default=None,
-            help=(
-                "Override API base URL (default: https://app.asana.com/api/1.0). "
-                "(Configuration: host)"
-            ),
-        ),
-        click.Option(
-            ["--proxy"],
-            default=None,
-            help="HTTP/HTTPS proxy URL. (Configuration: proxy)",
-        ),
-        click.Option(
-            ["--verify-ssl/--no-verify-ssl", "verify_ssl"],
-            default=None,
-            help=(
-                "Verify TLS certificates (default: True). Pass "
-                "--no-verify-ssl to disable (insecure). "
-                "(Configuration: verify_ssl)"
-            ),
-        ),
-        click.Option(
-            ["--ssl-ca-cert", "ssl_ca_cert"],
-            default=None,
-            type=click.Path(exists=True, dir_okay=False),
-            help="Path to a PEM bundle of trusted CA certs. (Configuration: ssl_ca_cert)",
-        ),
-        click.Option(
-            ["--cert-file", "cert_file"],
-            default=None,
-            type=click.Path(exists=True, dir_okay=False),
-            help="Client TLS certificate for mTLS. (Configuration: cert_file)",
-        ),
-        click.Option(
-            ["--key-file", "key_file"],
-            default=None,
-            type=click.Path(exists=True, dir_okay=False),
-            help="Client TLS private key for mTLS. (Configuration: key_file)",
-        ),
-        click.Option(
-            ["--assert-hostname/--no-assert-hostname", "assert_hostname"],
-            default=None,
-            help=(
-                "Verify the server certificate's hostname matches the "
-                "request URL host. Tri-state: unspecified → urllib3 "
-                "default. (Configuration: assert_hostname)"
-            ),
-        ),
-        click.Option(
-            ["--user-agent", "user_agent"],
-            default=None,
-            help=(
-                "Override the User-Agent header the SDK sends on every request. "
-                "(ApiClient: user_agent)"
-            ),
-        ),
-        click.Option(
-            ["--set-default-header", "default_headers"],
-            multiple=True,
-            callback=default_header_callback,
-            help=(
-                "Add an HTTP header sent on every request, given as NAME=VALUE; "
-                "repeatable. Unlike per-call --header-params it applies to all "
-                "calls. Not redacted in --debug output — see SECURITY.md. "
-                "(ApiClient: set_default_header)"
-            ),
-        ),
-        *(
-            [
-                click.Option(
-                    ["--retry-strategy", "retry_strategy_overrides"],
-                    default=None,
-                    callback=click_callback(schema=RETRY_FIELD_SCHEMA),
-                    help=(
-                        "Override urllib3 Retry fields. VALUE: "
-                        "'k1=v1,k2=v2,...', JSON object, or @path. See "
-                        "urllib3 Retry docs. List-typed fields "
-                        "(allowed_methods, status_forcelist, "
-                        "remove_headers_on_redirect) require JSON. "
-                        "(Configuration: retry_strategy)"
-                    ),
-                ),
-            ]
-            if _SDK_HAS_RETRY_STRATEGY
-            else []
-        ),
-        click.Option(
-            ["--connection-pool-maxsize", "connection_pool_maxsize"],
-            type=click.IntRange(min=1),
-            default=None,
-            help=(
-                "Max urllib3 connections cached per host (default: "
-                "cpu_count * 5). (Configuration: connection_pool_maxsize)"
-            ),
-        ),
-        click.Option(
-            ["--access-token", "access_token"],
-            default=None,
-            help=(
-                "Asana personal access token (default: $ASANA_ACCESS_TOKEN). "
-                "(Configuration: access_token)"
-            ),
-        ),
-        click.Option(
-            ["--temp-folder-path", "temp_folder_path"],
-            default=None,
-            type=click.Path(file_okay=False),
-            help="Directory for temporary downloads. (Configuration: temp_folder_path)",
-        ),
-        click.Option(
-            ["--safe-chars-for-path-param", "safe_chars_for_path_param"],
-            default=None,
-            help=(
-                "Extra chars treated as safe when percent-encoding path "
-                "parameters. (Configuration: safe_chars_for_path_param)"
-            ),
-        ),
-        click.Option(
-            ["--logger-format", "logger_format"],
-            default=None,
-            help="Python logging format string. (Configuration: logger_format)",
-        ),
-        click.Option(
-            ["--logger-file", "logger_file"],
-            default=None,
-            type=click.Path(dir_okay=False),
-            help="Path SDK loggers write to. (Configuration: logger_file)",
-        ),
-        click.Option(
-            ["--debug"],
-            is_flag=True,
-            default=False,
-            help=(
-                "Print HTTP request/response to stderr for troubleshooting. (Configuration: debug)"
-            ),
-        ),
-        click.Option(
-            ["--return-page-iterator/--no-return-page-iterator", "return_page_iterator"],
-            default=None,
-            help=(
-                "Toggle the SDK page iterator (default: enabled). With "
-                "--no-return-page-iterator, paginatable endpoints return a "
-                "single {data, next_page} dict from one HTTP call instead of "
-                "auto-walking every page. (Configuration: return_page_iterator)"
-            ),
-        ),
-        click.Option(
-            ["--page-limit", "page_limit"],
-            type=int,
-            default=None,
-            help=(
-                "Per-page size when the iterator falls back to Configuration "
-                "(default: 100). Equivalent to --limit on paginatable endpoints; "
-                '--limit (per-call opts["limit"]) takes precedence when both '
-                "are set. (Configuration: page_limit)"
-            ),
-        ),
-    ]
-
-
 def _apply_global_to_runtime(name: str, value: Any) -> None:
     """Write a single global option value to the shared ``runtime`` singleton.
 
-    Mirrors the body of ``main`` in ``cli.py``; if the set of global options
-    changes there, update both places.
+    Every global option's dest matches a ``_Runtime`` field name 1:1 — the
+    option declarations and the dataclass fields are authored together, and the
+    inventory tests in ``test_click_ext.py`` (``TestGlobalOptionNamesInventory``)
+    pin the ``GLOBAL_OPTION_NAMES`` set against ``_Runtime``'s fields — so a
+    direct ``setattr`` suffices. Every option, ``access_token`` included,
+    follows the same last-wins rule: the command-line value from the deepest
+    level reached overwrites whatever an earlier level wrote. An explicit empty
+    ``--access-token`` therefore clears a value set earlier, and
+    ``AsanaSession.from_env`` then falls back to ``$ASANA_ACCESS_TOKEN``.
+
+    The caller, :func:`_consume_global_options`, only ever passes names drawn
+    from ``GLOBAL_OPTION_NAMES`` and only when the parameter source is
+    ``ParameterSource.COMMANDLINE``. This is the single application path for
+    every level of the tree (root group included). That guarantee is why this
+    function needs no name validation and no ``None``-default guarding: the
+    tri-state toggles' (``verify_ssl`` / ``assert_hostname`` /
+    ``return_page_iterator``) ``None`` default never reaches here.
     """
-    if name == "host":
-        runtime.host = value
-    elif name == "proxy":
-        runtime.proxy = value
-    elif name == "verify_ssl":
-        # Click guarantees the toggle yields True / False once the user
-        # picked a side; the None default is filtered out by the
-        # COMMANDLINE-source check in ``_consume_global_options``.
-        runtime.verify_ssl = value
-    elif name == "ssl_ca_cert":
-        runtime.ssl_ca_cert = value
-    elif name == "cert_file":
-        runtime.cert_file = value
-    elif name == "key_file":
-        runtime.key_file = value
-    elif name == "assert_hostname":
-        runtime.assert_hostname = value
-    elif name == "user_agent":
-        runtime.user_agent = value
-    elif name == "default_headers":
-        runtime.default_headers = value
-    elif name == "retry_strategy_overrides":
-        runtime.retry_strategy_overrides = value
-    elif name == "connection_pool_maxsize":
-        runtime.connection_pool_maxsize = value
-    elif name == "access_token":
-        if value:
-            runtime.access_token = value
-    elif name == "temp_folder_path":
-        runtime.temp_folder_path = value
-    elif name == "safe_chars_for_path_param":
-        runtime.safe_chars_for_path_param = value
-    elif name == "logger_format":
-        runtime.logger_format = value
-    elif name == "logger_file":
-        runtime.logger_file = value
-    elif name == "debug":
-        runtime.debug = value
-    elif name == "return_page_iterator":
-        # No ``is not None`` guard needed here (cf. the symmetric guard in
-        # ``cli.py:main`` for the root-level decorator): this function is
-        # only called from ``_consume_global_options`` after the
-        # ``ParameterSource.COMMANDLINE`` check, which excludes the
-        # tri-state's ``None`` default value.
-        runtime.return_page_iterator = value
-    elif name == "page_limit":
-        runtime.page_limit = value
+    setattr(runtime, name, value)
 
 
 def _consume_global_options(ctx: click.Context) -> None:
@@ -459,7 +483,7 @@ class _GlobalOptionsMixin:
 
 
 class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):
-    """A ``click.Command`` that also accepts the root group's global options."""
+    """A ``click.Command`` that also accepts the shared global options."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -472,7 +496,7 @@ class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):
 
 
 class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):
-    """A ``click.Group`` that also accepts the root group's global options.
+    """A ``click.Group`` that also accepts the shared global options.
 
     Children created via ``@group.command(...)`` default to
     ``CommandWithGlobalOptions`` so they inherit the same behavior.
@@ -490,13 +514,19 @@ class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):
         return super().invoke(ctx)
 
 
-class LazyGroup(_GlobalOptionsMixin, click.Group):
-    """A ``click.Group`` that loads subcommand modules only when invoked.
+class LazyGroup(GroupWithGlobalOptions):
+    """A ``GroupWithGlobalOptions`` that loads subcommand modules only when invoked.
 
     ``lazy_subcommands`` maps a subcommand name to a ``(import_path, short_help)``
     tuple. ``import_path`` is the standard ``"package.module:attr"`` form. The
     ``short_help`` is shown in the parent's command listing without importing
     the target module, which keeps top-level ``--help`` cheap.
+
+    Used as the root group. Global-option handling (the params append in
+    ``__init__`` and the ``_consume_global_options`` call in ``invoke``) is
+    inherited from ``GroupWithGlobalOptions``, so the root accepts and applies
+    the same global flags as every subcommand, all from the single
+    ``_global_option_sections`` source — there is no separate root declaration.
     """
 
     def __init__(

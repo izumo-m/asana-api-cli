@@ -306,7 +306,7 @@ class TestDeprecationAliases:
 
 
 # ---------------------------------------------------------------------------
-# Debug redactor lifecycle across pagination
+# Global option validation
 # ---------------------------------------------------------------------------
 
 
@@ -367,16 +367,18 @@ class TestTriStateToggles:
     explicit True (user passed the positive form), explicit False (user
     passed the negative form), and unset (user passed neither).
 
-    ``main()`` guards the unset case so the runtime singleton is not
-    clobbered with ``None`` over a value an earlier code path may have
-    set. ``AsanaSession`` mirrors the guard so it only writes
-    ``config.<prop>`` when the runtime carries an explicit value.
+    ``_consume_global_options`` (in ``click_ext``) guards the unset case: it
+    writes a global into ``runtime`` only when its parameter source is
+    ``COMMANDLINE``, so an unset toggle (its ``None`` default) never clobbers a
+    value an earlier code path may have set. ``AsanaSession`` mirrors the guard
+    so it only writes ``config.<prop>`` when the runtime carries an explicit
+    value.
 
-    These tests invoke ``main`` with a subcommand path ending in
-    ``--help``: Click runs the root group callback (which writes to
-    ``runtime``) before descending into the subcommand, and the leaf
-    ``--help`` then short-circuits without touching the SDK — exactly
-    what we want for an option-plumbing test.
+    These tests invoke ``main`` with a subcommand path ending in ``--help``:
+    Click runs the root group's invoke (``GroupWithGlobalOptions.invoke`` →
+    ``_consume_global_options``, which writes to ``runtime``) before descending
+    into the subcommand, and the leaf ``--help`` then short-circuits without
+    touching the SDK — exactly what we want for an option-plumbing test.
     """
 
     def test_verify_ssl_explicit_true(self) -> None:
@@ -396,11 +398,12 @@ class TestTriStateToggles:
         assert runtime.verify_ssl is False
 
     def test_verify_ssl_unset_does_not_clobber_existing_runtime_value(self) -> None:
-        """Regression for the round-1 review fix: when ``main()`` runs
-        without either side of the toggle, it must NOT overwrite a value
-        already in ``runtime.verify_ssl`` (set by a higher-priority source).
-        Pre-set to False, invoke main with no toggle on the command line;
-        the guard must leave it intact."""
+        """Regression: when neither side of the toggle is passed,
+        ``_consume_global_options`` must NOT overwrite a value already in
+        ``runtime.verify_ssl`` (set by a higher-priority source) — a ``None``
+        default is not ``COMMANDLINE``-sourced, so the guard skips it. Pre-set
+        to False, invoke main with no toggle on the command line; the guard
+        must leave it intact."""
         from asana_api_cli.cli import main
 
         runtime.verify_ssl = False
@@ -425,8 +428,9 @@ class TestTriStateToggles:
         assert runtime.assert_hostname is False
 
     def test_assert_hostname_unset_does_not_clobber_existing_runtime_value(self) -> None:
-        """Same regression shape as ``verify_ssl`` — round-2 review added
-        the ``is not None`` guard to ``main()`` for symmetry."""
+        """Same regression shape as ``verify_ssl`` — ``_consume_global_options``
+        skips a ``None`` default (not ``COMMANDLINE``-sourced), so an unset
+        toggle never overwrites a pre-existing ``runtime`` value."""
         from asana_api_cli.cli import main
 
         runtime.assert_hostname = True
@@ -559,10 +563,41 @@ class TestHttpHeaderGlobalsReachClient:
         assert "NAME=VALUE" in full_output(result)
 
 
+class TestAccessTokenLastWins:
+    """``access_token`` follows the same last-wins rule as every other global
+    option: the command-line value overwrites whatever ``runtime`` held,
+    empty included. An explicit empty ``--access-token`` therefore clears a
+    preset token, and ``AsanaSession.from_env`` falls back to
+    ``$ASANA_ACCESS_TOKEN`` (set to ``test-token`` by ``_isolated_runtime``)."""
+
+    def test_empty_access_token_overwrites_runtime(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
+        runtime.access_token = "preset-token"
+        result = make_runner().invoke(cmd, ["--access-token", "", "--task", "T"])
+        # The empty value wins (clears the preset); from_env falls back to env.
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.access_token == ""
+
+    def test_nonempty_access_token_reaches_runtime(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_task")
+        _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})
+        runtime.access_token = "preset-token"
+        result = make_runner().invoke(cmd, ["--access-token", "new-token", "--task", "T"])
+        assert result.exit_code == 0, full_output(result)
+        assert runtime.access_token == "new-token"
+
+
+# ---------------------------------------------------------------------------
+# Debug redactor lifecycle across pagination
+# ---------------------------------------------------------------------------
+
+
 class TestDebugRedactorLifecycle:
     """The http.client debug redactor must stay installed for the duration
     of every paginated request, including the lazy per-page HTTP calls made
-    while the formatter iterates the SDK's PageIterator."""
+    while ``cli.py:inner_callback`` consumes the SDK's iterator inside the
+    session context."""
 
     def test_all_items_with_debug_keeps_redactor_installed_during_iteration(
         self, monkeypatch: pytest.MonkeyPatch
@@ -694,11 +729,10 @@ class TestArgumentForwarding:
 class TestMultibyteFilenamesUploadFlag:
     """``--multibyte-filenames`` is a per-command flag on upload commands only.
 
-    It sets ``runtime.multibyte_filenames``, which ``AsanaSession`` reads to
-    install ``MultibyteFilenameSupport`` (the multipart filename patch) for the
-    duration of the call. These tests observe the patch state *during* the SDK
-    call — not just the post-invocation ``runtime`` value — so an ordering bug
-    (the session reading the flag before the callback sets it) cannot pass.
+    Its callback installs ``MultibyteFilenameSupport`` (the multipart filename
+    patch) via ``ctx.with_resource`` and uninstalls it at command teardown.
+    These tests observe the patch state *during* the SDK call, so an ordering
+    bug (the patch not active when the multipart body is built) cannot pass.
     Mirrors ``TestDebugRedactorLifecycle``. (Absence from the global flags /
     non-upload commands is covered in test_cli.py.)
     """
@@ -744,8 +778,7 @@ class TestMultibyteFilenamesUploadFlag:
         )
         assert result.exit_code == 0, full_output(result)
         assert installed_during is True  # patch was active while the SDK call ran
-        assert cleaned_after is True  # session uninstalled it on exit (no leak)
-        assert runtime.multibyte_filenames is True
+        assert cleaned_after is True  # uninstalled at command teardown (no leak)
 
     def test_absent_flag_does_not_install_patch(self, monkeypatch: pytest.MonkeyPatch) -> None:
         result, installed_during, cleaned_after = self._invoke_capturing_patch_state(
@@ -754,7 +787,6 @@ class TestMultibyteFilenamesUploadFlag:
         assert result.exit_code == 0, full_output(result)
         assert installed_during is False  # no patch installed when the flag is absent
         assert cleaned_after is True
-        assert runtime.multibyte_filenames is False
 
 
 # ---------------------------------------------------------------------------
@@ -854,8 +886,10 @@ class TestErrorPathExitCodes:
     catches the SDK exception, writes ``format_exception_only``
     (qualified class + ``__str__``, no traceback) to stderr, and exits
     1. Opting into an envelope format produces a machine-readable
-    envelope on stdout (exit 3). User-input errors (bad jq,
-    query-without-format) are exit 2.
+    envelope on stdout (exit 3). A bad jq expression is a user-input error
+    (exit 2); pairing ``--exception-query`` with the default
+    ``--exception-output=none`` only warns and still exits 1 (the filter is
+    ignored, so the underlying exception result is preserved).
     """
 
     def test_api_error_default_none_renders_without_traceback(

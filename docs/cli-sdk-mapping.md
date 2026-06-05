@@ -9,8 +9,10 @@ what each option *does* (behavior, examples), see [`usage.md`](usage.md); for
 
 **Included** — options written by hand in this codebase:
 
-- Global options declared on `cli.py:main` (`@click.option(...)` decorators).
-- The `formatted` decorator's options in `formatter.py`.
+- Global options declared in `click_ext.py:_global_option_sections` — the single
+  source they are built from and appended to the root group and every subcommand.
+- The output-formatter options declared by `formatter.py:make_formatter_options`
+  (injected per command by `_make_command`); `formatter.py:formatted` renders the result.
 - Common per-command options injected by `_make_command` in `cli.py`: the
   boilerplate per-call kwargs (`_make_per_call_kwarg_options`) on **every**
   command, the pagination deprecation aliases on paginatable commands only, and
@@ -27,8 +29,10 @@ produce them are in [Conversion rules](#conversion-rules).
 
 In the **"SDK destination"** column:
 
-- *Direct property* — assigned to a field on `asana.Configuration` once, during
-  session construction (`session.py:AsanaSession.__init__`).
+- *Direct property* — assigned to a field on `asana.Configuration` during
+  session construction (`session.py:AsanaSession.__init__`), except `--debug`,
+  which is applied on session entry (`AsanaSession.open`) because it has
+  process-global side effects reversed on exit (see its row below).
 - *Struct member* — passed into a nested constructor that `Configuration`
   consumes (e.g. `Configuration.retry_strategy` is built from a
   `urllib3.util.retry.Retry`).
@@ -36,12 +40,12 @@ In the **"SDK destination"** column:
   construction (e.g. `ApiClient.user_agent`, `ApiClient.set_default_header`),
   not on `Configuration`. Session-wide: rides every request the client makes.
 - *Per-call kwarg* — forwarded through `_make_command` as a method kwarg.
-- *Patch* — a monkey-patch on an SDK-adjacent module, installed while the
-  session is open (`AsanaSession.open` → `close`, i.e. for the `with` block).
+- *Patch* — a monkey-patch on an SDK-adjacent module, installed via the option's
+  callback (`ctx.with_resource`) and scoped to the command's context teardown.
 - *(none)* — no SDK counterpart (CLI-only; cataloged in
   [`sdk-deviations.md`](sdk-deviations.md), behavior in [`usage.md`](usage.md)).
 
-## Global options (`cli.py:main`)
+## Global options (`click_ext.py:_global_option_sections`)
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
@@ -85,10 +89,10 @@ The `--limit` / `--offset` flags are docstring-derived (per-method) and appear
 only on commands whose SDK method declares them — same category as `--sync` /
 `--assignee` / other per-method opts.
 
-## Output formatter options (`formatter.py:formatted`)
+## Output formatter options (`formatter.py:make_formatter_options`)
 
 CLI-only — no SDK destination. Behavior in
-[`usage.md`](usage.md#output-formatting) and [`usage.md`](usage.md#error-output);
+[`usage.md`](usage.md#output-formats) and [`usage.md`](usage.md#error-handling);
 rationale in [`sdk-deviations.md`](sdk-deviations.md). Because they bind to the
 single SDK method call (not the client `Configuration`), they are per-command
 leaf options — placing them before the command path is a usage error.
@@ -121,7 +125,7 @@ runtime by `_Operation.does_upload` (the sole such command today is
 
 | Flag | SDK destination | Mapping mechanism |
 |---|---|---|
-| `--multibyte-filenames` | *(none)* | *Patch*: installs `MultibyteFilenameSupport` (RFC 5987 `filename*=`), set via `runtime` and installed on session entry (`AsanaSession.open`). Behavior in [`usage.md`](usage.md#file-uploads); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
+| `--multibyte-filenames` | *(none)* | *Patch*: installs `MultibyteFilenameSupport` (RFC 5987 `filename*=`) from its option callback via `ctx.with_resource`, scoped to the command. Behavior in [`usage.md`](usage.md#file-uploads); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
 
 ## Conversion rules
 
@@ -138,9 +142,9 @@ How the CLI surface is derived from the SDK at runtime:
   the SDK's uniform `all_params` `**kwargs` become common per-command options.
   An SDK bump that adds either fails `tests/test_sdk_boilerplate.py`, forcing a
   conscious classification.
-- **Collision.** When a runtime-derived SDK arg/opt name would collide with a
-  built-in flag, it is exposed as `--sdk-<name>` (the built-in keeps its bare
-  name; the label still shows the real SDK name) — e.g.
+- **Collision.** When a runtime-derived SDK arg/opt name would collide with one
+  of asana-api's own (non-SDK) flags, it is exposed as `--sdk-<name>` (the own
+  flag keeps its bare name; the label still shows the real SDK name) — e.g.
   `typeahead-for-workspace --sdk-query`. `tests/test_cli.py::TestFlagCollisions`
   fails on any duplicate flag.
 - **Parity.** Every built-in non-extension flag matches the SDK input name 1:1

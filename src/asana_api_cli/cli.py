@@ -54,31 +54,27 @@ import asana
 import click
 
 from asana_api_cli.click_ext import (
-    _SDK_HAS_RETRY_STRATEGY,
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
     LazyGroup,
-    _make_global_option_params,
 )
-from asana_api_cli.formatter import formatted, formatter_flag_names
+from asana_api_cli.formatter import formatted, formatter_flag_names, make_formatter_options
 from asana_api_cli.session import (
     AsanaSession,
-    runtime,
+    MultibyteFilenameSupport,
 )
 from asana_api_cli.structured_arg import (
-    RETRY_FIELD_SCHEMA,
     click_callback,
-    default_header_callback,
 )
 from asana_api_cli.version import version_string
 
 # ---------------------------------------------------------------------------
 # Input resolution
 #
-# Turn a raw CLI option value into the argument the SDK call receives, exiting
-# with code 2 (user-input error) on bad input. These are pure invocation-layer
-# helpers — no SDK client / session involved — called only from the command
-# callback below.
+# Turn a raw CLI option value into the argument the SDK call receives, raising
+# ``click.BadParameter`` (exit code 2, user-input error) on bad input. These are
+# pure invocation-layer helpers — no SDK client / session involved — called only
+# from the command callback below.
 # ---------------------------------------------------------------------------
 
 DEFAULT_WORKSPACE_ENV = "ASANA_DEFAULT_WORKSPACE"
@@ -101,32 +97,30 @@ def resolve_body(value: str) -> JsonValue:
             # stdin is reconfigured to UTF-8 at startup (see ``main``), so
             # non-UTF-8 input from a pipe surfaces here instead of being
             # silently misdecoded with the locale code page.
-            click.echo(f"Body from stdin is not valid UTF-8: {exc}", err=True)
-            sys.exit(2)
+            raise click.BadParameter(
+                f"stdin is not valid UTF-8: {exc}", param_hint="--body"
+            ) from exc
     elif value.startswith("@"):
         path = Path(value[1:])
         try:
             raw = path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            click.echo(f"Body file not found: {path}", err=True)
-            sys.exit(2)
+        except FileNotFoundError as exc:
+            raise click.BadParameter(f"file not found: {path}", param_hint="--body") from exc
         except UnicodeDecodeError as exc:
-            click.echo(
-                f"Body file {path} is not valid UTF-8: {exc}",
-                err=True,
-            )
-            sys.exit(2)
+            raise click.BadParameter(
+                f"file {path} is not valid UTF-8: {exc}", param_hint="--body"
+            ) from exc
         except OSError as exc:
-            click.echo(f"Cannot read body file {path}: {exc}", err=True)
-            sys.exit(2)
+            raise click.BadParameter(
+                f"cannot read file {path}: {exc}", param_hint="--body"
+            ) from exc
     else:
         raw = value
 
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        click.echo(f"Invalid JSON in body: {exc}", err=True)
-        sys.exit(2)
+        raise click.BadParameter(f"invalid JSON: {exc}", param_hint="--body") from exc
 
 
 def resolve_workspace(
@@ -144,7 +138,7 @@ def resolve_workspace(
     alongside other scope parameters (e.g. ``--project`` on ``get-tasks``)
     that the Asana API accepts in place of workspace.
 
-    If *required* is True and no value is found, exits with an error.
+    If *required* is True and no value is found, raises ``click.BadParameter``.
     """
     if explicit is not None:
         return explicit
@@ -152,11 +146,9 @@ def resolve_workspace(
         ws = os.environ.get(DEFAULT_WORKSPACE_ENV)
         if ws:
             return ws
-        click.echo(
-            f"Workspace is required. Specify --workspace or set {DEFAULT_WORKSPACE_ENV}.",
-            err=True,
+        raise click.BadParameter(
+            f"required (or set {DEFAULT_WORKSPACE_ENV})", param_hint="--workspace"
         )
-        sys.exit(2)
     return None
 
 
@@ -285,9 +277,11 @@ def _group_short_help(class_name: str) -> str:
 
 
 # Hand-written help text for endpoint-local options whose SDK ``:param:``
-# docstring is empty. The triple ``(class_name, method_name, param_name)``
-# is the key because bare param names (``file``, ``parent``, ``name``)
-# would collide across endpoints. Sourced from Asana's developer
+# docstring is empty. The key is ``(group_class, method_name, param_name)``
+# where ``group_class`` is the ``*Api`` class name with the ``Api`` suffix
+# stripped (e.g. ``"Attachments"``, not ``"AttachmentsApi"`` — the lookup uses
+# ``api_cls.__name__[:-3]``); bare param names (``file``, ``parent``, ``name``)
+# would otherwise collide across endpoints. Sourced from Asana's developer
 # reference. Lookup is conditional — only used when the SDK provides no
 # description — so an SDK that later fills in a description silently wins
 # over the override (which is fine, the SDK text is authoritative).
@@ -357,14 +351,14 @@ def _escape_help(text: str) -> str:
 #   (asana-api: extension)   no SDK counterpart                  (CLI-only)
 #
 # Configuration globals and the two ApiClient-instance globals (--user-agent /
-# --set-default-header) carry the literal by hand in both ``main`` and
-# ``_make_global_option_params`` (kept byte-identical between cli.py and
-# click_ext.py by ``test_click_ext.TestHelpTextSync``); the CLI-only formatter
-# flags (``--output`` / ``--query`` / ``--csv-bom`` and the error-path twins
-# ``--exception-output`` / ``--exception-query``) live only in ``formatted``. This
-# helper builds every label
-# ``_make_command`` derives at runtime: ``args`` / ``opts`` for path / body /
-# docstring params, ``kwargs`` for the common per-call kwargs, and the
+# --set-default-header) carry the literal in their single declaration in
+# ``click_ext.py:_global_option_sections`` (the one source every command's
+# globals are built from, so the label is identical at the root and at any
+# subcommand); the CLI-only formatter flags (``--output`` / ``--query`` /
+# ``--csv-bom`` and the error-path twins ``--exception-output`` /
+# ``--exception-query``) live in ``formatter.py:make_formatter_options``. This helper builds every
+# label ``_make_command`` derives at runtime: ``args`` / ``opts`` for path /
+# body / docstring params, ``kwargs`` for the common per-call kwargs, and the
 # extension marker on the deprecated aliases.
 def _sdk_dest(category: str, name: str = "") -> str:
     if category == "args":
@@ -440,7 +434,7 @@ def _parse_params(doc: str) -> dict[str, _DocParam]:
             p.description = p.description.replace("(required)", "").strip()
 
     # `_PARAM_RE` already drops the SDK's `:param async_req bool` line (no
-    # colon after the type, so the regex never matches). Kept as a guard in
+    # colon after the name, so the regex never matches). Kept as a guard in
     # case the SDK docstring format changes to the colon form.
     params.pop("async_req", None)
     return params
@@ -543,11 +537,13 @@ class _Operation:
 
     @property
     def workspace_required(self) -> bool:
-        """Workspace is required exactly when it is a path positional.
+        """Workspace is required when it is a path positional.
 
         An ``opts`` workspace is always optional — no python-asana method marks
-        a query param ``(required)``. Drives the ``ASANA_DEFAULT_WORKSPACE``
-        env-var fallback: auto-fill only when required.
+        a query param ``(required)`` — so the return's second branch
+        (``wo.required``) is a defensive guard that does not fire on today's SDK.
+        Drives the ``ASANA_DEFAULT_WORKSPACE`` env-var fallback: auto-fill only
+        when required.
         """
         wo = self.workspace_opt
         return self.workspace_positional is not None or (wo is not None and wo.required)
@@ -665,36 +661,16 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
 
 @functools.cache
 def _static_reserved_flags() -> frozenset[str]:
-    """Built-in CLI flag strings present on (essentially) every command.
-
-    An SDK arg/opt whose derived flag lands in this set is exposed with a
-    ``sdk-`` prefix (see :func:`_decls`) so the built-in keeps its bare name.
-    Derived from the actual option builders (not hand-kept) so it tracks
-    renames / additions automatically. Per-command conditional flags
-    (deprecated aliases, ``--multibyte-filenames``) are added in
-    :func:`_reserved_flags`.
-
-    ``--help`` is added by click at parse time (never in ``cmd.params``) and
-    ``--version`` is root-only, so neither is discoverable by scanning a leaf's
-    params — they are listed explicitly so a future SDK ``help`` / ``version``
-    param is still pushed to ``--sdk-help`` / ``--sdk-version``.
+    """All asana-api own flags (no SDK counterpart). An SDK arg/opt whose
+    derived flag collides with one is exposed as ``--sdk-<name>``
+    (:func:`_decls`) so the built-in keeps its bare name. ``--help`` /
+    ``--version`` are listed explicitly because neither appears in a leaf's
+    params.
     """
     flags: set[str] = {"--help", "--version"}
     flags |= formatter_flag_names()
-    for params in (_make_per_call_kwarg_options(), _make_global_option_params()):
-        for p in params:
-            flags.update(p.opts)
-            flags.update(getattr(p, "secondary_opts", []))
-    return frozenset(flags)
-
-
-def _reserved_flags(op: _Operation) -> frozenset[str]:
-    """Built-in flags this command occupies (static set + per-command extras)."""
-    flags = set(_static_reserved_flags())
-    if op.paginatable:
-        flags |= {"--all-items", "--page-size", "--max-items"}
-    if op.does_upload:
-        flags.add("--multibyte-filenames")
+    # pagination aliases + upload toggle; keep in sync with _make_command
+    flags |= {"--all-items", "--page-size", "--max-items", "--multibyte-filenames"}
     return frozenset(flags)
 
 
@@ -704,7 +680,7 @@ def _decls(flag: str, dest: str, reserved: frozenset[str]) -> list[str]:
     If ``flag`` collides with a built-in CLI flag (in ``reserved``), the SDK
     param yields: it is exposed as ``--sdk-<name>`` with an *explicit* ``dest``
     equal to the SDK param name, so the call path (which pops by param name) is
-    unchanged and the ``(opts/arg: <name>)`` help label still shows the real
+    unchanged and the ``(opts/args: <name>)`` help label still shows the real
     name. Otherwise the bare ``[flag]`` is used (dest auto-derives to ``dest``).
     """
     if flag in reserved:
@@ -809,6 +785,54 @@ def _plain_opt_option(
     return click.Option(_decls(flag, p.name, reserved), **kw)
 
 
+def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) -> int | None:
+    """Resolve the deprecated pagination aliases and return the effective item
+    limit. Pops ``all_items`` / ``page_size`` / ``max_items`` from ``kwargs``
+    (absent on non-paginatable commands), warns on stderr, and folds
+    ``page_size`` into ``kwargs["limit"]`` / ``max_items`` into the item limit,
+    with the canonical ``--limit`` / ``--item-limit`` winning when both are given.
+    """
+    all_items = kwargs.pop("all_items", False)
+    page_size = kwargs.pop("page_size", None)
+    max_items = kwargs.pop("max_items", None)
+
+    if all_items:
+        click.echo(
+            "warning: --all-items is deprecated; walking every page is "
+            "now the default (will be removed in a future release)",
+            err=True,
+        )
+    if page_size is not None:
+        click.echo(
+            "warning: --page-size is deprecated; use --limit instead "
+            "(will be removed in a future release)",
+            err=True,
+        )
+        # Canonical --limit wins when both are given.
+        if kwargs.get("limit") is None:
+            kwargs["limit"] = page_size
+    if max_items is not None:
+        click.echo(
+            "warning: --max-items is deprecated; use --item-limit "
+            "instead (will be removed in a future release)",
+            err=True,
+        )
+        # Canonical --item-limit wins when both are given.
+        if item_limit is None:
+            item_limit = max_items
+    return item_limit
+
+
+def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """``--multibyte-filenames`` callback: install the RFC 5987 multipart patch
+    for this command and uninstall it at context teardown. ``with_resource``
+    enters the context manager now (install) and exits it when the command
+    finishes (uninstall), so the patch is scoped to this one invocation.
+    """
+    if value:
+        ctx.with_resource(MultibyteFilenameSupport())
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method.
 
@@ -822,6 +846,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
        so there is no required/optional split to order by.
     3. **Boilerplate per-call kwargs** (the SDK ``all_params``), plus the
        upload / deprecation extensions where they apply.
+    4. **Output-formatting options** (``--output`` / ``--query`` / ``--csv-bom``
+       / ``--exception-output`` / ``--exception-query``) from
+       ``make_formatter_options``, appended last.
     """
     # If the SDK method has no ``opts`` parameter, docstring-derived named
     # arguments cannot be forwarded — they would be silently dropped at call
@@ -832,10 +859,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     )
     paginatable = op.paginatable
     does_upload = op.does_upload
-    # Built-in flags this command occupies. An SDK arg/opt whose flag collides
-    # with one of these is exposed as ``--sdk-<name>`` (see ``_decls``) so the
-    # built-in keeps its bare name; the SDK param stays reachable + labelled.
-    reserved = _reserved_flags(op)
+    # asana-api's own flags (reserved uniformly across commands). An SDK arg/opt
+    # whose flag collides with one is exposed as ``--sdk-<name>`` (see
+    # ``_decls``) so the own flag keeps its bare name; the SDK param stays
+    # reachable + labelled.
+    reserved = _static_reserved_flags()
 
     options: list[click.Option] = []
 
@@ -871,12 +899,17 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # only affects multipart uploads, so it is exposed solely on upload commands
     # (``does_upload``) rather than as a global flag. Off by default to preserve
     # strict SDK parity (the SDK emits ``filename=`` only); see sdk-deviations.md.
+    # Its callback installs the patch and scopes it to this command via
+    # ``ctx.with_resource``; ``expose_value=False`` keeps it out of
+    # ``inner_callback``'s ``**kwargs``.
     if does_upload:
         options.append(
             click.Option(
                 ["--multibyte-filenames", "multibyte_filenames"],
                 is_flag=True,
                 default=False,
+                callback=_multibyte_filenames_callback,
+                expose_value=False,
                 help=(
                     "Emit RFC 5987 filename*=UTF-8'' on this multipart upload. "
                     "Required when the --file name contains non-ASCII characters; "
@@ -925,46 +958,10 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         header_params = kwargs.pop("header_params", None)
         request_timeout = kwargs.pop("request_timeout", None)
 
-        # Per-command extension on upload commands only: pop the toggle (so it
-        # does not leak into the opts dict) and set the runtime flag the session
-        # reads when deciding whether to install MultibyteFilenameSupport. Other
-        # commands never expose it, so their runtime value stays the default.
-        if does_upload:
-            runtime.multibyte_filenames = kwargs.pop("multibyte_filenames", False)
-
-        # Deprecated aliases: pop from kwargs (per-command) and warn. Effective
-        # values fold into local vars without mutating ``runtime``, so the
-        # dispatch state stays scoped to this invocation.
-        all_items = kwargs.pop("all_items", False) if paginatable else False
-        page_size = kwargs.pop("page_size", None) if paginatable else None
-        max_items = kwargs.pop("max_items", None) if paginatable else None
-
-        effective_item_limit = item_limit
-
-        if all_items:
-            click.echo(
-                "warning: --all-items is deprecated; walking every page is "
-                "now the default (will be removed in a future release)",
-                err=True,
-            )
-        if page_size is not None:
-            click.echo(
-                "warning: --page-size is deprecated; use --limit instead "
-                "(will be removed in a future release)",
-                err=True,
-            )
-            # Canonical --limit wins when both are given.
-            if kwargs.get("limit") is None:
-                kwargs["limit"] = page_size
-        if max_items is not None:
-            click.echo(
-                "warning: --max-items is deprecated; use --item-limit "
-                "instead (will be removed in a future release)",
-                err=True,
-            )
-            # Canonical --item-limit wins when both are given.
-            if effective_item_limit is None:
-                effective_item_limit = max_items
+        # Deprecated aliases (--all-items / --page-size / --max-items): warn and
+        # fold into their canonical replacements. Isolated in a helper so their
+        # eventual removal does not touch this hot-path closure.
+        effective_item_limit = _apply_deprecated_aliases(kwargs, item_limit)
 
         if op.has_body:
             body_value = kwargs.pop("body")  # click marks --body as required
@@ -1037,7 +1034,8 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             # Two independent layers:
             #   - Layer A (session lifecycle, above): every SDK call runs
             #     inside ``with AsanaSession.from_env() as session:``, which
-            #     keeps the ``HttpClientAuthRedactor`` installed.
+            #     keeps the ``HttpClientAuthRedactor`` installed when ``--debug``
+            #     is active.
             #   - Layer B (this block): when the SDK returns a lazy iterator
             #     (PageIterator / EventIterator), iterating it issues one
             #     HTTP request per page. We must consume the iterator *before*
@@ -1053,12 +1051,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
 
     callback = formatted(inner_callback)
 
-    # ``formatted`` adds the output-formatting options (--output / --query /
-    # --csv-bom and their error-path twins --exception-output / --exception-query)
-    # via click.option decorators; pull those Option instances out of the
-    # wrapped callback (in natural order) and append them to our options list.
-    fmt_params = list(reversed(getattr(callback, "__click_params__", [])))
-    options.extend(fmt_params)
+    # The output-formatting options (--output / --query / --csv-bom and their
+    # error-path twins --exception-output / --exception-query) are declared by
+    # ``make_formatter_options``; ``callback`` (wrapped by ``formatted``) consumes
+    # their parsed values as kwargs.
+    options.extend(make_formatter_options())
 
     summary = _escape_help(op.summary or f"Call {api_cls.__name__}.{op.method_name}")
     return CommandWithGlobalOptions(
@@ -1127,202 +1124,16 @@ _ROOT_EPILOG = (
 )
 
 
-def _retry_strategy_option(f: Any) -> Any:
-    """Apply the ``--retry-strategy`` decorator only when the installed
-    python-asana exposes ``Configuration.retry_strategy`` (added in 5.1).
-
-    On older SDKs the flag would crash at apply time, so we hide it
-    entirely — both from ``--help`` and from the parser, so users on
-    5.0.x get a clean ``no such option`` rather than a traceback.
-    """
-    if not _SDK_HAS_RETRY_STRATEGY:
-        return f
-    return click.option(
-        "--retry-strategy",
-        "retry_strategy_overrides",
-        default=None,
-        callback=click_callback(schema=RETRY_FIELD_SCHEMA),
-        help=(
-            "Override urllib3 Retry fields. VALUE: 'k1=v1,k2=v2,...', JSON "
-            "object, or @path. See urllib3 Retry docs. List-typed fields "
-            "(allowed_methods, status_forcelist, remove_headers_on_redirect) "
-            "require JSON. (Configuration: retry_strategy)"
-        ),
-    )(f)
-
-
-# Root uses LazyGroup so that the manually declared @click.option globals are
-# not duplicated by GroupWithGlobalOptions' auto-append behavior. Subgroups
-# (_ApiGroup) and leaf commands (CommandWithGlobalOptions) still auto-append
-# so global options work at any level of the tree.
+# Root group. ``LazyGroup`` is a ``GroupWithGlobalOptions``, so the root
+# appends and consumes the global Configuration / ApiClient flags from the
+# single ``_global_option_sections`` source in ``click_ext.py`` — exactly the
+# way every subgroup (``_ApiGroup``) and leaf command (``CommandWithGlobalOptions``)
+# does. There is no separate root-level declaration; the flags work at any level
+# of the tree, and ``--retry-strategy`` is gated on the SDK version in that one
+# source.
 @click.group(name="asana-api", cls=LazyGroup, epilog=_ROOT_EPILOG)
 @click.version_option(version_string(), prog_name="asana-api")
-@click.option(
-    "--host",
-    default=None,
-    help="Override API base URL (default: https://app.asana.com/api/1.0). (Configuration: host)",
-)
-@click.option("--proxy", default=None, help="HTTP/HTTPS proxy URL. (Configuration: proxy)")
-@click.option(
-    "--verify-ssl/--no-verify-ssl",
-    "verify_ssl",
-    default=None,
-    help=(
-        "Verify TLS certificates (default: True). Pass --no-verify-ssl "
-        "to disable (insecure). (Configuration: verify_ssl)"
-    ),
-)
-@click.option(
-    "--ssl-ca-cert",
-    "ssl_ca_cert",
-    default=None,
-    type=click.Path(exists=True, dir_okay=False),
-    help="Path to a PEM bundle of trusted CA certs. (Configuration: ssl_ca_cert)",
-)
-@click.option(
-    "--cert-file",
-    "cert_file",
-    default=None,
-    type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS certificate for mTLS. (Configuration: cert_file)",
-)
-@click.option(
-    "--key-file",
-    "key_file",
-    default=None,
-    type=click.Path(exists=True, dir_okay=False),
-    help="Client TLS private key for mTLS. (Configuration: key_file)",
-)
-@click.option(
-    "--assert-hostname/--no-assert-hostname",
-    "assert_hostname",
-    default=None,
-    help=(
-        "Verify the server certificate's hostname matches the request URL "
-        "host. Tri-state: unspecified → urllib3 default. "
-        "(Configuration: assert_hostname)"
-    ),
-)
-@click.option(
-    "--user-agent",
-    "user_agent",
-    default=None,
-    help=("Override the User-Agent header the SDK sends on every request. (ApiClient: user_agent)"),
-)
-@click.option(
-    "--set-default-header",
-    "default_headers",
-    multiple=True,
-    callback=default_header_callback,
-    help=(
-        "Add an HTTP header sent on every request, given as NAME=VALUE; "
-        "repeatable. Unlike per-call --header-params it applies to all "
-        "calls. Not redacted in --debug output — see SECURITY.md. "
-        "(ApiClient: set_default_header)"
-    ),
-)
-@_retry_strategy_option
-@click.option(
-    "--connection-pool-maxsize",
-    "connection_pool_maxsize",
-    type=click.IntRange(min=1),
-    default=None,
-    help=(
-        "Max urllib3 connections cached per host (default: cpu_count "
-        "* 5). (Configuration: connection_pool_maxsize)"
-    ),
-)
-@click.option(
-    "--access-token",
-    "access_token",
-    default=None,
-    help=(
-        "Asana personal access token (default: $ASANA_ACCESS_TOKEN). (Configuration: access_token)"
-    ),
-)
-@click.option(
-    "--temp-folder-path",
-    "temp_folder_path",
-    default=None,
-    type=click.Path(file_okay=False),
-    help="Directory for temporary downloads. (Configuration: temp_folder_path)",
-)
-@click.option(
-    "--safe-chars-for-path-param",
-    "safe_chars_for_path_param",
-    default=None,
-    help=(
-        "Extra chars treated as safe when percent-encoding path "
-        "parameters. (Configuration: safe_chars_for_path_param)"
-    ),
-)
-@click.option(
-    "--logger-format",
-    "logger_format",
-    default=None,
-    help="Python logging format string. (Configuration: logger_format)",
-)
-@click.option(
-    "--logger-file",
-    "logger_file",
-    default=None,
-    type=click.Path(dir_okay=False),
-    help="Path SDK loggers write to. (Configuration: logger_file)",
-)
-@click.option(
-    "--debug",
-    is_flag=True,
-    default=False,
-    help="Print HTTP request/response to stderr for troubleshooting. (Configuration: debug)",
-)
-@click.option(
-    "--return-page-iterator/--no-return-page-iterator",
-    "return_page_iterator",
-    default=None,
-    help=(
-        "Toggle the SDK page iterator (default: enabled). With "
-        "--no-return-page-iterator, paginatable endpoints return a "
-        "single {data, next_page} dict from one HTTP call instead of "
-        "auto-walking every page. (Configuration: return_page_iterator)"
-    ),
-)
-@click.option(
-    "--page-limit",
-    "page_limit",
-    type=int,
-    default=None,
-    help=(
-        "Per-page size when the iterator falls back to Configuration "
-        "(default: 100). Equivalent to --limit on paginatable endpoints; "
-        '--limit (per-call opts["limit"]) takes precedence when both '
-        "are set. (Configuration: page_limit)"
-    ),
-)
-def main(
-    host: str | None,
-    proxy: str | None,
-    verify_ssl: bool | None,
-    ssl_ca_cert: str | None,
-    cert_file: str | None,
-    key_file: str | None,
-    assert_hostname: bool | None,
-    user_agent: str | None,
-    default_headers: dict[str, str] | None,
-    # ``retry_strategy_overrides`` and everything after it have ``= None``
-    # defaults so the ``--retry-strategy`` decorator can be skipped on
-    # python-asana <5.1 without click then trying to call this function
-    # without a value for that name.
-    retry_strategy_overrides: dict[str, Any] | None = None,
-    connection_pool_maxsize: int | None = None,
-    access_token: str | None = None,
-    temp_folder_path: str | None = None,
-    safe_chars_for_path_param: str | None = None,
-    logger_format: str | None = None,
-    logger_file: str | None = None,
-    debug: bool = False,
-    return_page_iterator: bool | None = None,
-    page_limit: int | None = None,
-) -> None:
+def main() -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
     # stream encodings are the locale code page (e.g. cp932 on Japanese
@@ -1331,38 +1142,14 @@ def main(
     # Reconfigure all three to UTF-8 so the same input/output works on every
     # platform. The hasattr guard keeps CliRunner's in-memory streams (used
     # by tests) from blowing up, since StringIO has no reconfigure().
+    #
+    # The global flags are parsed into the root context and written to
+    # ``runtime`` by ``GroupWithGlobalOptions.invoke`` → ``_consume_global_options``
+    # (inherited by ``LazyGroup``) before this callback runs, so there is nothing
+    # to apply here.
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
-
-    runtime.host = host
-    runtime.proxy = proxy
-    # Both verify_ssl and assert_hostname are tri-state toggles (positive /
-    # negative / unset). Guard so the unset case does not clobber a value
-    # set by an earlier code path; symmetry with how the leaf-level
-    # propagation in ``click_ext._consume_global_options`` skips the
-    # default ``None``.
-    if verify_ssl is not None:
-        runtime.verify_ssl = verify_ssl
-    runtime.ssl_ca_cert = ssl_ca_cert
-    runtime.cert_file = cert_file
-    runtime.key_file = key_file
-    if assert_hostname is not None:
-        runtime.assert_hostname = assert_hostname
-    runtime.user_agent = user_agent
-    runtime.default_headers = default_headers
-    runtime.retry_strategy_overrides = retry_strategy_overrides
-    runtime.connection_pool_maxsize = connection_pool_maxsize
-    if access_token:
-        runtime.access_token = access_token
-    runtime.temp_folder_path = temp_folder_path
-    runtime.safe_chars_for_path_param = safe_chars_for_path_param
-    runtime.logger_format = logger_format
-    runtime.logger_file = logger_file
-    runtime.debug = debug
-    if return_page_iterator is not None:
-        runtime.return_page_iterator = return_page_iterator
-    runtime.page_limit = page_limit
 
 
 def _register_groups(root: click.Group) -> None:

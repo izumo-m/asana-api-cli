@@ -46,9 +46,13 @@ environment variable. Treat this token as a secret:
 
 ## Debug output
 
-`asana-api --debug` writes HTTP request/response traces to stderr.
-The CLI masks only the request `Authorization` header (which carries
-the personal access token); everything else is shown verbatim.
+`asana-api --debug` turns on the SDK's HTTP debug output. Mirroring the
+SDK, the `http.client` wire trace (request and response headers) goes to
+stdout and the SDK / urllib3 debug log (connection, status line, response
+body) to stderr. The CLI masks only the request `Authorization` header in
+the stdout wire trace (it carries the personal access token); everything
+else — on either stream — is shown verbatim, so scrub both streams before
+sharing.
 
 This masking lives in the CLI, not the SDK. Direct use of the SDK's
 HTTP debug logging from Python leaves the `Authorization` header in
@@ -57,7 +61,7 @@ clear text.
 ### Custom request headers are not masked
 
 `--header-params VALUE` (per call) and the session-wide `--user-agent` /
-`--default-header NAME=VALUE` (repeatable) let you inject arbitrary HTTP
+`--set-default-header NAME=VALUE` (repeatable) let you inject arbitrary HTTP
 request headers. The `--debug` redactor masks **only** the `Authorization`
 header; any value passed via these flags is logged verbatim. If a custom
 header carries a secret — an API key, signing token, or other credential —

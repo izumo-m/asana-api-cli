@@ -16,7 +16,7 @@ substring (e.g. a debug log pasted into a task description) is never
 rewritten.
 
 This module has no third-party dependencies — it is intended to be
-copyable, file as-is, into any project that needs the same redaction.
+copied, as-is, into any project that needs the same redaction.
 """
 
 from __future__ import annotations
@@ -139,7 +139,7 @@ class HttpClientAuthRedactor:
     ``install()`` / ``uninstall()``::
 
         with HttpClientAuthRedactor():
-            ...  # any HTTP traffic with http.client.debuglevel = 1
+            ...  # any HTTP traffic with http.client.HTTPConnection.debuglevel = 1
 
         r = HttpClientAuthRedactor()
         r.install()

@@ -34,13 +34,13 @@ class MultibyteFilenameSupport:
     emits only ``filename="..."`` and omits the RFC 5987 ``filename*=``
     parameter the server needs to decode them. This context manager patches
     ``urllib3.fields.RequestField.make_multipart`` to add
-    ``filename*=UTF-8''<percent-encoded>`` for such names.
+    ``filename*=utf-8''<percent-encoded>`` for such names.
 
     Off by default to preserve strict SDK parity. The CLI enables it when
     ``--multibyte-filenames`` is passed to an upload command (e.g.
-    ``attachments create-attachment-for-object``); ``AsanaSession`` then holds
-    the patch open for the duration of that command. The context-manager form
-    scopes the patch to a block::
+    ``attachments create-attachment-for-object``): that option's callback enters
+    this context manager via ``ctx.with_resource``, scoping the patch to the
+    command. The context-manager form scopes the patch to a block::
 
         with MultibyteFilenameSupport():
             # urllib3-based uploads in this block emit filename*=
@@ -89,7 +89,7 @@ class MultibyteFilenameSupport:
 class _Runtime:
     """Configuration shared globally during a CLI invocation.
 
-    Updated by the ``main`` callback and the global-option mixins in ``click_ext``.
+    Updated by the global-option mixins in ``click_ext`` (``_consume_global_options``).
     Each non-flag scalar defaults to ``None`` so ``AsanaSession`` can tell
     "user did not pass the flag" from "user explicitly chose this value" and
     leave the SDK default in place for the former.
@@ -102,11 +102,6 @@ class _Runtime:
     ssl_ca_cert: str | None = None
     access_token: str | None = None
     temp_folder_path: str | None = None
-    # Set by the upload command's per-command ``--multibyte-filenames`` flag
-    # (``cli.py:_make_command``), not a global option. Kept here because the
-    # session reads it to decide whether to install ``MultibyteFilenameSupport``;
-    # non-upload commands leave it at this default.
-    multibyte_filenames: bool = False
     logger_format: str | None = None
     logger_file: str | None = None
     cert_file: str | None = None
@@ -124,9 +119,9 @@ class _Runtime:
     # Configuration-backed iterator knobs. The per-call kwargs
     # (full_payload / item_limit / header_params / _request_timeout) are NOT
     # here: they are per-command options forwarded by ``cli.py:_make_command``.
-    # The CLI-only output-formatting options (--output / --query and their
-    # error-path twins --exception-output / --exception-query) are likewise not here:
-    # they flow as kwargs through ``formatter.py:formatted``.
+    # The CLI-only output-formatting options (--output / --query / --csv-bom and
+    # their error-path twins --exception-output / --exception-query) are likewise
+    # not here: they flow as kwargs through ``formatter.py:formatted``.
     return_page_iterator: bool | None = None
     page_limit: int | None = None
 
@@ -134,16 +129,46 @@ class _Runtime:
 runtime = _Runtime()
 
 
+# Configuration knobs applied from ``runtime`` onto ``asana.Configuration`` in
+# ``AsanaSession.__init__``. Each entry is ``(attr, apply_when_truthy)``: the
+# Configuration attribute name matches the ``_Runtime`` field 1:1, and the
+# condition follows each knob's SDK semantics.
+# ``apply_when_truthy`` is True for only the four URL/directory strings where an
+# empty value is meaningless (``host`` / ``proxy`` / ``ssl_ca_cert`` /
+# ``temp_folder_path``, skipped when empty); it is False for every other field —
+# including the path-like ``cert_file`` / ``key_file`` / ``logger_file`` — which
+# apply on "is not None" (so an explicit ``False`` / ``0`` still applies).
+# ``access_token`` (set from the constructor argument), the ``ApiClient``-instance
+# settings (``user_agent`` / ``default_headers``), and ``retry_strategy`` (which
+# transforms the value via ``Retry.new()``) are applied separately, not here.
+_CONFIG_KNOBS: tuple[tuple[str, bool], ...] = (
+    ("return_page_iterator", False),
+    ("page_limit", False),
+    ("host", True),
+    ("proxy", True),
+    ("verify_ssl", False),
+    ("ssl_ca_cert", True),
+    ("temp_folder_path", True),
+    ("logger_format", False),
+    ("logger_file", False),
+    ("cert_file", False),
+    ("key_file", False),
+    ("assert_hostname", False),
+    ("connection_pool_maxsize", False),
+    ("safe_chars_for_path_param", False),
+)
+
+
 class AsanaSession:
     """Session holding an ApiClient from the official asana SDK.
 
     Use it as a context manager. The global side effects — the ``--debug``
-    HTTP-log redactor, the ``http.client`` debuglevel flip the SDK's debug
-    setter performs, and the multibyte-filename multipart patch — are
-    installed on ``__enter__`` and reversed on ``__exit__``, so they are in
-    effect only for the duration of the ``with`` block. Constructing a
-    session without entering it builds a plain ApiClient and mutates no
-    process globals.
+    HTTP-log redactor, the ``http.client`` debuglevel flip, and the asana/urllib3
+    logger levels the SDK's debug setter raises — are installed on ``__enter__``
+    and reversed on
+    ``__exit__``, so they are in effect only for the duration of the ``with``
+    block. Constructing a session without entering it builds a plain ApiClient
+    and mutates no process globals.
 
     Internal class: reached only through the CLI's
     ``with AsanaSession.from_env() as session:`` and carrying no stability
@@ -154,41 +179,20 @@ class AsanaSession:
         config = asana.Configuration()
         config.access_token = token
 
-        # Apply runtime values to Configuration.
-        # ``return_page_iterator`` / ``page_limit`` are read from runtime
-        # like the other Configuration knobs. Unspecified ⇒ leave the SDK
-        # default (True / 100) in place.
-        if runtime.return_page_iterator is not None:
-            config.return_page_iterator = runtime.return_page_iterator
-        if runtime.page_limit is not None:
-            config.page_limit = runtime.page_limit
-        if runtime.host:
-            config.host = runtime.host
-        if runtime.proxy:
-            config.proxy = runtime.proxy  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.verify_ssl is not None:
-            # Honor both sides of the toggle: --no-verify-ssl writes False,
-            # --verify-ssl writes True (pinning the SDK default even if the
-            # SDK later changes its own default).
-            config.verify_ssl = runtime.verify_ssl
-        if runtime.ssl_ca_cert:
-            config.ssl_ca_cert = runtime.ssl_ca_cert  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.temp_folder_path:
-            config.temp_folder_path = runtime.temp_folder_path  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.logger_format is not None:
-            config.logger_format = runtime.logger_format  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.logger_file is not None:
-            config.logger_file = runtime.logger_file  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.cert_file is not None:
-            config.cert_file = runtime.cert_file  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.key_file is not None:
-            config.key_file = runtime.key_file  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.assert_hostname is not None:
-            config.assert_hostname = runtime.assert_hostname  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.connection_pool_maxsize is not None:
-            config.connection_pool_maxsize = runtime.connection_pool_maxsize  # pyright: ignore[reportAttributeAccessIssue]
-        if runtime.safe_chars_for_path_param is not None:
-            config.safe_chars_for_path_param = runtime.safe_chars_for_path_param  # pyright: ignore[reportAttributeAccessIssue]
+        # Apply runtime values to Configuration from the ``_CONFIG_KNOBS`` table
+        # (module level). Each knob's Configuration attribute matches its
+        # ``_Runtime`` field name, and ``apply_when_truthy`` encodes each knob's
+        # condition (truthy for path/host-like
+        # strings, "is not None" otherwise — so an explicit ``verify_ssl=False``
+        # still applies, while an empty ``--ssl-ca-cert`` is skipped). Unspecified
+        # values leave the SDK default in place (e.g. return_page_iterator / page_limit
+        # at True / 100). ``setattr`` keeps the few attributes python-asana does
+        # not type-annotate ignore-free.
+        for attr, apply_when_truthy in _CONFIG_KNOBS:
+            value = getattr(runtime, attr)
+            applies = value if apply_when_truthy else value is not None
+            if applies:
+                setattr(config, attr, value)
         if runtime.retry_strategy_overrides is not None:
             # Start from the SDK's default Retry instance so unspecified
             # fields keep their python-asana defaults (e.g. total=5,
@@ -196,21 +200,19 @@ class AsanaSession:
             # An empty dict (e.g. `--retry-strategy '{}'`) yields a copy
             # with no field overridden — semantically a no-op, but still
             # honored as "user did pass the flag".
-            config.retry_strategy = config.retry_strategy.new(  # pyright: ignore[reportAttributeAccessIssue]
-                **runtime.retry_strategy_overrides
-            )
+            base_retry = config.retry_strategy
+            config.retry_strategy = base_retry.new(**runtime.retry_strategy_overrides)
 
-        # Global side effects (the debug redactor, the ``http.client``
-        # debuglevel flip, and the multibyte multipart patch) are installed by
-        # ``open()`` (on ``__enter__``) and reversed by ``close()`` (on
+        # Global side effects (the debug redactor, the ``http.client`` debuglevel
+        # flip, and the asana/urllib3 logger levels) are installed by ``open()``
+        # (on ``__enter__``) and reversed by ``close()`` (on
         # ``__exit__``), so merely constructing a session never mutates process
         # globals. ApiClient construction stays here because it touches no
         # globals — a failure just propagates with nothing to unwind.
-        # Pre-initialize the patch handles to ``None`` so ``open()``'s cleanup
-        # and ``close()`` can tell which patches actually got installed.
+        # Pre-initialize the redactor handle to ``None`` so ``open()``'s cleanup
+        # and ``close()`` can tell whether it actually got installed.
         self._config = config
         self._redactor: HttpClientAuthRedactor | None = None
-        self._multibyte_filenames: MultibyteFilenameSupport | None = None
         # Prior ``http.client.HTTPConnection.debuglevel`` and the prior levels
         # of the asana/urllib3 loggers, captured by ``open()`` only when this
         # session turns debug on (the SDK ``debug`` setter raises both).
@@ -235,11 +237,11 @@ class AsanaSession:
         return self._client
 
     def open(self) -> None:
-        """Install this session's global side effects: the ``http.client``
-        debuglevel flip plus the ``Authorization`` redactor (under
-        ``--debug``) and the multibyte-filename multipart patch (under
-        ``--multibyte-filenames``). The reverse of :meth:`close`; ``__enter__``
-        calls it so the globals live only for the ``with`` block.
+        """Install this session's global side effects under ``--debug``: the
+        ``http.client`` debuglevel flip, the asana/urllib3 logger levels the SDK
+        debug setter raises, and the ``Authorization`` redactor. The reverse of
+        :meth:`close`; ``__enter__`` calls it so the globals live only for the
+        ``with`` block.
 
         If a later ``install()`` raises after an earlier one already
         succeeded, every side effect installed so far is reversed (via
@@ -268,9 +270,6 @@ class AsanaSession:
                 self._config.debug = True
                 self._redactor = HttpClientAuthRedactor()
                 self._redactor.install()
-            if runtime.multibyte_filenames:
-                self._multibyte_filenames = MultibyteFilenameSupport()
-                self._multibyte_filenames.install()
         except Exception:
             self.close()
             raise
@@ -278,8 +277,7 @@ class AsanaSession:
     def close(self) -> None:
         """Reverse every global side effect :meth:`open` installed: the
         ``http.client`` debuglevel flip and the asana/urllib3 logger levels the
-        SDK debug setter raised, the ``Authorization`` redactor, and the
-        multibyte-filename multipart patch.
+        SDK debug setter raised, and the ``Authorization`` redactor.
 
         Safe to call multiple times, and a no-op if :meth:`open` never ran.
         Prefer using the session as a context manager
@@ -300,9 +298,6 @@ class AsanaSession:
         if self._redactor is not None:
             self._redactor.uninstall()
             self._redactor = None
-        if self._multibyte_filenames is not None:
-            self._multibyte_filenames.uninstall()
-            self._multibyte_filenames = None
 
     def __enter__(self) -> AsanaSession:
         self.open()

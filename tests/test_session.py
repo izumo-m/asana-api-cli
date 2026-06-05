@@ -1,5 +1,7 @@
 """Tests for asana_api_cli.session — the AsanaSession side-effect lifecycle,
-MultibyteFilenameSupport, and pagination knobs.
+MultibyteFilenameSupport, the pagination knobs, the ``_CONFIG_KNOBS``
+Configuration table, and the ApiClient-instance settings (``--user-agent`` /
+``--set-default-header``).
 
 The input-resolution helpers (``resolve_body`` / ``resolve_workspace``) now
 live in ``asana_api_cli.cli``; their tests are in ``test_cli.py``.
@@ -26,9 +28,10 @@ from asana_api_cli.session import (
 #
 # The ``HttpClientAuthRedactor`` itself (helpers, masking, lifecycle,
 # end-to-end with a live HTTP server) is covered in ``test_redactor.py``;
-# the tests here only check that ``AsanaSession`` installs the global
-# ``http.client`` patches on ``__enter__`` (never at construction) and
-# reverses them on ``__exit__``, including the partial-failure path.
+# the tests here check that ``AsanaSession`` installs all its global side
+# effects (the ``http.client`` debuglevel/print patch and the asana/urllib3
+# logger levels raised by the SDK ``debug`` setter) on ``__enter__`` (never at
+# construction) and reverses them on ``__exit__``.
 # ---------------------------------------------------------------------------
 
 
@@ -68,8 +71,8 @@ class TestAsanaSessionSideEffectLifecycle:
         ``__enter__`` and reverses them on ``__exit__`` — never merely on
         construction. Inside the block, ``http.client`` wire tracing is on
         (debuglevel 1) AND the ``Authorization`` redactor is installed; on exit
-        both are reversed together, so the process is never left
-        tracing-on-without-mask (constitution #2).
+        both are reversed in order (tracing off first, mask removed last), so the
+        process is never left tracing-on-without-mask (constitution #2).
         """
         monkeypatch.setattr(runtime, "debug", True)
         http.client.HTTPConnection.debuglevel = 0
@@ -83,7 +86,8 @@ class TestAsanaSessionSideEffectLifecycle:
             # Inside the block: tracing on AND the masking patch installed.
             assert http.client.HTTPConnection.debuglevel == 1
             assert "print" in http.client.__dict__
-        # After exit: both reversed together — never tracing-on-without-mask.
+        # After exit: both reversed in order (tracing off first, mask last) —
+        # never tracing-on-without-mask.
         assert http.client.HTTPConnection.debuglevel == 0
         assert "print" not in http.client.__dict__
 
@@ -150,37 +154,6 @@ class TestAsanaSessionSideEffectLifecycle:
         assert http.client.__dict__.get("print") is pre_print
         assert http.client.HTTPConnection.debuglevel == 0
 
-    def test_open_failure_in_later_patch_uninstalls_earlier_patch(
-        self, _clean_http_client_print: None, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """If a *later* ``install()`` raises after the redactor is already
-        installed, ``open()`` must uninstall the redactor (and restore the
-        debuglevel) before re-raising. ``__enter__`` delegates to ``open()``
-        and cannot fall back on ``__exit__`` for this, since Python skips
-        ``__exit__`` when ``__enter__`` raises. Guards a global
-        ``http.client.print`` leak when, e.g., a urllib3 change breaks
-        ``MultibyteFilenameSupport``.
-        """
-
-        def _boom(_self: MultibyteFilenameSupport) -> None:
-            raise RuntimeError("simulated multibyte patch failure")
-
-        monkeypatch.setattr(MultibyteFilenameSupport, "install", _boom)
-        monkeypatch.setattr(runtime, "debug", True)
-        monkeypatch.setattr(runtime, "multibyte_filenames", True)
-        http.client.HTTPConnection.debuglevel = 0
-
-        pre_print = http.client.__dict__.get("print")
-        with (
-            pytest.raises(RuntimeError, match="simulated multibyte patch failure"),
-            AsanaSession(token="x" * 20),
-        ):
-            pass
-        # The redactor installed before the failing patch was rolled back,
-        # and the debuglevel flip with it.
-        assert http.client.__dict__.get("print") is pre_print
-        assert http.client.HTTPConnection.debuglevel == 0
-
 
 # ---------------------------------------------------------------------------
 # MultibyteFilenameSupport
@@ -212,7 +185,7 @@ class TestMultibyteFilenameSupport:
     so that multipart fields whose filename contains non-ASCII characters
     also carry the RFC 5987 ``filename*=UTF-8''<percent-encoded>``
     parameter. Off by default to preserve strict SDK parity; opt-in via
-    ``--multibyte-filenames`` / ``runtime.multibyte_filenames``."""
+    ``--multibyte-filenames``."""
 
     def test_context_manager_installs_and_uninstalls(self, _clean_request_field: None) -> None:
         original = RequestField.make_multipart
@@ -287,23 +260,6 @@ class TestMultibyteFilenameSupport:
         assert 'name="parent"' in disposition
         assert "filename*=" not in disposition
 
-    def test_asana_session_installs_patch_on_enter_and_reverses_on_exit(
-        self, _clean_request_field: None, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """With ``--multibyte-filenames``, ``AsanaSession`` installs the
-        ``RequestField.make_multipart`` patch on ``__enter__`` and removes it
-        on ``__exit__`` — never merely on construction.
-        """
-        monkeypatch.setattr(runtime, "multibyte_filenames", True)
-        original = RequestField.make_multipart
-
-        session = AsanaSession(token="x" * 20)
-        # Construction alone does not patch make_multipart.
-        assert RequestField.make_multipart is original
-        with session:
-            assert RequestField.make_multipart is not original
-        assert RequestField.make_multipart is original
-
 
 # ---------------------------------------------------------------------------
 # AsanaSession pagination kwargs
@@ -327,6 +283,90 @@ class TestAsanaSessionPaginationKwargs:
     def test_constructor_defaults_match_sdk_defaults(self) -> None:
         with AsanaSession(token="x" * 20) as session:
             assert session.client.configuration.return_page_iterator is True
+
+
+# ---------------------------------------------------------------------------
+# AsanaSession.from_env token resolution
+# ---------------------------------------------------------------------------
+
+
+class TestAsanaSessionFromEnv:
+    """``from_env`` resolves the token as ``runtime.access_token`` first, then
+    ``$ASANA_ACCESS_TOKEN``, and exits ``2`` if neither is set. The empty-token
+    fallback is the other half of the ``--access-token`` last-wins behavior: an
+    explicit empty ``--access-token`` clears the runtime value, then this
+    fallback applies."""
+
+    def test_empty_runtime_token_falls_back_to_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "access_token", "")
+        monkeypatch.setenv("ASANA_ACCESS_TOKEN", "env-token-1234567890")
+        with AsanaSession.from_env() as session:
+            assert session.client.configuration.access_token == "env-token-1234567890"
+
+    def test_no_token_anywhere_exits_2(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr(runtime, "access_token", "")
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        with pytest.raises(SystemExit) as exc:
+            AsanaSession.from_env()
+        assert exc.value.code == 2
+        assert "Access token is not set" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# AsanaSession Configuration knobs (the _CONFIG_KNOBS table)
+# ---------------------------------------------------------------------------
+
+
+class TestAsanaSessionConfigKnobs:
+    """Every ``runtime`` Configuration knob reaches ``asana.Configuration`` via
+    the ``_CONFIG_KNOBS`` table in ``AsanaSession.__init__``. The expected
+    (knob -> value) pairs here are written independently of that table, so a
+    dropped or mis-conditioned entry is caught. (``retry_strategy`` has its own
+    end-to-end coverage in ``test_cli_invocation.py:TestRetryStrategyReachesSession``.)
+    """
+
+    def test_runtime_knobs_reach_configuration(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Representative non-default values. Includes the "is not None" knobs
+        # that must still apply an explicit ``False`` (return_page_iterator /
+        # verify_ssl) alongside the path/string knobs.
+        expected: dict[str, Any] = {
+            "return_page_iterator": False,
+            "page_limit": 50,
+            "host": "https://example.test/api",
+            "proxy": "http://127.0.0.1:8080",
+            "verify_ssl": False,
+            "ssl_ca_cert": "/tmp/ca.pem",
+            "temp_folder_path": "/tmp/dl",
+            "logger_format": "%(message)s",
+            "logger_file": "/tmp/sdk.log",
+            "cert_file": "/tmp/client.crt",
+            "key_file": "/tmp/client.key",
+            "assert_hostname": True,
+            "connection_pool_maxsize": 7,
+            "safe_chars_for_path_param": "/:",
+        }
+        for attr, value in expected.items():
+            monkeypatch.setattr(runtime, attr, value)
+        config = AsanaSession(token="x" * 20).client.configuration
+        for attr, value in expected.items():
+            assert getattr(config, attr) == value, f"{attr} did not reach Configuration"
+
+    @pytest.mark.parametrize("attr", ["host", "proxy", "ssl_ca_cert", "temp_folder_path"])
+    def test_truthy_guarded_empty_string_is_skipped(
+        self, attr: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The truthy-guarded knobs must NOT overwrite the SDK default with an
+        # empty string (mirrors the original ``if runtime.X:`` conditions). A
+        # flipped ``apply_when_truthy`` would let "" through. Asserting "value is
+        # not the empty string" works regardless of the knob's own default
+        # (host defaults to a URL; proxy/ssl_ca_cert/temp_folder_path to None).
+        monkeypatch.setattr(runtime, attr, "")
+        config = AsanaSession(token="x" * 20).client.configuration
+        assert getattr(config, attr, None) != "", (
+            f"empty {attr!r} must be skipped, leaving the SDK default"
+        )
 
 
 # ---------------------------------------------------------------------------

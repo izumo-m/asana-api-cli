@@ -1,6 +1,8 @@
 """End-to-end pagination tests.
 
-Exercises every pagination flag exposed by ``tasks get-tasks`` against the
+Exercises the ``tasks get-tasks`` pagination flags ``--item-limit`` / ``--limit``
+/ ``--full-payload`` / ``--no-return-page-iterator`` and the deprecated aliases
+``--all-items`` / ``--page-size`` / ``--max-items``, against the
 projects provisioned by ``tools/e2e_init.py``:
 
 - ``pagination-test`` (1500 tasks named ``ptest-0001`` .. ``ptest-1500``)

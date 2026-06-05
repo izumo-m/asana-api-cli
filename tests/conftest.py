@@ -1,10 +1,12 @@
-"""Project-rootdir pytest hooks shared across the whole test tree.
+"""Project-rootdir pytest hooks and the one autouse fixture shared across the whole test tree.
 
-Only ``pytest_addoption`` / ``pytest_configure`` live here so the
-``--live`` / ``--record`` flags show up in ``pytest --help`` regardless
-of which path the user collects. Test fixtures, vcr_config, masking and
-templating remain in ``tests/e2e/conftest.py`` where their scope is
-self-evident.
+The autouse ``_reset_runtime`` fixture isolates the module-level ``runtime``
+singleton between tests; ``pytest_addoption`` registers the ``--live`` /
+``--record`` flags so they show up in ``pytest --help`` regardless of which
+path the user collects, and ``pytest_configure`` validates their combinations
+and translates them into pytest-recording's native options. The e2e test
+fixtures, vcr_config, masking and templating remain in
+``tests/e2e/conftest.py`` where their scope is self-evident.
 
 See ``tests/e2e/README.md`` for the full workflow.
 """

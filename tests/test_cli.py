@@ -338,8 +338,8 @@ def _option_flags(cmd: click.Command) -> set[str]:
 class TestFlagCollisions:
     """An SDK arg/opt whose flag collides with a built-in CLI flag is exposed as
     ``--sdk-<name>`` so the built-in keeps its bare name (``cli._decls`` /
-    ``_reserved_flags``). Real case: ``typeahead-for-workspace``'s ``query`` opt
-    vs the formatter's ``--query`` (jq filter)."""
+    ``_static_reserved_flags``). Real case: ``typeahead-for-workspace``'s
+    ``query`` opt vs the formatter's ``--query`` (jq filter)."""
 
     def test_no_command_has_duplicate_flags(self) -> None:
         """Whole-SDK sweep: collision resolution must leave no command with a
@@ -364,12 +364,13 @@ class TestFlagCollisions:
         """Sibling of the duplicate-flag sweep, but on the click *dest*
         (``p.name``). ``_decls`` resolves a flag collision by renaming the SDK
         flag to ``--sdk-<name>`` while KEEPING its dest = the SDK param name.
-        If a future SDK param's name matches an injected global (e.g. a
-        ``:param ... debug:``), the renamed ``--sdk-debug`` and the global
-        ``--debug`` end up sharing the dest ``debug``: click stores only one in
-        ``ctx.params`` and ``_consume_global_options`` then reads the wrong
-        value, silently corrupting both. The flag sweep above misses this (the
-        flag strings differ), so guard dests explicitly."""
+        If that dest also belongs to another option on the command, the two
+        distinct flags share one dest: click stores only one in ``ctx.params``
+        and the other option reads the wrong value. E.g. a future SDK opt named
+        ``all_items`` on a paginatable command renders as ``--sdk-all-items``
+        (dest ``all_items``), colliding in dest with the ``--all-items``
+        deprecation alias (also dest ``all_items``). The flag sweep above misses
+        this (the flag strings differ), so guard dests explicitly."""
         offenders: dict[str, list[str]] = {}
         for cls in _enumerate_api_classes():
             for op in _operations_for(cls):
@@ -409,11 +410,38 @@ class TestReservedFlags:
     def test_decls_prefixes_and_preserves_dest_on_collision(self) -> None:
         assert _decls("--query", "query", frozenset({"--query"})) == ["--sdk-query", "query"]
 
-    def test_static_reserved_covers_each_builtin_family(self) -> None:
+    def test_static_reserved_covers_each_own_flag_family(self) -> None:
         reserved = _static_reserved_flags()
-        # formatter / kwarg / global (+ a --no- toggle's negative form).
-        for flag in ("--query", "--output", "--item-limit", "--host", "--no-verify-ssl"):
+        # asana-api's own flags: help/version, formatter, and the extensions.
+        for flag in (
+            "--help",
+            "--version",
+            "--query",
+            "--output",
+            "--all-items",
+            "--multibyte-filenames",
+        ):
             assert flag in reserved, f"{flag} missing from reserved set"
+
+    def test_static_reserved_excludes_sdk_derived_flags(self) -> None:
+        # globals (Configuration/ApiClient) and per-call kwargs (all_params) are
+        # SDK-derived, not asana-api's own — they stay out of the reserved set, so
+        # an opt/arg clashing with one is caught by the duplicate-flag sweep above
+        # rather than silently --sdk-'d.
+        reserved = _static_reserved_flags()
+        assert "--host" not in reserved  # global (Configuration)
+        assert "--item-limit" not in reserved  # per-call kwarg (all_params)
+
+    def test_extension_flags_yield_to_sdk_prefix_uniformly(self) -> None:
+        # The pagination aliases / upload toggle are reserved unconditionally, so a
+        # colliding SDK param maps to --sdk-<name> on every command, not only on
+        # paginatable / upload ones.
+        reserved = _static_reserved_flags()
+        assert _decls("--all-items", "all_items", reserved) == ["--sdk-all-items", "all_items"]
+        assert _decls("--multibyte-filenames", "multibyte_filenames", reserved) == [
+            "--sdk-multibyte-filenames",
+            "multibyte_filenames",
+        ]
 
     def test_help_and_version_reserved_so_sdk_opts_yield(self) -> None:
         # --help is click-added at parse time and --version is root-only, so
@@ -544,7 +572,8 @@ class TestBuiltCommands:
         # The boilerplate per-call kwargs (all_params) are method inputs, so
         # they render as per-command options — present on a command, absent
         # from the root. (Configuration-backed --page-limit /
-        # --return-page-iterator stay global; asserted above.)
+        # --return-page-iterator are global flags from
+        # click_ext._global_option_sections, present on every command.)
         cmd_flags = _option_flags(get_tasks_cmd)
         root_flags = _option_flags(main)
         for flag in ("--item-limit", "--full-payload", "--header-params", "--request-timeout"):
@@ -816,8 +845,8 @@ class TestResolveBodyInline:
         result = resolve_body("[1, 2, 3]")
         assert result == [1, 2, 3]
 
-    def test_invalid_json_exits(self) -> None:
-        with pytest.raises(SystemExit):
+    def test_invalid_json_raises(self) -> None:
+        with pytest.raises(click.BadParameter, match="invalid JSON"):
             resolve_body("{bad json")
 
 
@@ -828,27 +857,23 @@ class TestResolveBodyFile:
         result = resolve_body(f"@{body_file}")
         assert result == {"data": {"name": "from file"}}
 
-    def test_missing_file_exits(self, tmp_path: Path) -> None:
-        with pytest.raises(SystemExit):
+    def test_missing_file_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(click.BadParameter, match="file not found"):
             resolve_body(f"@{tmp_path / 'nonexistent.json'}")
 
-    def test_invalid_json_in_file_exits(self, tmp_path: Path) -> None:
+    def test_invalid_json_in_file_raises(self, tmp_path: Path) -> None:
         body_file = tmp_path / "bad.json"
         body_file.write_text("not json")
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter, match="invalid JSON"):
             resolve_body(f"@{body_file}")
 
-    def test_non_utf8_file_exits_cleanly(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_non_utf8_file_raises_cleanly(self, tmp_path: Path) -> None:
         """A binary file (or any non-UTF-8 byte sequence) must produce a
-        clean error message, not a raw ``UnicodeDecodeError`` traceback."""
+        clean ``BadParameter``, not a raw ``UnicodeDecodeError`` traceback."""
         body_file = tmp_path / "binary.bin"
         body_file.write_bytes(b"\x80\x81\x82")  # invalid UTF-8 start bytes
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter, match="not valid UTF-8"):
             resolve_body(f"@{body_file}")
-        err = capsys.readouterr().err
-        assert "not valid UTF-8" in err
 
 
 class TestResolveBodyStdin:
@@ -857,9 +882,9 @@ class TestResolveBodyStdin:
         result = resolve_body("-")
         assert result == {"data": {"name": "stdin"}}
 
-    def test_invalid_stdin_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_invalid_stdin_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("sys.stdin", StringIO("not json"))
-        with pytest.raises(SystemExit):
+        with pytest.raises(click.BadParameter, match="invalid JSON"):
             resolve_body("-")
 
 
@@ -892,6 +917,6 @@ class TestResolveWorkspaceNoValue:
     def test_returns_none_when_optional(self) -> None:
         assert resolve_workspace(None) is None
 
-    def test_exits_when_required(self) -> None:
-        with pytest.raises(SystemExit):
+    def test_raises_when_required(self) -> None:
+        with pytest.raises(click.BadParameter, match="required"):
             resolve_workspace(None, required=True)

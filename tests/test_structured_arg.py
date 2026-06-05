@@ -33,8 +33,8 @@ class TestJsonForm:
 
     def test_only_brace_triggers_json_form(self) -> None:
         # Inputs starting with '[' fall through to shorthand on purpose;
-        # JSON arrays are not a valid Configuration value for any of the
-        # three structured options.
+        # JSON arrays are not a valid Configuration value for either of the
+        # two structured options (--retry-strategy, --header-params).
         with pytest.raises(click.BadParameter, match="Missing '='"):
             parse_structured_arg("[1, 2, 3]")
 
@@ -63,7 +63,7 @@ class TestFileForm:
 
     def test_file_containing_json_array_rejected(self, tmp_path: Path) -> None:
         # The file body must parse to a JSON object; arrays / scalars are
-        # not valid Configuration values for any of the three options.
+        # not valid Configuration values for either of the two options.
         f = tmp_path / "arr.json"
         f.write_text("[1, 2, 3]", encoding="utf-8")
         with pytest.raises(click.BadParameter, match="Expected a JSON object"):
@@ -92,6 +92,18 @@ class TestShorthandUnsupervised:
     def test_missing_equals_rejected(self) -> None:
         with pytest.raises(click.BadParameter, match="Missing '='"):
             parse_structured_arg("noeq")
+
+    def test_stdin_dash_is_not_a_stdin_marker(self) -> None:
+        # Unlike ``--body``, the structured options (``--retry-strategy`` /
+        # ``--header-params``) do NOT treat ``-`` as a stdin marker (see
+        # usage.md "Structured values"). It falls through to the shorthand
+        # parser and is rejected for lacking ``=`` — pinned on both the
+        # schema-less (``--header-params``) and schema'd (``--retry-strategy``)
+        # paths so a future stdin handler cannot silently break the contract.
+        with pytest.raises(click.BadParameter, match="Missing '='"):
+            parse_structured_arg("-")
+        with pytest.raises(click.BadParameter, match="Missing '='"):
+            parse_structured_arg("-", schema=RETRY_FIELD_SCHEMA)
 
     def test_empty_key_rejected(self) -> None:
         with pytest.raises(click.BadParameter, match="Empty key"):

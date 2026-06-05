@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-06-05
+
+### Fixed
+
+- **`--access-token` now follows the same last-wins rule as every other global
+  option.** Previously an explicit empty `--access-token ""` was silently
+  ignored, so it could not override a token set earlier on the command line
+  (for example one injected by a shell alias). Now the later occurrence wins —
+  empty included — so `--access-token ""` clears the earlier token and
+  authentication falls back to `$ASANA_ACCESS_TOKEN`. A non-empty
+  `--access-token` already took precedence and is unchanged.
+
 ## [3.1.1] - 2026-06-01
 
 ### Fixed
@@ -39,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   412 sync-token body in events polling) is readable from stderr without extra
   flags. The other formats also render a `{exception, status, reason, body,
   headers}` envelope on **stdout** and exit `3`; `--exception-query` filters that
-  envelope through `jq`. See [`docs/usage.md`](docs/usage.md#error-output) and
+  envelope through `jq`. See [`docs/usage.md`](docs/usage.md#error-handling) and
   [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 
 - **`--output none`** suppresses the success payload for side-effect-only
@@ -368,7 +380,8 @@ Combining a deprecated alias with its replacement (e.g.
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.1...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.2...HEAD
+[3.1.2]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.1...v3.1.2
 [3.1.1]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/izumo-m/asana-api-cli/compare/v2.1.1...v3.0.0

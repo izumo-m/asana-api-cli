@@ -48,7 +48,7 @@ done
 The script uses `--exception-output text` + `--exception-query` because
 every events call may return a 412 whose body carries the next sync
 token — extracting that body programmatically requires the envelope
-path on stdout. See [`usage.md`](usage.md#error-output) and
+path on stdout. See [`usage.md`](usage.md#error-handling) and
 [`sdk-deviations.md`](sdk-deviations.md) for the generic envelope
 contract.
 
@@ -77,5 +77,5 @@ exit `3` from a steady-state poll as "re-run the bootstrap step"; the
 example above does not include that recovery path. (`--exception-output`
 is therefore needed on the polling call too, not just on bootstrap.)
 
-See also: [`usage.md`](usage.md#error-output),
+See also: [`usage.md`](usage.md#error-handling),
 [`sdk-deviations.md`](sdk-deviations.md).
