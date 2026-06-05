@@ -11,6 +11,7 @@ Runtime-introspection wrapper around `python-asana`. API group stubs are registe
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
 | `click_ext.py` | `LazyGroup` for cheap top-level `--help`; the `_GlobalOptionsMixin` mixin and its concrete subclasses propagating global options to subgroups (`GroupWithGlobalOptions`) and leaf commands (`CommandWithGlobalOptions`) |
 | `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |
+| `multibyte_filename.py` | `MultibyteFilenameSupport` — patches `urllib3` multipart encoding to add the RFC 5987 `filename*=` parameter for non-ASCII filenames; backs the upload-only `--multibyte-filenames` flag |
 | `structured_arg.py` | Hybrid value parser for structured options (`k=v,k=v` / JSON object / `@path`) |
 | `version.py` | `version_string()` used by `--version` |
 
