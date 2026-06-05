@@ -331,9 +331,11 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
     option declarations and the dataclass fields are authored together, and the
     inventory tests in ``test_click_ext.py`` (``TestGlobalOptionNamesInventory``)
     pin the ``GLOBAL_OPTION_NAMES`` set against ``_Runtime``'s fields — so a
-    direct ``setattr`` suffices. The sole exception is ``access_token``: an
-    empty command-line value must not clobber a token set by a higher-priority
-    source, so it is skipped.
+    direct ``setattr`` suffices. Every option, ``access_token`` included,
+    follows the same last-wins rule: the command-line value from the deepest
+    level reached overwrites whatever an earlier level wrote. An explicit empty
+    ``--access-token`` therefore clears a value set earlier, and
+    ``AsanaSession.from_env`` then falls back to ``$ASANA_ACCESS_TOKEN``.
 
     The caller, :func:`_consume_global_options`, only ever passes names drawn
     from ``GLOBAL_OPTION_NAMES`` and only when the parameter source is
@@ -343,8 +345,6 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
     tri-state toggles' (``verify_ssl`` / ``assert_hostname`` /
     ``return_page_iterator``) ``None`` default never reaches here.
     """
-    if name == "access_token" and not value:
-        return
     setattr(runtime, name, value)
 
 

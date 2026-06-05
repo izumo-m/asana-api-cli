@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--access-token` now follows the same last-wins rule as every other global
+  option.** Previously an explicit empty `--access-token ""` was silently
+  ignored, so it could not override a token set earlier on the command line
+  (for example one injected by a shell alias). Now the later occurrence wins —
+  empty included — so `--access-token ""` clears the earlier token and
+  authentication falls back to `$ASANA_ACCESS_TOKEN`. A non-empty
+  `--access-token` already took precedence and is unchanged.
+
 ## [3.1.1] - 2026-06-01
 
 ### Fixed
