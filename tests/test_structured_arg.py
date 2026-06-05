@@ -93,6 +93,18 @@ class TestShorthandUnsupervised:
         with pytest.raises(click.BadParameter, match="Missing '='"):
             parse_structured_arg("noeq")
 
+    def test_stdin_dash_is_not_a_stdin_marker(self) -> None:
+        # Unlike ``--body``, the structured options (``--retry-strategy`` /
+        # ``--header-params``) do NOT treat ``-`` as a stdin marker (see
+        # usage.md "Structured values"). It falls through to the shorthand
+        # parser and is rejected for lacking ``=`` — pinned on both the
+        # schema-less (``--header-params``) and schema'd (``--retry-strategy``)
+        # paths so a future stdin handler cannot silently break the contract.
+        with pytest.raises(click.BadParameter, match="Missing '='"):
+            parse_structured_arg("-")
+        with pytest.raises(click.BadParameter, match="Missing '='"):
+            parse_structured_arg("-", schema=RETRY_FIELD_SCHEMA)
+
     def test_empty_key_rejected(self) -> None:
         with pytest.raises(click.BadParameter, match="Empty key"):
             parse_structured_arg("=value")

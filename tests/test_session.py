@@ -286,6 +286,35 @@ class TestAsanaSessionPaginationKwargs:
 
 
 # ---------------------------------------------------------------------------
+# AsanaSession.from_env token resolution
+# ---------------------------------------------------------------------------
+
+
+class TestAsanaSessionFromEnv:
+    """``from_env`` resolves the token as ``runtime.access_token`` first, then
+    ``$ASANA_ACCESS_TOKEN``, and exits ``2`` if neither is set. The empty-token
+    fallback is the other half of the ``--access-token`` last-wins behavior: an
+    explicit empty ``--access-token`` clears the runtime value, then this
+    fallback applies."""
+
+    def test_empty_runtime_token_falls_back_to_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "access_token", "")
+        monkeypatch.setenv("ASANA_ACCESS_TOKEN", "env-token-1234567890")
+        with AsanaSession.from_env() as session:
+            assert session.client.configuration.access_token == "env-token-1234567890"
+
+    def test_no_token_anywhere_exits_2(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr(runtime, "access_token", "")
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        with pytest.raises(SystemExit) as exc:
+            AsanaSession.from_env()
+        assert exc.value.code == 2
+        assert "Access token is not set" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
 # AsanaSession Configuration knobs (the _CONFIG_KNOBS table)
 # ---------------------------------------------------------------------------
 
