@@ -61,7 +61,7 @@ clear text.
 ### Custom request headers are not masked
 
 `--header-params VALUE` (per call) and the session-wide `--user-agent` /
-`--default-header NAME=VALUE` (repeatable) let you inject arbitrary HTTP
+`--set-default-header NAME=VALUE` (repeatable) let you inject arbitrary HTTP
 request headers. The `--debug` redactor masks **only** the `Authorization`
 header; any value passed via these flags is logged verbatim. If a custom
 header carries a secret — an API key, signing token, or other credential —

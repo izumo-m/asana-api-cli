@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   412 sync-token body in events polling) is readable from stderr without extra
   flags. The other formats also render a `{exception, status, reason, body,
   headers}` envelope on **stdout** and exit `3`; `--exception-query` filters that
-  envelope through `jq`. See [`docs/usage.md`](docs/usage.md#error-output) and
+  envelope through `jq`. See [`docs/usage.md`](docs/usage.md#error-handling) and
   [`docs/sdk-deviations.md`](docs/sdk-deviations.md).
 
 - **`--output none`** suppresses the success payload for side-effect-only

@@ -207,7 +207,7 @@ def _handle_exception(
     Only reached for the envelope formats (``json|text|csv|table``); the
     ``none`` path and the stderr echo are handled upstream in
     :func:`formatted`. For the envelope schema and exit-code contract see
-    ``docs/usage.md`` ("Error output"); for the rationale,
+    ``docs/usage.md`` ("Error handling"); for the rationale,
     ``docs/sdk-deviations.md``.
     """
     envelope: dict[str, Any]

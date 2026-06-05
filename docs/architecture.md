@@ -38,7 +38,7 @@ Every option's `--help` ends with a uniform `(<kind>: <name>)` label naming wher
 
 ## Error handling
 
-`formatter.py:_handle_exception` builds an envelope from any exception raised by the SDK call path (ApiException, urllib3 connection errors, etc.) and routes it through the same `_format_output` used by the success path. `_echo_exception_only` first writes the exception to **stderr** (`traceback.format_exception_only` — qualified class name + `__str__`, no frames), applied pre-`--exception-query` so unexpected error shapes stay diagnosable. Click's own errors (`ClickException`, `Abort`, `Exit`) are re-raised, not envelope-wrapped. The user-facing contract — exit codes, the 5/2-field envelope schema, and the stderr echo — is documented in [`usage.md`](usage.md#error-output) and [`usage.md`](usage.md#exit-codes).
+`formatter.py:_handle_exception` builds an envelope from any exception raised by the SDK call path (ApiException, urllib3 connection errors, etc.) and routes it through the same `_format_output` used by the success path. `_echo_exception_only` first writes the exception to **stderr** (`traceback.format_exception_only` — qualified class name + `__str__`, no frames), applied pre-`--exception-query` so unexpected error shapes stay diagnosable. Click's own errors (`ClickException`, `Abort`, `Exit`) are re-raised, not envelope-wrapped. The user-facing contract — exit codes, the 5/2-field envelope schema, and the stderr echo — is documented in [`usage.md`](usage.md#error-handling) and [`usage.md`](usage.md#exit-codes).
 
 ## Extension point
 

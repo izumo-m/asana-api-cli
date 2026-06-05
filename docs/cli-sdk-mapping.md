@@ -92,7 +92,7 @@ only on commands whose SDK method declares them — same category as `--sync` /
 ## Output formatter options (`formatter.py:make_formatter_options`)
 
 CLI-only — no SDK destination. Behavior in
-[`usage.md`](usage.md#output-formatting) and [`usage.md`](usage.md#error-output);
+[`usage.md`](usage.md#output-formats) and [`usage.md`](usage.md#error-handling);
 rationale in [`sdk-deviations.md`](sdk-deviations.md). Because they bind to the
 single SDK method call (not the client `Configuration`), they are per-command
 leaf options — placing them before the command path is a usage error.
