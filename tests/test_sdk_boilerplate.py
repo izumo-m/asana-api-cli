@@ -267,18 +267,20 @@ def _upload_ops_via_does_upload() -> set[tuple[str, str]]:
 
 
 # The constructors the SDK calls in the ``return_page_iterator`` branch of an
-# array-response endpoint; both are ``collections.abc.Iterator`` subclasses.
+# array-response endpoint. The method returns their ``.items()`` generator, so
+# the runtime materialization gate sees an iterator.
 _ITERATOR_CTORS = {"PageIterator", "EventIterator"}
 
 
 def _methods_constructing_iterator() -> set[tuple[str, str]]:
     """Methods whose ``*_with_http_info`` source constructs a lazy iterator.
 
-    Returning a ``PageIterator`` / ``EventIterator`` is the ground-truth signal
-    the runtime ``isinstance(result, Iterator)`` gate keys off — i.e. an
-    array-response endpoint. Detected by an AST scan for a call to either
-    constructor (a bare ``Name``, as the SDK imports them). Returns
-    ``(ApiClassName, public_method_name)`` pairs.
+    Constructing a ``PageIterator`` / ``EventIterator`` (the array-response
+    branch) is the ground-truth source signal that the endpoint returns a lazy
+    iterator — the method returns the constructor's ``.items()`` generator, which
+    the runtime ``isinstance(result, Iterator)`` gate materializes. Detected by an
+    AST scan for a call to either constructor (a bare ``Name``, as the SDK imports
+    them). Returns ``(ApiClassName, public_method_name)`` pairs.
     """
     suffix = "_with_http_info"
     out: set[tuple[str, str]] = set()
@@ -367,8 +369,9 @@ def test_iterator_detection_matches_source_construction() -> None:
         "the set of iterator-returning methods drifted:\n"
         f"  added:   {sorted(constructed - EXPECTED_ITERATOR_RETURNING_METHODS)}\n"
         f"  removed: {sorted(EXPECTED_ITERATOR_RETURNING_METHODS - constructed)}\n"
-        "These are exactly the calls code generation wraps in list(...); review "
-        "the change and regenerate the set. See _Operation.returns_iterator."
+        "These are exactly the calls execute_call_plan materializes with "
+        "list(...); review the change and regenerate the set. See "
+        "_Operation.returns_iterator."
     )
     via_proxy = _iterator_ops_via_returns_iterator()
     assert via_proxy == constructed, (
@@ -380,14 +383,17 @@ def test_iterator_detection_matches_source_construction() -> None:
     )
 
 
-def test_sdk_iterators_are_iterator_instances() -> None:
-    # The runtime gate (cli.py:execute_call_plan) materializes results with
-    # ``isinstance(result, collections.abc.Iterator)``, and code generation
-    # wraps exactly the ``:return: *Array`` calls in list(...). Both rely on the
-    # SDK's PageIterator / EventIterator being Iterator subclasses — assert it so
-    # a future SDK that stops subclassing Iterator (silently breaking
-    # materialization) fails here rather than in production.
+def test_pagination_items_are_generators() -> None:
+    # The runtime gate (cli.py:execute_call_plan) materializes a result with
+    # ``isinstance(result, collections.abc.Iterator)`` while the session — and the
+    # --debug redactor — is still open (principle #2: pages 2..N must be fetched
+    # in-session). Array endpoints return ``PageIterator(...).items()`` /
+    # ``EventIterator(...).items()``, and ``.items()`` is a generator function, so
+    # the result is a generator — hence always an Iterator — which is what makes
+    # the gate fire. Pin that: a future SDK whose ``.items()`` stopped being a
+    # generator (e.g. returned a list) would silently change materialization, and
+    # under --debug could leak Authorization on later pages.
     from asana.pagination import EventIterator, PageIterator
 
-    assert issubclass(PageIterator, Iterator)
-    assert issubclass(EventIterator, Iterator)
+    assert inspect.isgeneratorfunction(PageIterator.items)
+    assert inspect.isgeneratorfunction(EventIterator.items)
