@@ -398,6 +398,17 @@ def _parse_summary(doc: str) -> str:
     return ""
 
 
+def _parse_return_type(doc: str) -> str | None:
+    """Return the SDK ``:return:`` type token (e.g. ``TaskResponseArray``).
+
+    python-asana's codegen emits ``:return: <Type>`` on its own line. Returns
+    ``None`` when absent. Feeds :attr:`_Operation.returns_iterator`: a ``*Array``
+    type marks an array-response endpoint that yields a lazy iterator.
+    """
+    m = re.search(r"^\s*:return:\s*(\S+)", doc, re.MULTILINE)
+    return m.group(1) if m else None
+
+
 def _parse_params(doc: str) -> dict[str, _DocParam]:
     """Extract ``:param TYPE NAME: DESC`` entries from *doc*."""
     params: dict[str, _DocParam] = {}
@@ -461,7 +472,15 @@ def _click_type(py_type: str) -> type | None:
 
 
 class _Operation:
-    __slots__ = ("command_name", "has_opts", "method_name", "params", "positional", "summary")
+    __slots__ = (
+        "command_name",
+        "has_opts",
+        "method_name",
+        "params",
+        "positional",
+        "return_type",
+        "summary",
+    )
 
     def __init__(
         self,
@@ -471,6 +490,7 @@ class _Operation:
         positional: list[str],
         params: dict[str, _DocParam],
         has_opts: bool,
+        return_type: str | None,
     ) -> None:
         self.method_name = method_name
         self.command_name = command_name
@@ -478,6 +498,7 @@ class _Operation:
         self.positional = positional
         self.params = params
         self.has_opts = has_opts
+        self.return_type = return_type
 
     @property
     def has_body(self) -> bool:
@@ -521,6 +542,27 @@ class _Operation:
         only affects multipart uploads whose filename is non-ASCII.
         """
         return any(p.name == "file" for p in self.opts_params)
+
+    @property
+    def returns_iterator(self) -> bool:
+        """True iff the SDK method's response is an array.
+
+        Under the default flags (``return_page_iterator`` on, ``full_payload``
+        off) such a method returns a lazy ``PageIterator`` / ``EventIterator``,
+        which the CLI materializes with ``list(...)`` in
+        :func:`execute_call_plan`.
+
+        Detected from the docstring ``:return:`` type ending in ``Array`` (e.g.
+        ``TaskResponseArray``) — python-asana's codegen emits that exactly for
+        array-response endpoints. ``tests/test_sdk_boilerplate.py`` holds this in
+        lockstep with the ground-truth source signal (the ``PageIterator(`` /
+        ``EventIterator(`` construction in the ``*_with_http_info`` sibling), so
+        a future SDK that breaks the correspondence trips that guard.
+
+        Distinct from ``paginatable`` (which keys off a ``limit`` query param):
+        ``events`` returns an iterator yet declares no ``limit``.
+        """
+        return self.return_type is not None and self.return_type.endswith("Array")
 
     @property
     def workspace_positional(self) -> str | None:
@@ -582,6 +624,7 @@ def _extract_operation(method_name: str, fn: object) -> _Operation | None:
         positional=positional,
         params=_parse_params(doc),
         has_opts=has_opts,
+        return_type=_parse_return_type(doc),
     )
 
 

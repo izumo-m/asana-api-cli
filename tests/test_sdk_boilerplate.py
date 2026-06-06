@@ -108,6 +108,92 @@ EXPECTED_MULTIPART_UPLOAD_METHODS: frozenset[tuple[str, str]] = frozenset(
     {("AttachmentsApi", "create_attachment_for_object")}
 )
 
+# The python-asana methods whose response is an array — they return a lazy
+# ``PageIterator`` / ``EventIterator`` (built in the ``*_with_http_info`` source)
+# under the default flags, which the CLI materializes with ``list(...)``. The
+# runtime detects them via a cheap proxy (the ``:return:`` type ends in
+# ``Array``; see ``_Operation.returns_iterator``). This anchor plus the
+# proxy-equality check below pin that proxy to the true iterator-construction
+# signal so an SDK bump that adds, removes, or reshapes an array endpoint fails
+# loudly. (73 methods in python-asana 5.2.4.)
+EXPECTED_ITERATOR_RETURNING_METHODS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("AccessRequestsApi", "get_access_requests"),
+        ("AllocationsApi", "get_allocations"),
+        ("AttachmentsApi", "get_attachments_for_object"),
+        ("AuditLogAPIApi", "get_audit_log_events"),
+        ("BatchAPIApi", "create_batch_request"),
+        ("BudgetsApi", "get_budgets"),
+        ("CustomFieldSettingsApi", "get_custom_field_settings_for_goal"),
+        ("CustomFieldSettingsApi", "get_custom_field_settings_for_portfolio"),
+        ("CustomFieldSettingsApi", "get_custom_field_settings_for_project"),
+        ("CustomFieldSettingsApi", "get_custom_field_settings_for_team"),
+        ("CustomFieldsApi", "get_custom_fields_for_workspace"),
+        ("CustomTypesApi", "get_custom_types"),
+        ("EventsApi", "get_events"),
+        ("GoalRelationshipsApi", "get_goal_relationships"),
+        ("GoalsApi", "get_goals"),
+        ("GoalsApi", "get_parent_goals_for_goal"),
+        ("MembershipsApi", "get_memberships"),
+        ("PortfolioMembershipsApi", "get_portfolio_memberships"),
+        ("PortfolioMembershipsApi", "get_portfolio_memberships_for_portfolio"),
+        ("PortfoliosApi", "get_items_for_portfolio"),
+        ("PortfoliosApi", "get_portfolios"),
+        ("ProjectMembershipsApi", "get_project_memberships_for_project"),
+        ("ProjectPortfolioSettingsApi", "get_project_portfolio_settings_for_portfolio"),
+        ("ProjectPortfolioSettingsApi", "get_project_portfolio_settings_for_project"),
+        ("ProjectStatusesApi", "get_project_statuses_for_project"),
+        ("ProjectTemplatesApi", "get_project_templates"),
+        ("ProjectTemplatesApi", "get_project_templates_for_team"),
+        ("ProjectsApi", "get_projects"),
+        ("ProjectsApi", "get_projects_for_task"),
+        ("ProjectsApi", "get_projects_for_team"),
+        ("ProjectsApi", "get_projects_for_workspace"),
+        ("ProjectsApi", "search_projects_for_workspace"),
+        ("RatesApi", "get_rates"),
+        ("ReactionsApi", "get_reactions_on_object"),
+        ("RolesApi", "get_roles"),
+        ("SectionsApi", "get_sections_for_project"),
+        ("StatusUpdatesApi", "get_statuses_for_object"),
+        ("StoriesApi", "get_stories_for_goal"),
+        ("StoriesApi", "get_stories_for_task"),
+        ("TagsApi", "get_tags"),
+        ("TagsApi", "get_tags_for_task"),
+        ("TagsApi", "get_tags_for_workspace"),
+        ("TaskTemplatesApi", "get_task_templates"),
+        ("TasksApi", "get_dependencies_for_task"),
+        ("TasksApi", "get_dependents_for_task"),
+        ("TasksApi", "get_subtasks_for_task"),
+        ("TasksApi", "get_tasks"),
+        ("TasksApi", "get_tasks_for_project"),
+        ("TasksApi", "get_tasks_for_section"),
+        ("TasksApi", "get_tasks_for_tag"),
+        ("TasksApi", "get_tasks_for_user_task_list"),
+        ("TasksApi", "search_tasks_for_workspace"),
+        ("TeamMembershipsApi", "get_team_memberships"),
+        ("TeamMembershipsApi", "get_team_memberships_for_team"),
+        ("TeamMembershipsApi", "get_team_memberships_for_user"),
+        ("TeamsApi", "get_teams_for_user"),
+        ("TeamsApi", "get_teams_for_workspace"),
+        ("TimePeriodsApi", "get_time_periods"),
+        ("TimeTrackingCategoriesApi", "get_time_tracking_categories"),
+        ("TimeTrackingCategoriesApi", "get_time_tracking_entries_for_time_tracking_category"),
+        ("TimeTrackingEntriesApi", "get_time_tracking_entries"),
+        ("TimeTrackingEntriesApi", "get_time_tracking_entries_for_task"),
+        ("TimesheetApprovalStatusesApi", "get_timesheet_approval_statuses"),
+        ("TypeaheadApi", "typeahead_for_workspace"),
+        ("UsersApi", "get_favorites_for_user"),
+        ("UsersApi", "get_users"),
+        ("UsersApi", "get_users_for_team"),
+        ("UsersApi", "get_users_for_workspace"),
+        ("WebhooksApi", "get_webhooks"),
+        ("WorkspaceMembershipsApi", "get_workspace_memberships_for_user"),
+        ("WorkspaceMembershipsApi", "get_workspace_memberships_for_workspace"),
+        ("WorkspacesApi", "get_workspace_events"),
+        ("WorkspacesApi", "get_workspaces"),
+    }
+)
+
 
 def _all_params_for(func: Any) -> frozenset[str]:
     """Collect the ``all_params.append('x')`` string literals from a method body.
@@ -180,6 +266,45 @@ def _upload_ops_via_does_upload() -> set[tuple[str, str]]:
     return out
 
 
+# The constructors the SDK calls in the ``return_page_iterator`` branch of an
+# array-response endpoint; both are ``collections.abc.Iterator`` subclasses.
+_ITERATOR_CTORS = {"PageIterator", "EventIterator"}
+
+
+def _methods_constructing_iterator() -> set[tuple[str, str]]:
+    """Methods whose ``*_with_http_info`` source constructs a lazy iterator.
+
+    Returning a ``PageIterator`` / ``EventIterator`` is the ground-truth signal
+    the runtime ``isinstance(result, Iterator)`` gate keys off — i.e. an
+    array-response endpoint. Detected by an AST scan for a call to either
+    constructor (a bare ``Name``, as the SDK imports them). Returns
+    ``(ApiClassName, public_method_name)`` pairs.
+    """
+    suffix = "_with_http_info"
+    out: set[tuple[str, str]] = set()
+    for cls_name, method_name, func in _with_http_info_methods():
+        tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in _ITERATOR_CTORS
+            ):
+                out.add((cls_name, method_name[: -len(suffix)]))
+    return out
+
+
+def _iterator_ops_via_returns_iterator() -> set[tuple[str, str]]:
+    """Methods the runtime classifies as iterator-returning via
+    ``_Operation.returns_iterator``."""
+    out: set[tuple[str, str]] = set()
+    for cls in _enumerate_api_classes():
+        for op in _operations_for(cls):
+            if op.returns_iterator:
+                out.add((cls.__name__, op.method_name))
+    return out
+
+
 def test_all_methods_share_expected_all_params() -> None:
     offenders: dict[str, list[str]] = {}
     count = 0
@@ -231,3 +356,38 @@ def test_upload_detection_matches_multipart_population() -> None:
         "Update the does_upload predicate in cli.py so --multibyte-filenames "
         "lands on exactly the upload commands."
     )
+
+
+def test_iterator_detection_matches_source_construction() -> None:
+    constructed = _methods_constructing_iterator()
+    assert constructed, (
+        "no method constructs a PageIterator/EventIterator — SDK introspection broke"
+    )
+    assert constructed == EXPECTED_ITERATOR_RETURNING_METHODS, (
+        "the set of iterator-returning methods drifted:\n"
+        f"  added:   {sorted(constructed - EXPECTED_ITERATOR_RETURNING_METHODS)}\n"
+        f"  removed: {sorted(EXPECTED_ITERATOR_RETURNING_METHODS - constructed)}\n"
+        "These are exactly the calls code generation wraps in list(...); review "
+        "the change and regenerate the set. See _Operation.returns_iterator."
+    )
+    via_proxy = _iterator_ops_via_returns_iterator()
+    assert via_proxy == constructed, (
+        "_Operation.returns_iterator (the ':return: *Array' proxy) no longer "
+        "matches the methods that actually construct an iterator:\n"
+        f"  proxy-only:  {sorted(via_proxy - constructed)}\n"
+        f"  source-only: {sorted(constructed - via_proxy)}\n"
+        "Update the returns_iterator predicate in cli.py."
+    )
+
+
+def test_sdk_iterators_are_iterator_instances() -> None:
+    # The runtime gate (cli.py:execute_call_plan) materializes results with
+    # ``isinstance(result, collections.abc.Iterator)``, and code generation
+    # wraps exactly the ``:return: *Array`` calls in list(...). Both rely on the
+    # SDK's PageIterator / EventIterator being Iterator subclasses — assert it so
+    # a future SDK that stops subclassing Iterator (silently breaking
+    # materialization) fails here rather than in production.
+    from asana.pagination import EventIterator, PageIterator
+
+    assert issubclass(PageIterator, Iterator)
+    assert issubclass(EventIterator, Iterator)
