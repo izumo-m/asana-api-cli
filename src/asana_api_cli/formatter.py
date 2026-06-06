@@ -386,9 +386,19 @@ def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:
     # ``dict.fromkeys`` preserves insertion order (Python 3.7+), giving a
     # stable column order based on first appearance.
     fieldnames = list(dict.fromkeys(key for row in rows for key in row))
-    # lineterminator="\n" avoids Windows text-mode stdout translating the
-    # csv module's default "\r\n" into "\r\r\n".
-    writer = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\n")
+    # RFC 4180: CRLF between records; newlines inside a field stay verbatim.
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\r\n")
     writer.writeheader()
     writer.writerows(rows)
-    click.echo(buf.getvalue(), nl=False)
+    # Write bytes via the binary layer so the stdout text layer can't translate
+    # newlines (Windows would turn each "\r\n" into "\r\r\n"); fall back to text
+    # for streams without one.
+    text = buf.getvalue()
+    out = sys.stdout
+    raw = getattr(out, "buffer", None)
+    if raw is None:
+        out.write(text)
+    else:
+        out.flush()
+        raw.write(text.encode(out.encoding or "utf-8"))
+        raw.flush()

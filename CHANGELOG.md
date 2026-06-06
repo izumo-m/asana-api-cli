@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CSV output is now RFC 4180-compliant and byte-identical on every platform.**
+  Each record is terminated with CRLF (`\r\n`), while a newline inside a quoted
+  field is preserved verbatim as LF (`\n`). Previously records were terminated
+  with LF, and on Windows a newline inside a field was corrupted into CRLF — so
+  the same call could produce different bytes on different platforms.
+
 ## [3.1.2] - 2026-06-05
 
 ### Fixed
