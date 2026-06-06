@@ -876,8 +876,8 @@ def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, va
 
     Returns *value* so it reaches the callback's ``kwargs`` (the option is
     ``expose_value=True``): ``build_call_plan`` records it on the ``CallPlan`` so
-    the ``--generate-python`` renderer can reproduce the patch (the live install
-    here is a no-op in generate mode, which makes no upload).
+    the ``--generate-python`` renderer can reproduce the patch. The live patch
+    installed here is harmless in generate mode, which makes no upload.
     """
     if value:
         ctx.with_resource(MultibyteFilenameSupport())
@@ -1135,8 +1135,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # flag. Off by default to preserve strict SDK parity (the SDK emits
     # ``filename=`` only); see sdk-deviations.md.
     # Its callback installs the patch and scopes it to this command via
-    # ``ctx.with_resource``; ``expose_value=False`` keeps it out of
-    # ``inner_callback``'s ``**kwargs``.
+    # ``ctx.with_resource``; the value is forwarded through ``inner_callback``'s
+    # ``**kwargs`` so ``build_call_plan`` records it on the ``CallPlan`` for the
+    # ``--generate-python`` renderer.
     if does_upload:
         options.append(
             click.Option(

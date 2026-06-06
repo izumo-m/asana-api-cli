@@ -542,3 +542,15 @@ class TestUploadLayer:
         code = _generate(["create-attachment-for-object", "--file", "/tmp/x.png"])
         assert "MultibyteFilenameSupport" not in code
         assert "result = api_instance.create_attachment_for_object(opts)" in code
+
+    def test_upload_script_runs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # The inlined MultibyteFilenameSupport must work as a context manager: the
+        # script enters it, calls the (mocked) SDK, and exits cleanly.
+        code = _generate(
+            ["create-attachment-for-object", "--file", "/tmp/x.png", "--multibyte-filenames"]
+        )
+        seen, _, namespace = _exec_generated(
+            monkeypatch, code, "create-attachment-for-object", lambda: {"gid": "att"}
+        )
+        assert "MultibyteFilenameSupport" in namespace
+        assert seen["args"] == ({"file": "/tmp/x.png"},)

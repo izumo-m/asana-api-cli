@@ -124,8 +124,9 @@ def _inline_module(module: ModuleType) -> list[str]:
     The module's own ``from __future__ import annotations`` is dropped (the
     generated script carries its own at the top, and a future-import is only
     valid there); surrounding blank lines are trimmed. The module's other imports
-    stay inline — these are standalone, dependency-free modules (``redactor`` /
-    ``multibyte_filename``) meant to be copied as-is.
+    stay inline — these modules (``redactor`` / ``multibyte_filename`` /
+    ``version``) need nothing beyond what a python-asana install already provides,
+    so they copy in as-is.
     """
     lines = [
         line
@@ -261,7 +262,10 @@ def _render_render(
     Used for both the success value and the error envelope.
     """
     lines: list[str] = []
-    if jq_query is not None:
+    # ``if jq_query`` (truthy), not ``is not None`` — matches
+    # ``formatter._format_output``: an empty ``--query ''`` is treated as no
+    # filter, not as the (invalid) jq program ``""``.
+    if jq_query:
         needs.jq = True
         needs.stdlib.add("sys")
         lines += [
