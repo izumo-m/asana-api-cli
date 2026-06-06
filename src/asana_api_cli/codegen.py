@@ -17,10 +17,12 @@ What the emitted script reproduces:
   with the body inlined as a Python literal, the ``opts`` dict, and the
   per-call kwargs. Array endpoints are wrapped in ``list(...)`` — predicted
   statically, never by calling the SDK.
-* **Output** (C-3 / C-17 / C-14): the CLI's pure formatter functions are inlined
-  via ``inspect.getsource`` (single source of truth) and driven exactly as
-  ``_format_output`` drives them, including the ``--query`` jq filter (the jq
-  dependency is added only when ``--query`` is used).
+* **Output** (C-3 / C-17 / C-14): without ``--query`` the value is rendered
+  directly; with ``--query`` it is jq-filtered and each yield rendered (the jq
+  dependency is added only then). ``json`` calls ``json.dumps`` directly;
+  ``text`` / ``table`` / ``csv`` inline the CLI's pure converters via
+  ``inspect.getsource`` (single source of truth) and drive them as
+  ``_format_output`` does.
 * **Errors** (C-16): under ``--exception-output`` the call is wrapped in
   try/except that echoes the exception to stderr and renders the same envelope
   the CLI does, then exits 3. Under the default ``none`` there is no try block
@@ -56,12 +58,14 @@ if TYPE_CHECKING:
     from asana_api_cli.cli import CallPlan
 
 # Per ``--output`` / ``--exception-output`` format: the pure formatter functions
-# it needs, the stdlib modules their bodies use, and whether ``tabulate`` is
-# required. The function set mirrors the branches of ``formatter._format_output``;
-# the equivalence tests exec the emitted script, so any drift (a converter
-# growing a new import) surfaces as a runtime error there.
+# it needs inlined, the stdlib modules their bodies use, and whether ``tabulate``
+# is required. ``json`` inlines nothing — it calls ``json.dumps`` directly (see
+# ``_render_single`` / ``_render_yields``) — but still needs ``import json``. The
+# function set mirrors the branches of ``formatter._format_output``; the
+# equivalence tests exec the emitted script, so any drift (a converter growing a
+# new import) surfaces as a runtime error there.
 _FORMAT_FUNCS: dict[str, tuple[frozenset[str], frozenset[str], bool]] = {
-    "json": (frozenset({"format_json"}), frozenset({"json"}), False),
+    "json": (frozenset(), frozenset({"json"}), False),
     "text": (frozenset({"scalar_text", "format_text"}), frozenset({"json"}), False),
     "table": (frozenset({"scalar_text", "to_rows", "format_table"}), frozenset({"json"}), True),
     "csv": (
@@ -76,7 +80,6 @@ _FORMAT_FUNCS: dict[str, tuple[frozenset[str], frozenset[str], bool]] = {
 _CONVERTER_ORDER: tuple[str, ...] = (
     "scalar_text",
     "to_rows",
-    "format_json",
     "format_text",
     "format_table",
     "format_csv",
@@ -261,41 +264,59 @@ def _call_expression(plan: CallPlan) -> str:
     return f"list({call})" if _returns_iterator(plan) else call
 
 
-def _render_render(
-    var: str, output_format: str, jq_query: str | None, csv_bom: bool, needs: _Imports
-) -> list[str]:
-    """Emit code that renders *var* to stdout via *output_format*.
+def _render_json_dumps(value_expr: str) -> str:
+    """``json.dumps`` matching ``formatter.format_json`` (indent 2, non-ASCII
+    kept). Inlined directly — the wrapper would add a function + ``Any`` import
+    for a one-liner; the json equivalence test guards against drift."""
+    return f"print(json.dumps({value_expr}, indent=2, ensure_ascii=False))"
 
-    Mirrors ``formatter._format_output``: optionally jq-filter *var* into
-    ``results`` (each yield rendered), else treat it as a single yield; ``none``
-    suppresses output but still runs the jq pass so a bad expression exits 2.
-    Used for both the success value and the error envelope.
-    """
-    lines: list[str] = []
-    # ``if jq_query`` (truthy), not ``is not None`` — matches
-    # ``formatter._format_output``: an empty ``--query ''`` is treated as no
-    # filter, not as the (invalid) jq program ``""``.
-    if jq_query:
-        needs.jq = True
+
+def _render_rows_tail(output_format: str, csv_bom: bool, needs: _Imports) -> list[str]:
+    """The shared ``elif rows:`` body for table / csv — stringify cells, then
+    print. Emitted at one level of indentation (inside ``elif rows:``)."""
+    lines = ["    rows = [{k: scalar_text(v) for k, v in row.items()} for row in rows]"]
+    if output_format == "table":
+        lines.append("    print(format_table(rows))")
+    else:
         needs.stdlib.add("sys")
         lines += [
-            "try:",
-            f"    results = jq.all({jq_query!r}, {var})",
-            "except ValueError as exc:",
-            '    sys.stderr.write(f"Invalid jq expression: {exc}\\n")',
-            "    sys.exit(2)",
+            f"    text = format_csv(rows, with_bom={csv_bom!r})",
+            "    if text:",
+            "        sys.stdout.flush()",
+            '        sys.stdout.buffer.write(text.encode(sys.stdout.encoding or "utf-8"))',
+            "        sys.stdout.buffer.flush()",
         ]
-    elif output_format == "none":
-        return []
-    else:
-        lines.append(f"results = [{var}]")
-    if output_format == "none":
-        return lines  # jq ran for validation; nothing is printed
-    needs.stdlib.add("sys")
+    return lines
+
+
+def _render_single(var: str, output_format: str, csv_bom: bool, needs: _Imports) -> list[str]:
+    """Render *var* as one value — the no-``--query`` path."""
     if output_format == "json":
-        lines += ["for value in results:", "    print(format_json(value))"]
-    elif output_format == "text":
-        lines += [
+        return [_render_json_dumps(var)]
+    if output_format == "text":
+        return [
+            f"if isinstance({var}, list):",
+            f"    for item in {var}:",
+            "        print(format_text(item))",
+            "else:",
+            f"    print(format_text({var}))",
+        ]
+    # table / csv
+    return [
+        f"rows = to_rows({var})",
+        "if rows is None:",
+        f"    print(scalar_text({var}))",
+        "elif rows:",
+        *_render_rows_tail(output_format, csv_bom, needs),
+    ]
+
+
+def _render_yields(output_format: str, csv_bom: bool, needs: _Imports) -> list[str]:
+    """Render every jq yield in ``results`` — the ``--query`` path."""
+    if output_format == "json":
+        return ["for value in results:", f"    {_render_json_dumps('value')}"]
+    if output_format == "text":
+        return [
             "for value in results:",
             "    if isinstance(value, list):",
             "        for item in value:",
@@ -303,33 +324,54 @@ def _render_render(
             "    else:",
             "        print(format_text(value))",
         ]
-    else:  # table / csv: collect rows across yields, fall back to scalars
-        lines += [
-            "rows = []",
-            "non_rowable = []",
-            "for value in results:",
-            "    converted = to_rows(value)",
-            "    if converted is None:",
-            "        non_rowable.append(value)",
-            "    else:",
-            "        rows.extend(converted)",
-            "if not rows and non_rowable:",
-            "    for value in non_rowable:",
-            "        print(scalar_text(value))",
-            "elif rows:",
-            "    rows = [{k: scalar_text(v) for k, v in row.items()} for row in rows]",
-        ]
-        if output_format == "table":
-            lines.append("    print(format_table(rows))")
-        else:
-            lines += [
-                f"    text = format_csv(rows, with_bom={csv_bom!r})",
-                "    if text:",
-                "        sys.stdout.flush()",
-                '        sys.stdout.buffer.write(text.encode(sys.stdout.encoding or "utf-8"))',
-                "        sys.stdout.buffer.flush()",
-            ]
-    return lines
+    # table / csv: collect rows across yields, fall back to scalars
+    return [
+        "rows = []",
+        "non_rowable = []",
+        "for value in results:",
+        "    converted = to_rows(value)",
+        "    if converted is None:",
+        "        non_rowable.append(value)",
+        "    else:",
+        "        rows.extend(converted)",
+        "if not rows and non_rowable:",
+        "    for value in non_rowable:",
+        "        print(scalar_text(value))",
+        "elif rows:",
+        *_render_rows_tail(output_format, csv_bom, needs),
+    ]
+
+
+def _render_render(
+    var: str, output_format: str, jq_query: str | None, csv_bom: bool, needs: _Imports
+) -> list[str]:
+    """Emit code that renders *var* to stdout via *output_format*.
+
+    Without ``--query`` the value is rendered directly (:func:`_render_single`).
+    With ``--query`` it is jq-filtered into ``results`` and each yield rendered
+    (:func:`_render_yields`); ``none`` still runs the jq pass so a bad expression
+    exits 2. Mirrors ``formatter._format_output``; used for both the success
+    value and the error envelope.
+    """
+    # ``if jq_query`` (truthy), not ``is not None`` — matches
+    # ``formatter._format_output``: an empty ``--query ''`` is treated as no
+    # filter, not as the (invalid) jq program ``""``.
+    if not jq_query:
+        if output_format == "none":
+            return []
+        return _render_single(var, output_format, csv_bom, needs)
+    needs.jq = True
+    needs.stdlib.add("sys")
+    lines = [
+        "try:",
+        f"    results = jq.all({jq_query!r}, {var})",
+        "except ValueError as exc:",
+        '    sys.stderr.write(f"Invalid jq expression: {exc}\\n")',
+        "    sys.exit(2)",
+    ]
+    if output_format == "none":
+        return lines  # jq ran for validation; nothing is printed
+    return lines + _render_yields(output_format, csv_bom, needs)
 
 
 def _render_call_block(
