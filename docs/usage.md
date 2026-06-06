@@ -144,8 +144,9 @@ asana-api tasks get-task --task <TASK_GID> --generate-python > fetch_task.py
 ```
 
 The emitted script is self-contained — it never imports `asana_api_cli`, only
-`asana` and the standard library (plus `jq` when you use `--query`, and
-`tabulate` for `--output table`). It reproduces:
+`asana` and the standard library (plus `jq` when you use `--query` or
+`--exception-query`, and `tabulate` when you use the `table` format for
+`--output` or `--exception-output`). It reproduces:
 
 - **Configuration** — every global option you passed (`--host`, `--retry-strategy`,
   `--user-agent`, …), applied to `asana.Configuration` / `ApiClient` exactly as

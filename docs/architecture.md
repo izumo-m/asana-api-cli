@@ -1,6 +1,6 @@
 # Architecture
 
-Runtime-introspection wrapper around `python-asana`. API group stubs are registered at import time; each group's commands and options are built lazily on first access. No codegen.
+Runtime-introspection wrapper around `python-asana`. API group stubs are registered at import time; each group's commands and options are built lazily on first access. No build-time codegen — the command tree is introspected at runtime. (Distinct from the `--generate-python` *output* mode, which emits equivalent SDK code; see `codegen.py` below.)
 
 ## Modules (`src/asana_api_cli/`)
 
@@ -14,6 +14,7 @@ Runtime-introspection wrapper around `python-asana`. API group stubs are registe
 | `multibyte_filename.py` | `MultibyteFilenameSupport` — patches `urllib3` multipart encoding to add the RFC 5987 `filename*=` parameter for non-ASCII filenames; backs the upload-only `--multibyte-filenames` flag |
 | `structured_arg.py` | Hybrid value parser for structured options (`k=v,k=v` / JSON object / `@path`) |
 | `version.py` | `version_string()` used by `--version` |
+| `codegen.py` | Renders a session-free `CallPlan` as a standalone python-asana script for `--generate-python` (`render_python` / `render_version`); inlines the pure formatter converters and the `redactor` / `multibyte_filename` / `version` helper modules so the emitted script never imports `asana_api_cli` |
 
 ## Command construction (lazy, per group)
 
@@ -36,6 +37,8 @@ Every option's `--help` ends with a uniform `(<kind>: <name>)` label naming wher
 1. The root group and every subcommand accept the global options (from the single `click_ext.py:_global_option_sections` source) and write the command-line ones into the shared `runtime` singleton via `_consume_global_options`; `AsanaSession.__init__` reads them, applies the `Configuration` knobs (host, retry, page_limit, return_page_iterator, ...), and builds the `ApiClient` — touching no process globals. Entering the session (`open()`, via `__enter__`) installs the global side effects: under `--debug`, the SDK `debug` flag (which flips `http.client` debuglevel to 1 and raises the asana / urllib3 loggers to DEBUG) plus the `Authorization` redactor that masks the resulting wire trace. `close()` (via `__exit__`) reverses them — restoring the prior debuglevel and logger levels before removing the mask — so these globals live only for the `with` block. (The upload-only multipart filename patch is *not* a session concern — see step 2.)
 2. The resolved command invokes the SDK `*Api` method via `_make_command()`, passing the docstring-derived `opts` and the common per-call kwargs (`item_limit` / `full_payload` / `header_params` / `_request_timeout`) — both are per-command options read from the command's own flags. `_request_timeout` reaches every page request through the SDK `PageIterator`. If the SDK returns a lazy iterator (`isinstance(result, collections.abc.Iterator)` check), it is consumed into a list inside the session context so multi-page HTTP requests stay under the auth redactor. The upload-only `--multibyte-filenames` flag installs the RFC 5987 multipart patch (`MultibyteFilenameSupport`) from its own option callback via `ctx.with_resource`, scoping it to the command's context teardown — not routed through `runtime` or the session.
 3. `@formatted` (in `formatter.py`) renders the response, optionally piped through `jq` via `--query`.
+
+Under `--generate-python` (`runtime.generate_python`) the flow diverges before any HTTP work: the leaf callback returns the collected `CallPlan` instead of executing it (no session opened, no token read), and `@formatted` renders that plan to a standalone script via `codegen.render_python` — transcribing the `--output` / `--query` / `--exception-*` / `--debug` choices into the emitted code — instead of formatting an SDK result.
 
 ## Error handling
 

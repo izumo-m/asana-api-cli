@@ -44,6 +44,23 @@ environment variable. Treat this token as a secret:
 - When sharing command output, scrub any GIDs or data you do not want to
   disclose; `asana-api-cli` prints raw API responses by default.
 
+## Generated scripts can carry your token
+
+`asana-api --generate-python` prints a standalone Python script instead of
+running the call. When you pass a literal `--access-token`, its value is written
+into the emitted script verbatim (`configuration.access_token = "..."`). When
+`--access-token` is omitted, the script instead reads
+`os.environ["ASANA_ACCESS_TOKEN"]` and embeds no secret.
+
+- Generate with a dummy token (or omit `--access-token`) when you intend to
+  share, commit, or paste the script.
+- Treat any script generated with a real `--access-token` — or with a
+  credential-bearing `--proxy` / `--set-default-header` / `--header-params`,
+  which are likewise transcribed verbatim — as a secret-bearing file: keep it
+  out of source control and out of issues, logs, and screenshots.
+- Rotate the token at <https://app.asana.com/0/my-apps> if such a script may
+  have been exposed.
+
 ## Secrets on the command line
 
 A value passed as a command-line argument is visible to other users through

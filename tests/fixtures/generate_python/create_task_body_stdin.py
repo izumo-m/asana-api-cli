@@ -18,6 +18,8 @@ configuration.access_token = os.environ['ASANA_ACCESS_TOKEN']
 api_client = asana.ApiClient(configuration)
 
 api_instance = asana.TasksApi(api_client)
+if hasattr(sys.stdin, "reconfigure"):
+    sys.stdin.reconfigure(encoding="utf-8")
 body = json.load(sys.stdin)
 opts = {}
 
