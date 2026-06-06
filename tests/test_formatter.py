@@ -16,10 +16,10 @@ from asana_api_cli.formatter import (
     _echo_exception_only,
     _format_output,
     _handle_exception,
-    _scalar_text,
-    _to_rows,
     formatted,
     make_formatter_options,
+    scalar_text,
+    to_rows,
 )
 
 
@@ -35,34 +35,34 @@ def _formatted_command(fn: Any, name: str = "cmd") -> click.Command:
 
 
 # ---------------------------------------------------------------------------
-# _to_rows
+# to_rows
 # ---------------------------------------------------------------------------
 
 
 class TestToRows:
     def test_list_of_dicts(self) -> None:
         data = [{"a": 1}, {"a": 2}]
-        assert _to_rows(data) == data
+        assert to_rows(data) == data
 
     def test_list_of_scalars(self) -> None:
-        assert _to_rows([1, "two", 3]) == [{"value": 1}, {"value": "two"}, {"value": 3}]
+        assert to_rows([1, "two", 3]) == [{"value": 1}, {"value": "two"}, {"value": 3}]
 
     def test_empty_list(self) -> None:
-        assert _to_rows([]) == []
+        assert to_rows([]) == []
 
     def test_single_dict(self) -> None:
-        assert _to_rows({"x": 1}) == [{"x": 1}]
+        assert to_rows({"x": 1}) == [{"x": 1}]
 
     def test_scalar_returns_none(self) -> None:
-        assert _to_rows("hello") is None
-        assert _to_rows(42) is None
-        assert _to_rows(None) is None
+        assert to_rows("hello") is None
+        assert to_rows(42) is None
+        assert to_rows(None) is None
 
     def test_mixed_list_returns_none(self) -> None:
         # A mixed dict/scalar list has no clean column layout; the caller
         # falls through to plain printing instead of crashing csv.DictWriter.
-        assert _to_rows([{"a": 1}, "scalar"]) is None
-        assert _to_rows([1, {"a": 1}]) is None
+        assert to_rows([{"a": 1}, "scalar"]) is None
+        assert to_rows([1, {"a": 1}]) is None
 
 
 # ---------------------------------------------------------------------------
@@ -473,7 +473,7 @@ class TestHandleApiExceptionFormats:
         assert cells[0] == "asana.rest.ApiException"
         assert cells[1] == "412"
         assert cells[2] == "Precondition Failed"
-        # headers (dict) is rendered via _scalar_text → JSON, not Python repr
+        # headers (dict) is rendered via scalar_text → JSON, not Python repr
         assert cells[4].startswith("{") and '"X-Asana-Request-Id"' in cells[4]
 
     def test_csv_format(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -547,36 +547,36 @@ class TestHandleApiExceptionQuery:
 
 
 class TestScalarText:
-    """``_scalar_text`` renders nested containers as JSON, scalars as str()."""
+    """``scalar_text`` renders nested containers as JSON, scalars as str()."""
 
     def test_scalars_unchanged(self) -> None:
-        assert _scalar_text("hello") == "hello"
-        assert _scalar_text(42) == "42"
-        assert _scalar_text(True) == "True"
-        assert _scalar_text(None) == "None"
+        assert scalar_text("hello") == "hello"
+        assert scalar_text(42) == "42"
+        assert scalar_text(True) == "True"
+        assert scalar_text(None) == "None"
 
     def test_dict_as_json(self) -> None:
-        assert _scalar_text({"a": 1, "b": "x"}) == '{"a": 1, "b": "x"}'
+        assert scalar_text({"a": 1, "b": "x"}) == '{"a": 1, "b": "x"}'
 
     def test_list_as_json(self) -> None:
-        assert _scalar_text([1, "two", None]) == '[1, "two", null]'
+        assert scalar_text([1, "two", None]) == '[1, "two", null]'
 
     def test_nested_dict_uses_double_quotes_not_python_repr(self) -> None:
-        # str(dict) gives `{'a': 'b'}` (Python repr); _scalar_text gives
+        # str(dict) gives `{'a': 'b'}` (Python repr); scalar_text gives
         # JSON `{"a": "b"}` so the cell is shell-tool friendly.
-        out = _scalar_text({"a": "b"})
+        out = scalar_text({"a": "b"})
         assert "'" not in out
         assert '"a"' in out and '"b"' in out
 
     def test_unicode_preserved(self) -> None:
-        assert _scalar_text({"name": "日本語"}) == '{"name": "日本語"}'
+        assert scalar_text({"name": "日本語"}) == '{"name": "日本語"}'
 
     def test_unserializable_falls_back_to_str(self) -> None:
         class NotJson:
             def __repr__(self) -> str:
                 return "<NotJson>"
 
-        assert _scalar_text(NotJson()) == "<NotJson>"
+        assert scalar_text(NotJson()) == "<NotJson>"
 
 
 class TestHandleNonApiException:

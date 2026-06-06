@@ -285,7 +285,7 @@ def _format_output(
 
     if output_format == "json":
         for v in results:
-            click.echo(json.dumps(v, indent=2, ensure_ascii=False))
+            click.echo(format_json(v))
         return
 
     if output_format == "text":
@@ -301,7 +301,7 @@ def _format_output(
     rows: list[dict[str, Any]] = []
     non_rowable: list[Any] = []
     for v in results:
-        r = _to_rows(v)
+        r = to_rows(v)
         if r is None:
             non_rowable.append(v)
         else:
@@ -309,24 +309,24 @@ def _format_output(
 
     if not rows and non_rowable:
         for v in non_rowable:
-            click.echo(_scalar_text(v))
+            click.echo(scalar_text(v))
         return
 
     # Stringify nested values (dict / list) as JSON so cells use JSON
     # syntax (`{"a":"b"}`) rather than Python repr (`{'a': 'b'}`).
-    rows = [{k: _scalar_text(v) for k, v in row.items()} for row in rows]
+    rows = [{k: scalar_text(v) for k, v in row.items()} for row in rows]
 
     if output_format == "table":
         # Skip empty data instead of emitting a spurious blank line:
         # ``tabulate([], ...)`` returns ``""`` and ``click.echo("")`` would
         # still write a newline. Matches ``_print_csv``'s empty-rows guard.
         if rows:
-            click.echo(tabulate(rows, headers="keys", tablefmt="simple"))
+            click.echo(format_table(rows))
     elif output_format == "csv":
         _print_csv(rows, with_bom=csv_bom)
 
 
-def _to_rows(data: Any) -> list[dict[str, Any]] | None:
+def to_rows(data: Any) -> list[dict[str, Any]] | None:
     """Convert data into a list of dicts for table/csv. Return None if not possible."""
     if isinstance(data, list):
         if not data:
@@ -343,7 +343,7 @@ def _to_rows(data: Any) -> list[dict[str, Any]] | None:
     return None
 
 
-def _scalar_text(value: Any) -> str:
+def scalar_text(value: Any) -> str:
     """Single-cell text representation.
 
     Scalars (None / str / int / float / bool) are stringified naturally;
@@ -359,24 +359,51 @@ def _scalar_text(value: Any) -> str:
         return str(value)
 
 
+def format_json(value: Any) -> str:
+    """JSON text for one value (indent 2, non-ASCII preserved). Pure (no I/O)."""
+    return json.dumps(value, indent=2, ensure_ascii=False)
+
+
+def format_table(rows: list[dict[str, Any]]) -> str:
+    """Table text for *rows*. Pure (no I/O); the caller guards the empty case."""
+    return tabulate(rows, headers="keys", tablefmt="simple")
+
+
+def format_text(value: Any) -> str:
+    """Plain-text representation of a single value (like ``aws --output text``).
+
+    A dict renders as its values tab-joined; anything else falls back to
+    :func:`scalar_text`. Pure (no I/O); the top-level list iteration lives in
+    :func:`_print_text` so an empty list emits nothing.
+    """
+    if isinstance(value, dict):
+        return "\t".join(scalar_text(v) for v in value.values())
+    return scalar_text(value)
+
+
 def _print_text(data: Any) -> None:
-    """Print data in plain text format (like ``aws --output text``)."""
-    if isinstance(data, dict):
-        click.echo("\t".join(_scalar_text(v) for v in data.values()))
-        return
+    """Print data in plain text format (like ``aws --output text``).
+
+    Thin I/O wrapper over :func:`format_text`: a top-level list prints one
+    line per item (an empty list prints nothing); any other value prints a
+    single line.
+    """
     if isinstance(data, list):
         for item in data:
-            if isinstance(item, dict):
-                click.echo("\t".join(_scalar_text(v) for v in item.values()))
-            else:
-                click.echo(_scalar_text(item))
+            click.echo(format_text(item))
         return
-    click.echo(_scalar_text(data))
+    click.echo(format_text(data))
 
 
-def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:
+def format_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> str:
+    """CSV text for *rows* (RFC 4180, CRLF record terminators). Pure (no I/O).
+
+    Empty *rows* \u2192 empty string. The caller writes the result through the
+    binary stdout layer (:func:`_print_csv`) so the CRLF terminators are not
+    doubled on Windows.
+    """
     if not rows:
-        return
+        return ""
     buf = io.StringIO()
     if with_bom:
         buf.write("\ufeff")
@@ -390,10 +417,19 @@ def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:
     writer = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\r\n")
     writer.writeheader()
     writer.writerows(rows)
-    # Write bytes via the binary layer so the stdout text layer can't translate
-    # newlines (Windows would turn each "\r\n" into "\r\r\n"); fall back to text
-    # for streams without one.
-    text = buf.getvalue()
+    return buf.getvalue()
+
+
+def _print_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> None:
+    """Write :func:`format_csv` output to stdout's binary layer.
+
+    The binary layer avoids the text layer's newline translation (which on
+    Windows would double each CRLF); falls back to text for streams without
+    one (e.g. an in-memory ``StringIO`` in tests).
+    """
+    text = format_csv(rows, with_bom=with_bom)
+    if not text:
+        return
     out = sys.stdout
     raw = getattr(out, "buffer", None)
     if raw is None:
