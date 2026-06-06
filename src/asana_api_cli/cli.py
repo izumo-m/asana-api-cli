@@ -47,6 +47,7 @@ import json
 import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -833,6 +834,173 @@ def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, va
         ctx.with_resource(MultibyteFilenameSupport())
 
 
+@dataclass
+class CallPlan:
+    """A fully collected SDK method invocation, independent of any session.
+
+    :func:`build_call_plan` produces it from the parsed CLI ``kwargs`` without
+    opening a session or needing a token; :func:`execute_call_plan` consumes it
+    to perform the call. The split is at the session boundary: everything that
+    needs no client — argument collection plus the session-free ``--body`` and
+    workspace resolution — happens in :func:`build_call_plan`, while the API
+    instantiation, the call itself, and lazy-iterator materialization (all of
+    which need the session's client) happen in :func:`execute_call_plan`. This
+    keeps the session — and the ``--debug`` redactor — scoped to the actual HTTP
+    work.
+
+    ``body`` is the already-resolved body value (``@file`` / ``-`` / JSON literal
+    parsed by :func:`resolve_body`); ``has_body`` distinguishes "no body
+    positional" from a body that legitimately parsed to ``None`` (``--body
+    null``). ``api_cls`` is the class, not an instance — instantiation needs the
+    session's client and happens in :func:`execute_call_plan`.
+    """
+
+    api_cls: type
+    method_name: str
+    has_opts: bool
+    has_body: bool
+    body: JsonValue
+    path_call_args: list[Any]
+    opts: dict[str, Any]
+    method_kwargs: dict[str, Any]
+
+
+def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> CallPlan:
+    """Collect everything needed to call ``op`` from the parsed ``kwargs``.
+
+    Session-free: needs no client and no token. It does read local input
+    (``@file`` / stdin for ``--body``, the ``ASANA_DEFAULT_WORKSPACE`` env var),
+    but nothing that requires the SDK client — that is what makes it separable
+    from :func:`execute_call_plan`. Consumes ``kwargs`` by popping each value,
+    mirroring the original single-pass collection.
+    """
+    # Common per-call kwargs (rendered as per-command options): pop into locals
+    # so they do not fall through into the opts dict.
+    item_limit = kwargs.pop("item_limit", None)
+    full_payload = kwargs.pop("full_payload", False)
+    header_params = kwargs.pop("header_params", None)
+    request_timeout = kwargs.pop("request_timeout", None)
+
+    # Deprecated aliases (--all-items / --page-size / --max-items): warn and fold
+    # into their canonical replacements.
+    effective_item_limit = _apply_deprecated_aliases(kwargs, item_limit)
+
+    # Resolve the body (``@file`` / stdin / JSON literal) before workspace, the
+    # same order as the original closure. Both reads are session-free, so they
+    # belong on the collection side of the split. ``--body`` is click-required,
+    # so the pop always yields a value when ``has_body``.
+    body = resolve_body(kwargs.pop("body")) if op.has_body else None
+
+    # Workspace resolution is session-free (an explicit value or the
+    # ``ASANA_DEFAULT_WORKSPACE`` env-var fallback — no client, no token), so it
+    # belongs here. ``resolve_workspace(required=True)`` can still raise when a
+    # required workspace is omitted and the env var is unset; it ran here, after
+    # body resolution, in the original closure too, so the order is preserved.
+    if op.has_workspace:
+        resolved_workspace = resolve_workspace(
+            kwargs.pop("workspace", None), required=op.workspace_required
+        )
+    else:
+        resolved_workspace = None
+
+    # Non-workspace opts pop straight into the opts dict; the workspace opt is
+    # resolved separately (env-var fallback) and added after.
+    opts: dict[str, Any] = {}
+    for p in op.opts_params:
+        if _is_workspace_param(p.name):
+            continue
+        value = kwargs.pop(p.name, None)
+        if p.required or value is not None:
+            opts[p.name] = value
+    workspace_opt = op.workspace_opt
+    if workspace_opt is not None and resolved_workspace is not None:
+        opts[workspace_opt.name] = resolved_workspace
+
+    # Path positionals in function-signature order. Body is prepended in
+    # :func:`execute_call_plan` (it is always the first positional in python-asana).
+    path_call_args: list[Any] = []
+    for name in op.path_positionals:
+        if _is_workspace_param(name):
+            path_call_args.append(resolved_workspace)
+        else:
+            path_call_args.append(kwargs.pop(_option_name(name)))
+
+    # Forward the common per-call kwargs uniformly. The SDK accepts
+    # ``item_limit`` / ``full_payload`` / ``header_params`` / ``_request_timeout``
+    # on every method (its ``all_params``), so a method that does not act on a
+    # given kwarg simply ignores it. ``_request_timeout`` propagates to every
+    # page request through the SDK ``PageIterator``.
+    method_kwargs: dict[str, Any] = {}
+    if effective_item_limit is not None:
+        method_kwargs["item_limit"] = effective_item_limit
+    if full_payload:
+        method_kwargs["full_payload"] = True
+    if header_params is not None:
+        method_kwargs["header_params"] = header_params
+    if request_timeout is not None:
+        method_kwargs["_request_timeout"] = request_timeout
+
+    return CallPlan(
+        api_cls=api_cls,
+        method_name=op.method_name,
+        has_opts=op.has_opts,
+        has_body=op.has_body,
+        body=body,
+        path_call_args=path_call_args,
+        opts=opts,
+        method_kwargs=method_kwargs,
+    )
+
+
+def execute_call_plan(plan: CallPlan) -> Any:
+    """Execute a collected :class:`CallPlan` and return the SDK result.
+
+    Opens a session, builds the API instance, invokes the method, and
+    materializes a lazy iterator while the session — and the ``--debug``
+    redactor — are still active. Everything session-free (argument collection,
+    body / workspace resolution) already happened in :func:`build_call_plan`.
+    """
+    # Body is always the first positional in python-asana. ``has_body`` (not
+    # ``body is not None``) is the gate, so a body that parsed to ``None``
+    # (``--body null``) is still passed through.
+    if plan.has_body:
+        call_args: list[Any] = [plan.body, *plan.path_call_args]
+    else:
+        call_args = list(plan.path_call_args)
+
+    with AsanaSession.from_env() as session:
+        api = plan.api_cls(session.client)
+        method = getattr(api, plan.method_name)
+        # ``method_kwargs`` (the common per-call kwargs) is forwarded in both
+        # branches: methods without an ``opts`` parameter still accept the
+        # boilerplate ``**kwargs`` (their ``all_params``), so dropping them here
+        # would silently no-op --request-timeout / --header-params / --item-limit
+        # / --full-payload on every no-opts endpoint.
+        result = (
+            method(*call_args, plan.opts, **plan.method_kwargs)
+            if plan.has_opts
+            else method(*call_args, **plan.method_kwargs)
+        )
+        # Lazy iterator consumption inside the session context.
+        #
+        # Two independent layers:
+        #   - Layer A (session lifecycle): every SDK call runs inside
+        #     ``with AsanaSession.from_env() as session:``, which keeps the
+        #     ``HttpClientAuthRedactor`` installed when ``--debug`` is active.
+        #   - Layer B (this block): when the SDK returns a lazy iterator
+        #     (PageIterator / EventIterator), iterating it issues one HTTP
+        #     request per page. We must consume the iterator *before* leaving
+        #     Layer A's ``with`` block — otherwise pages 2..N are fetched after
+        #     the redactor is uninstalled and leak ``Authorization`` into the
+        #     ``--debug`` log.
+        #
+        # post-judge by return value type: any ``Iterator`` is consumed here
+        # regardless of which endpoint produced it.
+        if isinstance(result, collections.abc.Iterator):
+            result = list(result)
+        return result
+
+
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
     """Build a :class:`CommandWithGlobalOptions` for a single SDK method.
 
@@ -951,104 +1119,10 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Common per-call kwargs (rendered as per-command options above): pop
-        # them into locals so they do not fall through into the opts dict, then
-        # forward to the SDK call below.
-        item_limit = kwargs.pop("item_limit", None)
-        full_payload = kwargs.pop("full_payload", False)
-        header_params = kwargs.pop("header_params", None)
-        request_timeout = kwargs.pop("request_timeout", None)
-
-        # Deprecated aliases (--all-items / --page-size / --max-items): warn and
-        # fold into their canonical replacements. Isolated in a helper so their
-        # eventual removal does not touch this hot-path closure.
-        effective_item_limit = _apply_deprecated_aliases(kwargs, item_limit)
-
-        if op.has_body:
-            body_value = kwargs.pop("body")  # click marks --body as required
-            parsed_body = resolve_body(body_value)
-        else:
-            parsed_body = None
-
-        if op.has_workspace:
-            workspace_value = kwargs.pop("workspace", None)
-            resolved_workspace = resolve_workspace(workspace_value, required=op.workspace_required)
-        else:
-            resolved_workspace = None
-
-        with AsanaSession.from_env() as session:
-            api = api_cls(session.client)
-
-            # Non-workspace opts pop straight into the opts dict; the workspace
-            # opt is resolved separately (env-var fallback) and added after.
-            opts: dict[str, Any] = {}
-            for p in op.opts_params:
-                if _is_workspace_param(p.name):
-                    continue
-                value = kwargs.pop(p.name, None)
-                if p.required or value is not None:
-                    opts[p.name] = value
-            workspace_opt = op.workspace_opt
-            if workspace_opt is not None and resolved_workspace is not None:
-                opts[workspace_opt.name] = resolved_workspace
-
-            # Build positional call args in function-signature order. Body is
-            # always the first positional in python-asana (e.g.
-            # ``add_followers_for_task(body, task_gid, opts)``).
-            call_args: list[Any] = []
-            if op.has_body:
-                call_args.append(parsed_body)
-            for name in op.path_positionals:
-                if _is_workspace_param(name):
-                    call_args.append(resolved_workspace)
-                else:
-                    call_args.append(kwargs.pop(_option_name(name)))
-
-            method = getattr(api, op.method_name)
-            # Forward the common per-call kwargs uniformly. The SDK accepts
-            # ``item_limit`` / ``full_payload`` / ``header_params`` /
-            # ``_request_timeout`` on every method (its ``all_params``), so we
-            # pass them without per-method gating; a method that does not act on
-            # a given kwarg simply ignores it. ``_request_timeout`` propagates
-            # to every page request through the SDK ``PageIterator``.
-            method_kwargs: dict[str, Any] = {}
-            if effective_item_limit is not None:
-                method_kwargs["item_limit"] = effective_item_limit
-            if full_payload:
-                method_kwargs["full_payload"] = True
-            if header_params is not None:
-                method_kwargs["header_params"] = header_params
-            if request_timeout is not None:
-                method_kwargs["_request_timeout"] = request_timeout
-            # ``method_kwargs`` (the common per-call kwargs) is forwarded in
-            # both branches: methods without an ``opts`` parameter still accept
-            # the boilerplate ``**kwargs`` (their ``all_params``), so dropping
-            # them here would silently no-op --request-timeout / --header-params
-            # / --item-limit / --full-payload on every no-opts endpoint.
-            result = (
-                method(*call_args, opts, **method_kwargs)
-                if op.has_opts
-                else method(*call_args, **method_kwargs)
-            )
-            # Lazy iterator consumption inside the session context.
-            #
-            # Two independent layers:
-            #   - Layer A (session lifecycle, above): every SDK call runs
-            #     inside ``with AsanaSession.from_env() as session:``, which
-            #     keeps the ``HttpClientAuthRedactor`` installed when ``--debug``
-            #     is active.
-            #   - Layer B (this block): when the SDK returns a lazy iterator
-            #     (PageIterator / EventIterator), iterating it issues one
-            #     HTTP request per page. We must consume the iterator *before*
-            #     leaving Layer A's ``with`` block — otherwise pages 2..N
-            #     are fetched after the redactor is uninstalled and leak
-            #     ``Authorization`` into ``--debug`` log.
-            #
-            # post-judge by return value type: any ``Iterator`` is consumed
-            # here regardless of which endpoint produced it.
-            if isinstance(result, collections.abc.Iterator):
-                result = list(result)
-            return result
+        # Collect the invocation (pure, no session) then execute it. The split
+        # lives in ``build_call_plan`` / ``execute_call_plan`` so the same
+        # collected plan can later drive code generation without a session.
+        return execute_call_plan(build_call_plan(op, api_cls, kwargs))
 
     callback = formatted(inner_callback)
 

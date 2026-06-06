@@ -114,7 +114,7 @@ def formatted(f: Any) -> Any:
         try:
             data = f(*args, **kwargs)
             # Iterator consumption is done inside the session context in
-            # ``cli.py:_make_command`` (Layer B post-judge via
+            # ``cli.py:execute_call_plan`` (Layer B post-judge via
             # ``isinstance(result, collections.abc.Iterator)``). Iterating
             # here — outside that context — would leak ``Authorization``
             # into ``--debug`` log on multi-page iterators, so the upstream
