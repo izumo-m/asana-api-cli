@@ -13,6 +13,7 @@
   "exclude": [
     "**/__pycache__",
     "**/.venv",
-    "dist"
+    "dist",
+    "tests/fixtures/generate_python"
   ]
 }

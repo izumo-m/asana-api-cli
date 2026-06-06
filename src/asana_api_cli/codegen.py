@@ -40,6 +40,7 @@ command-free path that inlines ``version.py`` and prints the version.
 
 from __future__ import annotations
 
+import ast
 import inspect
 import pprint
 import shlex
@@ -131,17 +132,29 @@ def _indent(lines: list[str], by: int = 4) -> list[str]:
 def _inline_module(module: ModuleType) -> list[str]:
     """The source of *module* as lines, ready to embed in the generated script.
 
-    The module's own ``from __future__ import annotations`` is dropped (the
-    generated script carries its own at the top, and a future-import is only
-    valid there); surrounding blank lines are trimmed. The module's other imports
-    stay inline — these modules (``redactor`` / ``multibyte_filename`` /
+    The module docstring and its ``from __future__ import annotations`` are
+    dropped (the docstring documents the standalone file, not the inlined copy;
+    a future-import is only valid at the top of the generated script, which
+    carries its own); surrounding blank lines are trimmed. The module's other
+    imports stay inline — these modules (``redactor`` / ``multibyte_filename`` /
     ``version``) need nothing beyond what a python-asana install already provides,
     so they copy in as-is.
     """
+    source = inspect.getsource(module)
+    drop: set[int] = set()
+    body = ast.parse(source).body
+    if (
+        body
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    ):
+        doc = body[0]
+        drop = set(range(doc.lineno, (doc.end_lineno or doc.lineno) + 1))
     lines = [
         line
-        for line in inspect.getsource(module).splitlines()
-        if line.strip() != "from __future__ import annotations"
+        for number, line in enumerate(source.splitlines(), start=1)
+        if number not in drop and line.strip() != "from __future__ import annotations"
     ]
     while lines and not lines[0].strip():
         lines.pop(0)

@@ -55,6 +55,10 @@ where = ["src"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+# Generated python-asana scripts pinned as golden snapshots; they use repr/pprint
+# literal style and are validated by ``compile()`` in the snapshot test, not by
+# this project's lint config.
+extend-exclude = ["tests/fixtures/generate_python"]
 
 [tool.ruff.format]
 docstring-code-format = true
