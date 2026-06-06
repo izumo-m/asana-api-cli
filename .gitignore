@@ -12,4 +12,5 @@ dist/
 htmlcov/
 CLAUDE.local.md
 .claude/settings.local.json
+.claude/*.lock
 _local/
