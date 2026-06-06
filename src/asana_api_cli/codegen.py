@@ -93,15 +93,22 @@ class _Imports:
 
     def __init__(self) -> None:
         self.stdlib: set[str] = set()
+        self.typing_any: bool = False
         self.tabulate: bool = False
         self.jq: bool = False
         self.api_exception: bool = False
 
     def block(self) -> list[str]:
         lines = ["from __future__ import annotations"]
-        if self.stdlib:
+        # The stdlib group: ``import x`` lines plus ``from typing import Any``
+        # (needed by the inlined converters' annotations), sorted by module name
+        # the way isort/ruff would order them.
+        stdlib_lines = [f"import {name}" for name in self.stdlib]
+        if self.typing_any:
+            stdlib_lines.append("from typing import Any")
+        if stdlib_lines:
             lines.append("")
-            lines += [f"import {name}" for name in sorted(self.stdlib)]
+            lines += sorted(stdlib_lines, key=lambda line: line.split()[1])
         lines.append("")
         lines.append("import asana")
         if self.api_exception:
@@ -176,6 +183,9 @@ def _render_converters(formats: set[str], needs: _Imports) -> list[str]:
         needs.tabulate = needs.tabulate or needs_tabulate
     if not wanted:
         return []
+    # Every converter annotates with ``Any`` (e.g. ``def format_json(value: Any)``),
+    # so the inlined block needs ``from typing import Any``.
+    needs.typing_any = True
     ordered = [name for name in _CONVERTER_ORDER if name in wanted]
     sources = [inspect.getsource(getattr(formatter, name)).rstrip() for name in ordered]
     return "\n\n".join(sources).split("\n")
