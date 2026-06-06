@@ -52,10 +52,21 @@ class _CaptureStdout:
         pass
 
 
-def _command(api_cls_name: str, method_name: str) -> Any:
+def _build_command(api_cls_name: str, method_name: str) -> Any:
     api_cls = next(c for c in _enumerate_api_classes() if c.__name__ == api_cls_name)
     op = next(o for o in _operations_for(api_cls) if o.method_name == method_name)
     return _make_command(api_cls, op)
+
+
+def _command(api_cls_name: str, method_name: str) -> Any:
+    """A command built once at import (see ``_COMMAND_CACHE``).
+
+    Returning the cached object — rather than rebuilding — is what keeps the
+    introspected option set tied to the *real* method signature: a test that
+    patches an SDK method (to record or raise) before another helper asks for
+    its command would otherwise rebuild from the stub's ``(*args, **kwargs)``.
+    """
+    return _COMMAND_CACHE[api_cls_name, method_name]
 
 
 def _record(
@@ -106,7 +117,12 @@ def _exec_generated(
 
 
 def _format_reference(
-    monkeypatch: pytest.MonkeyPatch, data: Any, *, output_format: str, csv_bom: bool
+    monkeypatch: pytest.MonkeyPatch,
+    data: Any,
+    *,
+    output_format: str,
+    csv_bom: bool,
+    jq_query: str | None = None,
 ) -> bytes:
     """The CLI's own output bytes for *data* — ``_format_output`` captured through
     the faithful byte stream. Used instead of a ``CliRunner`` invoke because
@@ -116,8 +132,40 @@ def _format_reference(
 
     cap = _CaptureStdout()
     monkeypatch.setattr(sys, "stdout", cap)
-    _format_output(data, output_format=output_format, jq_query=None, csv_bom=csv_bom)
+    _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
     return cap.buffer.getvalue()
+
+
+def _exec_expecting_exit(
+    monkeypatch: pytest.MonkeyPatch, code: str, cmd_name: str, factory: Factory
+) -> tuple[bytes, int]:
+    """Exec *code* whose SDK call raises or whose jq exits; return (stdout bytes,
+    exit code). ``SystemExit`` from the generated ``sys.exit`` is caught here."""
+    monkeypatch.setenv("ASANA_ACCESS_TOKEN", "dummy-token")
+    api_cls_name, method_name = _COMMANDS[cmd_name]
+    _record(monkeypatch, api_cls_name, method_name, factory)
+    cap = _CaptureStdout()
+    monkeypatch.setattr(sys, "stdout", cap)
+    monkeypatch.setattr(sys, "stderr", _CaptureStdout())
+    exit_code = 0
+    try:
+        exec(compile(code, "<generated>", "exec"), {})  # noqa: S102
+    except SystemExit as exc:
+        exit_code = exc.code if isinstance(exc.code, int) else 1
+    return cap.buffer.getvalue(), exit_code
+
+
+def _cli_run(
+    monkeypatch: pytest.MonkeyPatch, cmd_name: str, flags: list[str], factory: Factory
+) -> tuple[int, str]:
+    """Run the command in execute mode (SDK mocked), tolerating non-zero exits;
+    return (exit code, stdout)."""
+    monkeypatch.setenv("ASANA_ACCESS_TOKEN", "dummy-token")
+    api_cls_name, method_name = _COMMANDS[cmd_name]
+    cmd = _command(api_cls_name, method_name)
+    _record(monkeypatch, api_cls_name, method_name, factory)
+    result = make_runner().invoke(cmd, flags)
+    return result.exit_code, result.stdout
 
 
 def _cli_execute(
@@ -141,6 +189,12 @@ _COMMANDS = {
     "get-task": ("TasksApi", "get_task"),
     "create-task": ("TasksApi", "create_task"),
     "delete-task": ("TasksApi", "delete_task"),
+}
+
+# Built once, at import, before any test patches an SDK method — so every
+# command reflects the real signature no matter the order helpers build/patch in.
+_COMMAND_CACHE: dict[tuple[str, str], Any] = {
+    (cls, method): _build_command(cls, method) for cls, method in _COMMANDS.values()
 }
 
 
@@ -322,22 +376,90 @@ class TestGeneratedScriptHygiene:
         assert code.startswith("from __future__ import annotations\n")
 
 
-class TestUnsupportedFlagsRefused:
-    """Until their layers land, these flags are refused (exit 2), never rendered
-    into wrong or — for --debug — token-leaking code."""
+class TestQueryEquivalence:
+    """``--query`` runs jq over the result in the generated script, exactly as the
+    CLI does — same yields, same bytes; bad expressions exit 2."""
 
-    @pytest.mark.parametrize(
-        "flags",
-        [
-            ["--debug"],
-            ["--query", ".data"],
-            ["--exception-output", "json"],
-        ],
-    )
-    def test_refused(self, monkeypatch: pytest.MonkeyPatch, flags: list[str]) -> None:
+    # The page iterator materializes to a flat list, so queries run against the
+    # list (``.[]``), not a ``{data:[...]}`` envelope.
+    @pytest.mark.parametrize("query", [".[].name", "length", ".[0].name"])
+    def test_query_output_matches_cli(self, monkeypatch: pytest.MonkeyPatch, query: str) -> None:
+        factory: Factory = lambda: iter(  # noqa: E731
+            [{"gid": "1", "name": "あ"}, {"gid": "2", "name": "b"}]
+        )
+        code = _generate(["get-tasks", "--workspace", "1", "--query", query])
+        assert "import jq" in code
+        _, gen_bytes, _ = _exec_generated(monkeypatch, code, "get-tasks", factory)
+        ref = _format_reference(
+            monkeypatch, list(factory()), output_format="json", csv_bom=False, jq_query=query
+        )
+        assert gen_bytes == ref
+
+    def test_no_query_omits_jq_dependency(self) -> None:
+        code = _generate(["get-tasks", "--workspace", "1"])
+        assert "import jq" not in code
+
+    def test_bad_query_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        factory: Factory = lambda: iter([{"gid": "1"}])  # noqa: E731
+        code = _generate(["get-tasks", "--workspace", "1", "--query", "{"])
+        _, exit_code = _exec_expecting_exit(monkeypatch, code, "get-tasks", factory)
+        assert exit_code == 2
+
+
+class TestErrorEnvelopeEquivalence:
+    """``--exception-output`` wraps the call in try/except and renders the same
+    envelope (and exit 3) the CLI does."""
+
+    def _raise(self, exc: Exception) -> Factory:
+        def factory() -> Any:
+            raise exc
+
+        return factory
+
+    def test_generic_exception_envelope_matches_cli(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        factory = self._raise(ValueError("boom"))
+        code = _generate(["get-task", "--task", "1", "--exception-output", "json"])
+        gen_bytes, gen_exit = _exec_expecting_exit(monkeypatch, code, "get-task", factory)
+        cli_exit, cli_out = _cli_run(
+            monkeypatch, "get-task", ["--task", "1", "--exception-output", "json"], factory
+        )
+        assert gen_exit == cli_exit == 3
+        assert gen_bytes.decode("utf-8") == cli_out
+
+    def test_api_exception_envelope_matches_cli(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from asana.rest import ApiException
+
+        def make_exc() -> ApiException:
+            exc = ApiException(status=412, reason="Precondition Failed")
+            exc.body = '{"errors":[{"message":"sync token expired"}]}'
+            exc.headers = {"Content-Type": "application/json"}
+            return exc
+
+        factory = self._raise(make_exc())
+        code = _generate(["get-task", "--task", "1", "--exception-output", "json"])
+        gen_bytes, gen_exit = _exec_expecting_exit(monkeypatch, code, "get-task", factory)
+        cli_exit, cli_out = _cli_run(
+            monkeypatch, "get-task", ["--task", "1", "--exception-output", "json"], factory
+        )
+        assert gen_exit == cli_exit == 3
+        assert gen_bytes.decode("utf-8") == cli_out
+        # 5-field envelope reached stdout.
+        assert '"status": 412' in cli_out
+
+    def test_default_none_has_no_try_block(self) -> None:
+        code = _generate(["get-task", "--task", "1"])
+        assert "try:" not in code
+        assert "except" not in code
+
+
+class TestUnsupportedFlagsRefused:
+    """``--debug`` is refused (exit 2) until its layer lands, so no token-leaking
+    code is ever generated."""
+
+    def test_debug_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
         result = make_runner().invoke(
-            _command("TasksApi", "get_tasks"), ["--generate-python", "--workspace", "1", *flags]
+            _command("TasksApi", "get_tasks"), ["--generate-python", "--workspace", "1", "--debug"]
         )
         assert result.exit_code == 2, full_output(result)
-        assert "does not yet support" in full_output(result)
+        assert "does not yet support --debug" in full_output(result)

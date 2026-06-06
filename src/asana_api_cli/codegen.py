@@ -6,7 +6,7 @@ to be rendered as a self-contained script instead of being executed.
 ``formatter.py:formatted`` calls :func:`render_python` in place of
 ``_format_output`` whenever the mode is active.
 
-What the emitted script reproduces (this milestone):
+What the emitted script reproduces:
 
 * **Config / client** (C-8 / C-4): an ``asana.Configuration`` built from the
   same global flags the CLI applies — only options the user passed are written,
@@ -15,17 +15,20 @@ What the emitted script reproduces (this milestone):
   transcribed literally; the user is expected to pass a dummy).
 * **Call** (C-9 body / C-10 iterator): ``asana.<Api>(api_client).<method>(...)``
   with the body inlined as a Python literal, the ``opts`` dict, and the
-  per-call kwargs. Endpoints that return a lazy iterator are wrapped in
-  ``list(...)`` — predicted statically, never by calling the SDK.
-* **Output** (C-3 / C-17): the CLI's pure formatter functions are inlined via
-  ``inspect.getsource`` (single source of truth) and driven exactly as
-  ``_format_output`` drives them.
+  per-call kwargs. Array endpoints are wrapped in ``list(...)`` — predicted
+  statically, never by calling the SDK.
+* **Output** (C-3 / C-17 / C-14): the CLI's pure formatter functions are inlined
+  via ``inspect.getsource`` (single source of truth) and driven exactly as
+  ``_format_output`` drives them, including the ``--query`` jq filter (the jq
+  dependency is added only when ``--query`` is used).
+* **Errors** (C-16): under ``--exception-output`` the call is wrapped in
+  try/except that echoes the exception to stderr and renders the same envelope
+  the CLI does, then exits 3. Under the default ``none`` there is no try block
+  and exceptions propagate (Python traceback, exit 1).
 
-Not yet reproduced — :func:`render_python` refuses these with a clear error
-rather than emit wrong (or, for ``--debug``, token-leaking) code:
-``--query`` (C-14), ``--exception-output`` (C-16), ``--debug`` (C-7). Upload's
-``--multibyte-filenames`` (C-11) and ``--generate-python --version`` (C-15) are
-also later work.
+Not yet reproduced — :func:`render_python` refuses it rather than emit
+token-leaking code: ``--debug`` (C-7). Upload's ``--multibyte-filenames`` (C-11)
+and ``--generate-python --version`` (C-15) are also later work.
 """
 
 from __future__ import annotations
@@ -46,32 +49,47 @@ if TYPE_CHECKING:
     # ``from __future__ import annotations`` keeps as a string.
     from asana_api_cli.cli import CallPlan
 
-# Per ``--output`` format: the pure formatter functions to inline (in
-# definition order so callees precede callers), the stdlib modules their bodies
-# need, and whether ``tabulate`` is required. The function set mirrors the
-# branches of ``formatter._format_output``; the equivalence tests exec the
-# emitted script, so any drift (a converter growing a new import) surfaces as a
-# runtime error there.
-_OUTPUT_DEPS: dict[str, tuple[tuple[str, ...], frozenset[str], bool]] = {
-    "json": (("format_json",), frozenset({"json"}), False),
-    "text": (("scalar_text", "format_text"), frozenset({"json"}), False),
-    "table": (("scalar_text", "to_rows", "format_table"), frozenset({"json"}), True),
-    "csv": (("scalar_text", "to_rows", "format_csv"), frozenset({"json", "csv", "io"}), False),
-    "none": ((), frozenset(), False),
+# Per ``--output`` / ``--exception-output`` format: the pure formatter functions
+# it needs, the stdlib modules their bodies use, and whether ``tabulate`` is
+# required. The function set mirrors the branches of ``formatter._format_output``;
+# the equivalence tests exec the emitted script, so any drift (a converter
+# growing a new import) surfaces as a runtime error there.
+_FORMAT_FUNCS: dict[str, tuple[frozenset[str], frozenset[str], bool]] = {
+    "json": (frozenset({"format_json"}), frozenset({"json"}), False),
+    "text": (frozenset({"scalar_text", "format_text"}), frozenset({"json"}), False),
+    "table": (frozenset({"scalar_text", "to_rows", "format_table"}), frozenset({"json"}), True),
+    "csv": (
+        frozenset({"scalar_text", "to_rows", "format_csv"}),
+        frozenset({"json", "csv", "io"}),
+        False,
+    ),
+    "none": (frozenset(), frozenset(), False),
 }
+
+# Inline order: callees before callers, so the emitted block is import-clean.
+_CONVERTER_ORDER: tuple[str, ...] = (
+    "scalar_text",
+    "to_rows",
+    "format_json",
+    "format_text",
+    "format_table",
+    "format_csv",
+)
 
 
 class _Imports:
     """Accumulates the import lines the emitted script needs.
 
-    ``asana`` is always imported; stdlib modules and ``tabulate`` are added on
-    demand by the section renderers. ``block`` emits them isort-grouped (future,
-    stdlib, third-party).
+    ``asana`` is always imported; everything else is added on demand by the
+    section renderers. ``block`` emits them isort-grouped (future, stdlib,
+    third-party).
     """
 
     def __init__(self) -> None:
         self.stdlib: set[str] = set()
         self.tabulate: bool = False
+        self.jq: bool = False
+        self.api_exception: bool = False
 
     def block(self) -> list[str]:
         lines = ["from __future__ import annotations"]
@@ -80,41 +98,49 @@ class _Imports:
             lines += [f"import {name}" for name in sorted(self.stdlib)]
         lines.append("")
         lines.append("import asana")
+        if self.api_exception:
+            lines.append("from asana.rest import ApiException")
+        if self.jq:
+            lines.append("import jq  # requires: pip install jq")
         if self.tabulate:
             lines.append("from tabulate import tabulate")
         return lines
 
 
-def _reject_unsupported(*, jq_query: str | None, exception_output: str) -> None:
+def _indent(lines: list[str], by: int = 4) -> list[str]:
+    pad = " " * by
+    return [pad + line if line else line for line in lines]
+
+
+def _reject_unsupported() -> None:
     """Refuse the flags this milestone cannot yet render faithfully.
 
-    Generating code that silently dropped one of these would be wrong — and for
-    ``--debug`` it would emit a script that logs the token unmasked, violating
-    constitution #2. Refusing (exit 2) until the matching layer lands is the
-    safe behavior.
+    Generating ``--debug`` code without the ``HttpClientAuthRedactor`` would emit
+    a script that logs the token unmasked, violating constitution #2. Refusing
+    (exit 2) until that layer lands is the safe behavior.
     """
-    unsupported: list[str] = []
     if runtime.debug:
-        unsupported.append("--debug")
-    if jq_query is not None:
-        unsupported.append("--query")
-    if exception_output != "none":
-        unsupported.append("--exception-output")
-    if unsupported:
         raise click.UsageError(
-            f"--generate-python does not yet support {', '.join(unsupported)} "
-            "(coming in a later release)."
+            "--generate-python does not yet support --debug (coming in a later release)."
         )
 
 
-def _render_converters(output_format: str, needs: _Imports) -> list[str]:
-    """Inline the pure formatter functions for *output_format* via getsource."""
-    names, stdlib, needs_tabulate = _OUTPUT_DEPS[output_format]
-    if not names:
+def _render_converters(formats: set[str], needs: _Imports) -> list[str]:
+    """Inline (via getsource) the pure formatter functions for *formats*.
+
+    The union across the success and error output formats, emitted once in
+    dependency order.
+    """
+    wanted: set[str] = set()
+    for fmt in formats:
+        names, stdlib, needs_tabulate = _FORMAT_FUNCS[fmt]
+        wanted |= names
+        needs.stdlib |= stdlib
+        needs.tabulate = needs.tabulate or needs_tabulate
+    if not wanted:
         return []
-    needs.stdlib |= stdlib
-    needs.tabulate = needs.tabulate or needs_tabulate
-    sources = [inspect.getsource(getattr(formatter, name)).rstrip() for name in names]
+    ordered = [name for name in _CONVERTER_ORDER if name in wanted]
+    sources = [inspect.getsource(getattr(formatter, name)).rstrip() for name in ordered]
     return "\n\n".join(sources).split("\n")
 
 
@@ -159,60 +185,82 @@ def _returns_iterator(plan: CallPlan) -> bool:
     return runtime.return_page_iterator is not False
 
 
-def _render_call(plan: CallPlan) -> list[str]:
-    """Emit the API instantiation and the method call (C-9 body / C-10 iterator).
-
-    Argument order matches ``execute_call_plan``: ``method(body, *path_args,
-    opts, **method_kwargs)``. The body and opts are inlined as Python literals;
-    path positionals (gids) and the per-call kwargs are inlined in place.
-    """
+def _render_call_setup(plan: CallPlan) -> list[str]:
+    """The API instance and the body / opts literals — everything before the call."""
     lines = [f"api_instance = asana.{plan.api_cls.__name__}(api_client)"]
-    positional: list[str] = []
     if plan.has_body:
         lines.append(f"body = {pprint.pformat(plan.body, sort_dicts=False)}")
-        positional.append("body")
-    positional += [repr(arg) for arg in plan.path_call_args]
     if plan.has_opts:
         lines.append(f"opts = {pprint.pformat(plan.opts, sort_dicts=False)}")
-        positional.append("opts")
-    keyword = [f"{name}={value!r}" for name, value in plan.method_kwargs.items()]
-    call = f"api_instance.{plan.method_name}({', '.join(positional + keyword)})"
-    lines.append(f"result = list({call})" if _returns_iterator(plan) else f"result = {call}")
     return lines
 
 
-def _render_output(output_format: str, csv_bom: bool, needs: _Imports) -> list[str]:
-    """Drive the inlined converters over ``result`` (C-3 / C-17).
+def _call_expression(plan: CallPlan) -> str:
+    """``api_instance.method(body, *path_args, opts, **kwargs)`` — order matches
+    ``execute_call_plan``; array endpoints are wrapped in ``list(...)``."""
+    positional: list[str] = []
+    if plan.has_body:
+        positional.append("body")
+    positional += [repr(arg) for arg in plan.path_call_args]
+    if plan.has_opts:
+        positional.append("opts")
+    keyword = [f"{name}={value!r}" for name, value in plan.method_kwargs.items()]
+    call = f"api_instance.{plan.method_name}({', '.join(positional + keyword)})"
+    return f"list({call})" if _returns_iterator(plan) else call
 
-    Reproduces ``_format_output`` for the no-query case (a single value): json /
-    text print straight; table / csv reuse ``to_rows`` + ``scalar_text`` and fall
-    back to ``scalar_text`` for non-rowable data. csv writes bytes through the
-    binary layer so the RFC 4180 CRLFs are not doubled on Windows.
+
+def _render_render(
+    var: str, output_format: str, jq_query: str | None, csv_bom: bool, needs: _Imports
+) -> list[str]:
+    """Emit code that renders *var* to stdout via *output_format*.
+
+    Mirrors ``formatter._format_output``: optionally jq-filter *var* into
+    ``results`` (each yield rendered), else treat it as a single yield; ``none``
+    suppresses output but still runs the jq pass so a bad expression exits 2.
+    Used for both the success value and the error envelope.
     """
-    if output_format == "none":
+    lines: list[str] = []
+    if jq_query is not None:
+        needs.jq = True
+        needs.stdlib.add("sys")
+        lines += [
+            "try:",
+            f"    results = jq.all({jq_query!r}, {var})",
+            "except ValueError as exc:",
+            '    sys.stderr.write(f"Invalid jq expression: {exc}\\n")',
+            "    sys.exit(2)",
+        ]
+    elif output_format == "none":
         return []
+    else:
+        lines.append(f"results = [{var}]")
+    if output_format == "none":
+        return lines  # jq ran for validation; nothing is printed
     needs.stdlib.add("sys")
-    # Reproduce the CLI's startup UTF-8 reconfigure so non-ASCII prints on
-    # Windows too (constitution #5). Harmless for csv, which writes bytes.
-    lines = [
-        'if hasattr(sys.stdout, "reconfigure"):',
-        '    sys.stdout.reconfigure(encoding="utf-8")',
-    ]
     if output_format == "json":
-        lines.append("print(format_json(result))")
+        lines += ["for value in results:", "    print(format_json(value))"]
     elif output_format == "text":
         lines += [
-            "if isinstance(result, list):",
-            "    for item in result:",
-            "        print(format_text(item))",
-            "else:",
-            "    print(format_text(result))",
+            "for value in results:",
+            "    if isinstance(value, list):",
+            "        for item in value:",
+            "            print(format_text(item))",
+            "    else:",
+            "        print(format_text(value))",
         ]
-    else:  # table / csv share the row-collection and non-rowable fallback
+    else:  # table / csv: collect rows across yields, fall back to scalars
         lines += [
-            "rows = to_rows(result)",
-            "if rows is None:",
-            "    print(scalar_text(result))",
+            "rows = []",
+            "non_rowable = []",
+            "for value in results:",
+            "    converted = to_rows(value)",
+            "    if converted is None:",
+            "        non_rowable.append(value)",
+            "    else:",
+            "        rows.extend(converted)",
+            "if not rows and non_rowable:",
+            "    for value in non_rowable:",
+            "        print(scalar_text(value))",
             "elif rows:",
             "    rows = [{k: scalar_text(v) for k, v in row.items()} for row in rows]",
         ]
@@ -229,6 +277,57 @@ def _render_output(output_format: str, csv_bom: bool, needs: _Imports) -> list[s
     return lines
 
 
+def _render_call_block(
+    plan: CallPlan, exception_output: str, exception_query: str | None, needs: _Imports
+) -> list[str]:
+    """The call statement, wrapped in try/except + envelope when an
+    ``--exception-output`` format is set (C-16). Under ``none`` the bare call
+    propagates exceptions (Python traceback, exit 1)."""
+    call = f"result = {_call_expression(plan)}"
+    if exception_output == "none":
+        return [call]
+    needs.stdlib |= {"sys", "traceback"}
+    needs.api_exception = True
+    envelope = _render_render("envelope", exception_output, exception_query, False, needs)
+    return [
+        "try:",
+        f"    {call}",
+        "except Exception as exc:",
+        '    sys.stderr.write("".join(traceback.format_exception_only(type(exc), exc)))',
+        '    qualified = f"{type(exc).__module__}.{type(exc).__qualname__}"',
+        "    if isinstance(exc, ApiException):",
+        "        raw_body = exc.body",
+        "        if isinstance(raw_body, (bytes, bytearray)):",
+        '            body_text = bytes(raw_body).decode("utf-8", errors="replace")',
+        "        elif isinstance(raw_body, str):",
+        "            body_text = raw_body",
+        "        else:",
+        "            body_text = None",
+        "        envelope = {",
+        '            "exception": qualified,',
+        '            "status": exc.status,',
+        '            "reason": exc.reason,',
+        '            "body": body_text,',
+        '            "headers": dict(exc.headers) if exc.headers is not None else None,',
+        "        }",
+        "    else:",
+        '        envelope = {"exception": qualified, "reason": str(exc)}',
+        *_indent(envelope),
+        "    sys.exit(3)",
+    ]
+
+
+def _render_reconfigure(needs: _Imports) -> list[str]:
+    """Reproduce the CLI's startup UTF-8 reconfigure so non-ASCII prints on
+    Windows too (constitution #5). Harmless for csv, which writes bytes."""
+    needs.stdlib.add("sys")
+    return [
+        "for _stream in (sys.stdout, sys.stderr):",
+        '    if hasattr(_stream, "reconfigure"):',
+        '        _stream.reconfigure(encoding="utf-8")',
+    ]
+
+
 def render_python(
     plan: CallPlan,
     *,
@@ -240,19 +339,26 @@ def render_python(
 ) -> str:
     """Render *plan* as a standalone python-asana script.
 
-    Reproduces the global configuration, the SDK call, and the ``--output``
-    rendering. ``--query`` / ``--exception-output`` / ``--debug`` are refused for
-    now (see :func:`_reject_unsupported`); ``exception_query`` rides along with
-    ``--exception-output`` and so is unused until that layer lands.
+    Reproduces the global configuration, the SDK call, the ``--output`` (and
+    ``--query``) rendering, and the ``--exception-output`` error envelope.
+    ``--debug`` is refused for now (see :func:`_reject_unsupported`).
     """
-    _reject_unsupported(jq_query=jq_query, exception_output=exception_output)
+    _reject_unsupported()
     needs = _Imports()
-    converters = _render_converters(output_format, needs)
+    converters = _render_converters({output_format, exception_output}, needs)
     config = _render_config(needs)
-    call = _render_call(plan)
-    output = _render_output(output_format, csv_bom, needs)
+    setup = _render_call_setup(plan)
+    call_block = _render_call_block(plan, exception_output, exception_query, needs)
+    success = _render_render("result", output_format, jq_query, csv_bom, needs)
+    prints = output_format != "none" or exception_output != "none"
+    reconfigure = _render_reconfigure(needs) if prints else []
 
-    sections = [needs.block(), *([converters] if converters else []), config, call]
-    if output:
-        sections.append(output)
+    sections: list[list[str]] = [needs.block()]
+    if converters:
+        sections.append(converters)
+    if reconfigure:
+        sections.append(reconfigure)
+    sections += [config, setup, call_block]
+    if success:
+        sections.append(success)
     return "\n\n".join("\n".join(section) for section in sections) + "\n"
