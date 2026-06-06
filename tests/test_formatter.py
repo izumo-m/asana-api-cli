@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import json
+import sys
 from typing import Any, cast
 
 import click
@@ -132,17 +134,27 @@ class TestFormatOutputCsv:
         _format_output([], output_format="csv", jq_query=None)
         assert capsys.readouterr().out == ""
 
-    def test_no_carriage_returns_in_csv_output(self, capsys: pytest.CaptureFixture[str]) -> None:
-        # csv module's default lineterminator is "\r\n", which would interact
-        # with Windows text-mode stdout to produce "\r\r\n". We force "\n"
-        # so the platform layer handles any translation.
+    def test_crlf_rows_with_verbatim_lf_in_field(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # RFC 4180: each record is terminated by CRLF, while a newline inside a
+        # quoted field is written verbatim (LF). The bytes are identical on every
+        # platform — no text-layer translation doubling a CR into "\r\r\n".
         _format_output(
-            [{"a": "1", "b": "2"}, {"a": "3", "b": "4"}],
+            [{"a": "1", "b": "x\ny"}, {"a": "2", "b": "z"}],
             output_format="csv",
             jq_query=None,
         )
         out = capsys.readouterr().out
-        assert "\r" not in out
+        assert out == 'a,b\r\n1,"x\ny"\r\n2,z\r\n'
+        assert out.count("\r\n") == 3  # header + 2 records, each CRLF-terminated
+        assert "\r\r\n" not in out
+
+    def test_crlf_preserved_on_pure_text_stdout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A pure text stream (io.StringIO) has no binary buffer, exercising the
+        # fallback branch. It still emits RFC 4180 CRLF terminators verbatim.
+        buf = io.StringIO()
+        monkeypatch.setattr(sys, "stdout", buf)
+        _format_output([{"a": "1"}], output_format="csv", jq_query=None)
+        assert buf.getvalue() == "a\r\n1\r\n"
 
     def test_bom_off_by_default(self, capsys: pytest.CaptureFixture[str]) -> None:
         _format_output([{"a": "1"}], output_format="csv", jq_query=None)

@@ -44,6 +44,25 @@ environment variable. Treat this token as a secret:
 - When sharing command output, scrub any GIDs or data you do not want to
   disclose; `asana-api-cli` prints raw API responses by default.
 
+## Secrets on the command line
+
+A value passed as a command-line argument is visible to other users through
+the process list (for example `ps`) while the command runs, and is written to
+your shell history afterwards. This applies to ordinary use, not to any single
+feature. The values to watch are:
+
+- the `--access-token` value — prefer the `ASANA_ACCESS_TOKEN` environment
+  variable, which keeps the token off the command line entirely;
+- a `--proxy` URL that embeds credentials (`http://user:pass@host`);
+- a credential carried by `--header-params VALUE` or the session-wide
+  `--set-default-header NAME=VALUE` (for example an `Authorization` header).
+  `--header-params` accepts a `@file` form (`--header-params @headers.json`)
+  that reads the value from a file rather than the command line.
+
+Treat any secret you have typed on the command line as exposed: avoid passing
+real secrets inline where an environment variable or `@file` is available,
+clear or scrub your shell history, and rotate a token you suspect has leaked.
+
 ## Debug output
 
 `asana-api --debug` turns on the SDK's HTTP debug output. Mirroring the

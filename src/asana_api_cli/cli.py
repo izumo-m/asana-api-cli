@@ -59,9 +59,9 @@ from asana_api_cli.click_ext import (
     LazyGroup,
 )
 from asana_api_cli.formatter import formatted, formatter_flag_names, make_formatter_options
+from asana_api_cli.multibyte_filename import MultibyteFilenameSupport
 from asana_api_cli.session import (
     AsanaSession,
-    MultibyteFilenameSupport,
 )
 from asana_api_cli.structured_arg import (
     click_callback,
@@ -895,10 +895,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     options.extend(_make_per_call_kwarg_options())
 
     # ``--multibyte-filenames`` is an asana-api extension that toggles the
-    # multipart filename patch (``MultibyteFilenameSupport`` in session.py). It
-    # only affects multipart uploads, so it is exposed solely on upload commands
-    # (``does_upload``) rather than as a global flag. Off by default to preserve
-    # strict SDK parity (the SDK emits ``filename=`` only); see sdk-deviations.md.
+    # multipart filename patch (``MultibyteFilenameSupport`` in
+    # ``multibyte_filename.py``). It only affects multipart uploads, so it is
+    # exposed solely on upload commands (``does_upload``) rather than as a global
+    # flag. Off by default to preserve strict SDK parity (the SDK emits
+    # ``filename=`` only); see sdk-deviations.md.
     # Its callback installs the patch and scopes it to this command via
     # ``ctx.with_resource``; ``expose_value=False`` keeps it out of
     # ``inner_callback``'s ``**kwargs``.
