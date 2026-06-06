@@ -319,7 +319,7 @@ def _format_output(
     if output_format == "table":
         # Skip empty data instead of emitting a spurious blank line:
         # ``tabulate([], ...)`` returns ``""`` and ``click.echo("")`` would
-        # still write a newline. Matches ``_print_csv``'s empty-rows guard.
+        # still write a newline. Matches the empty-rows skip on the CSV path.
         if rows:
             click.echo(format_table(rows))
     elif output_format == "csv":
@@ -398,7 +398,7 @@ def _print_text(data: Any) -> None:
 def format_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> str:
     """CSV text for *rows* (RFC 4180, CRLF record terminators). Pure (no I/O).
 
-    Empty *rows* \u2192 empty string. The caller writes the result through the
+    Empty *rows* → empty string. The caller writes the result through the
     binary stdout layer (:func:`_print_csv`) so the CRLF terminators are not
     doubled on Windows.
     """

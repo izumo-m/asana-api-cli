@@ -1162,9 +1162,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Collect the invocation (pure, no session) then execute it. The split
-        # lives in ``build_call_plan`` / ``execute_call_plan`` so the same
-        # collected plan can later drive code generation without a session.
+        # Collect the invocation (session-free) then execute it. Splitting at the
+        # session boundary (``build_call_plan`` / ``execute_call_plan``) keeps the
+        # session — and the ``--debug`` redactor — scoped to the HTTP work.
         return execute_call_plan(build_call_plan(op, api_cls, kwargs))
 
     callback = formatted(inner_callback)
