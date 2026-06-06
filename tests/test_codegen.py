@@ -456,6 +456,20 @@ class TestGeneratedScriptHygiene:
             # generated module's namespace); NameErrors if e.g. ``Any`` is unbound.
             typing.get_type_hints(func)
 
+    def test_two_nonjson_formats_dedupe_converters(self) -> None:
+        # ``_render_converters`` takes the union of {output, exception-output}
+        # formats; with two distinct non-json formats the shared converters
+        # (scalar_text / to_rows) must be inlined exactly once, not per-format
+        # (a double def would be a SyntaxError). Guards the union/dedup path that
+        # the single-non-json-format tests never reach.
+        code = _generate(
+            ["get-task", "--task", "1", "--output", "csv", "--exception-output", "table"]
+        )
+        compile(code, "<gen>", "exec")
+        assert code.count("def scalar_text(") == 1
+        assert code.count("def to_rows(") == 1
+        assert "from tabulate import tabulate" in code
+
 
 class TestHeader:
     """C-5: a provenance line and the original command."""
@@ -528,17 +542,22 @@ class TestQueryEquivalence:
     CLI does — same yields, same bytes; bad expressions exit 2."""
 
     # The page iterator materializes to a flat list, so queries run against the
-    # list (``.[]``), not a ``{data:[...]}`` envelope.
+    # list (``.[]``), not a ``{data:[...]}`` envelope. Parametrized over every
+    # output format so the jq-then-render path (``_render_yields``) — the most
+    # logic-heavy generated branch — is byte-compared for json/text/table/csv.
+    @pytest.mark.parametrize("fmt", ["json", "text", "table", "csv"])
     @pytest.mark.parametrize("query", [".[].name", "length", ".[0].name"])
-    def test_query_output_matches_cli(self, monkeypatch: pytest.MonkeyPatch, query: str) -> None:
+    def test_query_output_matches_cli(
+        self, monkeypatch: pytest.MonkeyPatch, fmt: str, query: str
+    ) -> None:
         factory: Factory = lambda: iter(  # noqa: E731
             [{"gid": "1", "name": "あ"}, {"gid": "2", "name": "b"}]
         )
-        code = _generate(["get-tasks", "--workspace", "1", "--query", query])
+        code = _generate(["get-tasks", "--workspace", "1", "--output", fmt, "--query", query])
         assert "import jq" in code
         _, gen_bytes, _ = _exec_generated(monkeypatch, code, "get-tasks", factory)
         ref = _format_reference(
-            monkeypatch, list(factory()), output_format="json", csv_bom=False, jq_query=query
+            monkeypatch, list(factory()), output_format=fmt, csv_bom=False, jq_query=query
         )
         assert gen_bytes == ref
 
@@ -550,6 +569,21 @@ class TestQueryEquivalence:
         factory: Factory = lambda: iter([{"gid": "1"}])  # noqa: E731
         code = _generate(["get-tasks", "--workspace", "1", "--query", "{"])
         _, exit_code = _exec_expecting_exit(monkeypatch, code, "get-tasks", factory)
+        assert exit_code == 2
+
+    def test_output_none_with_query_validates_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # --output none + --query: jq still runs (validation), nothing is printed,
+        # and a bad expression exits 2 — matching _format_output's jq-before-none
+        # contract. The reconfigure block must still be present (the jq error
+        # writes to stderr).
+        factory: Factory = lambda: iter([{"gid": "1"}])  # noqa: E731
+        ok = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", ".[].name"])
+        assert "import jq" in ok
+        assert 'reconfigure(encoding="utf-8")' in ok
+        _, gen_bytes, _ = _exec_generated(monkeypatch, ok, "get-tasks", factory)
+        assert gen_bytes == b""  # validated, printed nothing
+        bad = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", "{"])
+        _, exit_code = _exec_expecting_exit(monkeypatch, bad, "get-tasks", factory)
         assert exit_code == 2
 
 

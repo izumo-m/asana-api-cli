@@ -29,8 +29,8 @@ def format_text(value: Any) -> str:
     """Plain-text representation of a single value (like ``aws --output text``).
 
     A dict renders as its values tab-joined; anything else falls back to
-    :func:`scalar_text`. Pure (no I/O); the top-level list iteration lives in
-    :func:`_print_text` so an empty list emits nothing.
+    :func:`scalar_text`. Pure (no I/O): one value in, one line out. The caller
+    iterates a top-level list (so an empty list emits nothing).
     """
     if isinstance(value, dict):
         return "\t".join(scalar_text(v) for v in value.values())

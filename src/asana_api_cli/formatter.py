@@ -400,8 +400,8 @@ def format_text(value: Any) -> str:
     """Plain-text representation of a single value (like ``aws --output text``).
 
     A dict renders as its values tab-joined; anything else falls back to
-    :func:`scalar_text`. Pure (no I/O); the top-level list iteration lives in
-    :func:`_print_text` so an empty list emits nothing.
+    :func:`scalar_text`. Pure (no I/O): one value in, one line out. The caller
+    iterates a top-level list (so an empty list emits nothing).
     """
     if isinstance(value, dict):
         return "\t".join(scalar_text(v) for v in value.values())
@@ -426,8 +426,7 @@ def format_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> str:
     """CSV text for *rows* (RFC 4180, CRLF record terminators). Pure (no I/O).
 
     Empty *rows* → empty string. The caller writes the result through the
-    binary stdout layer (:func:`_print_csv`) so the CRLF terminators are not
-    doubled on Windows.
+    binary stdout layer so the CRLF terminators are not doubled on Windows.
     """
     if not rows:
         return ""

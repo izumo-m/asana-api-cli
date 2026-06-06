@@ -544,8 +544,13 @@ def render_python(
     setup = _render_call_setup(plan, needs)
     call_block = _render_call_block(plan, exception_output, exception_query, needs)
     success = _render_render("result", output_format, jq_query, csv_bom, needs)
-    prints = output_format != "none" or exception_output != "none"
-    reconfigure = _render_reconfigure(needs) if prints else []
+    # Reconfigure the streams to UTF-8 whenever the script writes to one. Besides
+    # the rendered output, ``--query`` emits a ``sys.stderr.write`` of the jq error
+    # on a bad expression even under ``--output none`` — so a truthy ``jq_query``
+    # also needs the reconfigure (``exception_query`` does not: its envelope, and
+    # thus its jq error, is only rendered when ``exception_output`` is not none).
+    writes_a_stream = output_format != "none" or exception_output != "none" or bool(jq_query)
+    reconfigure = _render_reconfigure(needs) if writes_a_stream else []
 
     equivalent = [arg for arg in sys.argv[1:] if arg != "--generate-python"]
     sections: list[list[str]] = [_header(equivalent), needs.block()]

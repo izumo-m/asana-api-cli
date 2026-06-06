@@ -77,6 +77,8 @@ _CASES: dict[str, list[str]] = {
     "output_csv": ["tasks", "get-tasks", "--workspace", "111", "--output", "csv"],
     # text converters inlined
     "output_text": ["tasks", "get-task", "--task", "1", "--output", "text"],
+    # table: the tabulate import + inlined format_table layer
+    "output_table": ["tasks", "get-tasks", "--workspace", "111", "--output", "table"],
     # --query: jq dependency + per-yield render
     "query": ["tasks", "get-tasks", "--workspace", "111", "--query", ".[].name"],
     # --exception-output: try/except + envelope + exit 3
