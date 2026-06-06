@@ -907,6 +907,13 @@ class CallPlan:
     path_call_args: list[Any]
     opts: dict[str, Any]
     method_kwargs: dict[str, Any]
+    # Static prediction of whether the SDK returns a lazy iterator for this
+    # endpoint (``*Array`` response → ``PageIterator`` / ``EventIterator``). The
+    # generate path needs it to decide ``result = list(...)`` vs ``result = ...``
+    # without calling the SDK; ``execute_call_plan`` instead post-judges the live
+    # result via ``isinstance``. Gated further at render time by
+    # ``return_page_iterator`` / ``full_payload`` (see ``codegen``).
+    returns_iterator: bool
 
 
 def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> CallPlan:
@@ -993,6 +1000,7 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
         path_call_args=path_call_args,
         opts=opts,
         method_kwargs=method_kwargs,
+        returns_iterator=op.returns_iterator,
     )
 
 
@@ -1127,7 +1135,8 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                     "Emit RFC 5987 filename*=UTF-8'' on this multipart upload. "
                     "Required when the --file name contains non-ASCII characters; "
                     "off by default to match the underlying SDK behavior. "
-                    f"{_sdk_dest('extension')}"
+                    "Not yet reproduced by --generate-python (coming in a later "
+                    f"release). {_sdk_dest('extension')}"
                 ),
             )
         )

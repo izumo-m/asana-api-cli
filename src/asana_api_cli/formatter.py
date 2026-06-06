@@ -13,7 +13,6 @@ import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
 
-from asana_api_cli.codegen import render_python
 from asana_api_cli.session import runtime
 
 
@@ -122,6 +121,11 @@ def formatted(f: Any) -> Any:
             # ``build_call_plan`` (bad --body JSON / missing required workspace →
             # exit 2) propagate as usual; there is no SDK call here, so the
             # API-error envelope path below does not apply.
+            #
+            # Imported lazily: ``codegen`` inlines this module's pure converters
+            # via ``inspect.getsource``, so a top-level import here would cycle.
+            from asana_api_cli.codegen import render_python
+
             plan = f(*args, **kwargs)
             click.echo(
                 render_python(

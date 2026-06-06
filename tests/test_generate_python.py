@@ -1,15 +1,15 @@
-"""Tests for the ``--generate-python`` code-generation mode (Phase 1 plumbing).
+"""Tests for the ``--generate-python`` mode: the CLI-integration plumbing.
 
-Phase 1 wires the mode without yet emitting faithful code: the
-``--generate-python`` global flag sets ``runtime.generate_python``;
+The ``--generate-python`` global flag sets ``runtime.generate_python``;
 ``cli.py:inner_callback`` then returns the session-free ``CallPlan`` instead of
 executing it, and ``formatter.py:formatted`` renders it via
-``codegen.render_python`` (a stub for now) instead of formatting an SDK result.
+``codegen.render_python`` instead of formatting an SDK result.
 
 These tests pin that wiring — no SDK call, no token, formatter bypassed, the
 flag honored at any level of the tree, and the build-time input validation that
-still runs in generate mode — against the stub renderer. The faithful generated
-code is covered in later phases.
+still runs in generate mode. They assert only that real rendered code reaches
+stdout; the fidelity of that code (same call, config, and output bytes as the
+CLI) is covered in ``tests/test_codegen.py``.
 """
 
 from __future__ import annotations
@@ -65,8 +65,8 @@ class TestGenerateModeBypassesExecution:
         assert result.exit_code == 0, full_output(result)
         assert spy.call_count == 0, "the SDK method must not be invoked in generate mode"
         # The rendered code goes to stdout (so ``> script.py`` captures only it).
-        assert "TasksApi.get_tasks" in result.stdout
-        assert result.stdout.lstrip().startswith("#")
+        assert "import asana" in result.stdout
+        assert "api_instance.get_tasks(" in result.stdout
 
     def test_execute_mode_still_calls_sdk(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # The contrast arm: without the flag the same command opens a session and
@@ -95,9 +95,10 @@ class TestGenerateModeBypassesExecution:
 
         assert result.exit_code == 0, full_output(result)
         assert spy.call_count == 0, "the SDK must not be invoked even with --output set"
-        # Rendered code, not CSV of an SDK result.
-        assert result.stdout.lstrip().startswith("#")
-        assert "TasksApi.get_tasks" in result.stdout
+        # Output is the rendered script (csv handling inlined as code), not CSV
+        # data formatted from an SDK result.
+        assert "import asana" in result.stdout
+        assert "format_csv(" in result.stdout
 
 
 class TestGenerateModeIsGlobal:
@@ -123,7 +124,7 @@ class TestGenerateModeIsGlobal:
         result = make_runner().invoke(main, argv)
 
         assert result.exit_code == 0, full_output(result)
-        assert "TasksApi.get_tasks" in result.stdout
+        assert "api_instance.get_tasks(" in result.stdout
 
 
 class TestGenerateModeStillValidatesInput:
