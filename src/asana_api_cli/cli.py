@@ -868,14 +868,20 @@ def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) ->
     return item_limit
 
 
-def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, value: bool) -> bool:
     """``--multibyte-filenames`` callback: install the RFC 5987 multipart patch
     for this command and uninstall it at context teardown. ``with_resource``
     enters the context manager now (install) and exits it when the command
     finishes (uninstall), so the patch is scoped to this one invocation.
+
+    Returns *value* so it reaches the callback's ``kwargs`` (the option is
+    ``expose_value=True``): ``build_call_plan`` records it on the ``CallPlan`` so
+    the ``--generate-python`` renderer can reproduce the patch (the live install
+    here is a no-op in generate mode, which makes no upload).
     """
     if value:
         ctx.with_resource(MultibyteFilenameSupport())
+    return value
 
 
 @dataclass
@@ -914,6 +920,10 @@ class CallPlan:
     # result via ``isinstance``. Gated further at render time by
     # ``return_page_iterator`` / ``full_payload`` (see ``codegen``).
     returns_iterator: bool
+    # Whether ``--multibyte-filenames`` was passed (upload commands only). The
+    # live RFC 5987 patch is installed by the option callback; the generate path
+    # reads this to inline the patch and wrap the call in its ``with`` block.
+    multibyte: bool
 
 
 def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> CallPlan:
@@ -931,6 +941,9 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     full_payload = kwargs.pop("full_payload", False)
     header_params = kwargs.pop("header_params", None)
     request_timeout = kwargs.pop("request_timeout", None)
+    # Upload-only extension (absent on other commands). The callback already
+    # installed the live patch; this is carried for the generate renderer.
+    multibyte = kwargs.pop("multibyte_filenames", False)
 
     # Deprecated aliases (--all-items / --page-size / --max-items): warn and fold
     # into their canonical replacements.
@@ -1001,6 +1014,7 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
         opts=opts,
         method_kwargs=method_kwargs,
         returns_iterator=op.returns_iterator,
+        multibyte=multibyte,
     )
 
 
@@ -1130,13 +1144,11 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 is_flag=True,
                 default=False,
                 callback=_multibyte_filenames_callback,
-                expose_value=False,
                 help=(
                     "Emit RFC 5987 filename*=UTF-8'' on this multipart upload. "
                     "Required when the --file name contains non-ASCII characters; "
                     "off by default to match the underlying SDK behavior. "
-                    "Not yet reproduced by --generate-python (coming in a later "
-                    f"release). {_sdk_dest('extension')}"
+                    f"{_sdk_dest('extension')}"
                 ),
             )
         )

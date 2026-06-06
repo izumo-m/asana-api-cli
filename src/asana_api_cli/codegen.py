@@ -25,21 +25,24 @@ What the emitted script reproduces:
   try/except that echoes the exception to stderr and renders the same envelope
   the CLI does, then exits 3. Under the default ``none`` there is no try block
   and exceptions propagate (Python traceback, exit 1).
+* **Debug / upload** (C-7 / C-11): ``--debug`` inlines ``redactor.py`` and wraps
+  the call in ``with HttpClientAuthRedactor()`` (so the wire trace keeps the
+  ``Authorization`` header masked — constitution #2); ``--multibyte-filenames``
+  inlines ``multibyte_filename.py`` and wraps the call in
+  ``with MultibyteFilenameSupport()``.
 
-Not yet reproduced — :func:`render_python` refuses it rather than emit
-token-leaking code: ``--debug`` (C-7). Upload's ``--multibyte-filenames`` (C-11)
-and ``--generate-python --version`` (C-15) are also later work.
+``--generate-python --version`` (C-15) is rendered separately and remains later
+work.
 """
 
 from __future__ import annotations
 
 import inspect
 import pprint
+from types import ModuleType
 from typing import TYPE_CHECKING
 
-import click
-
-from asana_api_cli import formatter
+from asana_api_cli import formatter, multibyte_filename, redactor
 from asana_api_cli.session import _CONFIG_KNOBS, ACCESS_TOKEN_ENV, runtime
 
 if TYPE_CHECKING:
@@ -112,17 +115,47 @@ def _indent(lines: list[str], by: int = 4) -> list[str]:
     return [pad + line if line else line for line in lines]
 
 
-def _reject_unsupported() -> None:
-    """Refuse the flags this milestone cannot yet render faithfully.
+def _inline_module(module: ModuleType) -> list[str]:
+    """The source of *module* as lines, ready to embed in the generated script.
 
-    Generating ``--debug`` code without the ``HttpClientAuthRedactor`` would emit
-    a script that logs the token unmasked, violating constitution #2. Refusing
-    (exit 2) until that layer lands is the safe behavior.
+    The module's own ``from __future__ import annotations`` is dropped (the
+    generated script carries its own at the top, and a future-import is only
+    valid there); surrounding blank lines are trimmed. The module's other imports
+    stay inline — these are standalone, dependency-free modules (``redactor`` /
+    ``multibyte_filename``) meant to be copied as-is.
     """
+    lines = [
+        line
+        for line in inspect.getsource(module).splitlines()
+        if line.strip() != "from __future__ import annotations"
+    ]
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return lines
+
+
+def _render_support(plan: CallPlan) -> list[str]:
+    """Inline the standalone helper modules the call's ``with`` blocks need."""
+    blocks: list[list[str]] = []
     if runtime.debug:
-        raise click.UsageError(
-            "--generate-python does not yet support --debug (coming in a later release)."
+        blocks.append(
+            ["# --- inlined from asana_api_cli/redactor.py ---", *_inline_module(redactor)]
         )
+    if plan.multibyte:
+        blocks.append(
+            [
+                "# --- inlined from asana_api_cli/multibyte_filename.py ---",
+                *_inline_module(multibyte_filename),
+            ]
+        )
+    out: list[str] = []
+    for index, block in enumerate(blocks):
+        if index:
+            out.append("")
+        out += block
+    return out
 
 
 def _render_converters(formats: set[str], needs: _Imports) -> list[str]:
@@ -162,6 +195,11 @@ def _render_config(needs: _Imports) -> list[str]:
         applies = value if apply_when_truthy else value is not None
         if applies:
             lines.append(f"configuration.{attr} = {value!r}")
+    if runtime.debug:
+        # Not a ``_CONFIG_KNOBS`` entry: ``AsanaSession`` sets this in ``open()``
+        # alongside the redactor. The property setter flips the ``http.client``
+        # debuglevel; the inlined ``with HttpClientAuthRedactor()`` masks the token.
+        lines.append("configuration.debug = True")
     if runtime.retry_strategy_overrides is not None:
         kwargs = ", ".join(f"{k}={v!r}" for k, v in runtime.retry_strategy_overrides.items())
         lines.append(f"configuration.retry_strategy = configuration.retry_strategy.new({kwargs})")
@@ -280,18 +318,23 @@ def _render_render(
 def _render_call_block(
     plan: CallPlan, exception_output: str, exception_query: str | None, needs: _Imports
 ) -> list[str]:
-    """The call statement, wrapped in try/except + envelope when an
-    ``--exception-output`` format is set (C-16). Under ``none`` the bare call
+    """The call statement, wrapped (innermost first) in the upload / debug
+    ``with`` blocks (C-11 / C-7) and then, when an ``--exception-output`` format
+    is set, in try/except + envelope (C-16). Under ``none`` the bare call
     propagates exceptions (Python traceback, exit 1)."""
-    call = f"result = {_call_expression(plan)}"
+    core = [f"result = {_call_expression(plan)}"]
+    if plan.multibyte:
+        core = ["with MultibyteFilenameSupport():", *_indent(core)]
+    if runtime.debug:
+        core = ["with HttpClientAuthRedactor():", *_indent(core)]
     if exception_output == "none":
-        return [call]
+        return core
     needs.stdlib |= {"sys", "traceback"}
     needs.api_exception = True
     envelope = _render_render("envelope", exception_output, exception_query, False, needs)
     return [
         "try:",
-        f"    {call}",
+        *_indent(core),
         "except Exception as exc:",
         '    sys.stderr.write("".join(traceback.format_exception_only(type(exc), exc)))',
         '    qualified = f"{type(exc).__module__}.{type(exc).__qualname__}"',
@@ -340,12 +383,12 @@ def render_python(
     """Render *plan* as a standalone python-asana script.
 
     Reproduces the global configuration, the SDK call, the ``--output`` (and
-    ``--query``) rendering, and the ``--exception-output`` error envelope.
-    ``--debug`` is refused for now (see :func:`_reject_unsupported`).
+    ``--query``) rendering, the ``--exception-output`` error envelope, and the
+    ``--debug`` / ``--multibyte-filenames`` ``with`` blocks.
     """
-    _reject_unsupported()
     needs = _Imports()
     converters = _render_converters({output_format, exception_output}, needs)
+    support = _render_support(plan)
     config = _render_config(needs)
     setup = _render_call_setup(plan)
     call_block = _render_call_block(plan, exception_output, exception_query, needs)
@@ -356,6 +399,8 @@ def render_python(
     sections: list[list[str]] = [needs.block()]
     if converters:
         sections.append(converters)
+    if support:
+        sections.append(support)
     if reconfigure:
         sections.append(reconfigure)
     sections += [config, setup, call_block]

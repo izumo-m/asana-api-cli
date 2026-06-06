@@ -189,6 +189,7 @@ _COMMANDS = {
     "get-task": ("TasksApi", "get_task"),
     "create-task": ("TasksApi", "create_task"),
     "delete-task": ("TasksApi", "delete_task"),
+    "create-attachment-for-object": ("AttachmentsApi", "create_attachment_for_object"),
 }
 
 # Built once, at import, before any test patches an SDK method — so every
@@ -452,14 +453,41 @@ class TestErrorEnvelopeEquivalence:
         assert "except" not in code
 
 
-class TestUnsupportedFlagsRefused:
-    """``--debug`` is refused (exit 2) until its layer lands, so no token-leaking
-    code is ever generated."""
+class TestDebugLayer:
+    """``--debug`` inlines redactor.py and wraps the call so the wire trace keeps
+    the Authorization header masked (constitution #2)."""
 
-    def test_debug_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_inlines_redactor_and_wraps_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
-        result = make_runner().invoke(
-            _command("TasksApi", "get_tasks"), ["--generate-python", "--workspace", "1", "--debug"]
+        code = _generate(["get-task", "--task", "5", "--debug"])
+        assert "configuration.debug = True" in code
+        assert "class HttpClientAuthRedactor" in code  # whole module inlined
+        assert "def _default_mask_token" in code
+        assert "with HttpClientAuthRedactor():" in code
+        # The call is inside the with block, and no token is in the source.
+        assert "    result = api_instance.get_task('5', opts)" in code
+        assert "os.environ['ASANA_ACCESS_TOKEN']" in code
+
+    def test_debug_script_runs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        code = _generate(["get-task", "--task", "5", "--debug"])
+        _, _, namespace = _exec_generated(monkeypatch, code, "get-task", lambda: {"gid": "5"})
+        # The inlined redactor is byte-identical to redactor.py (getsource), so it
+        # masks by construction; just confirm it exec'd and is callable here.
+        assert "HttpClientAuthRedactor" in namespace
+
+
+class TestUploadLayer:
+    """``--multibyte-filenames`` inlines multibyte_filename.py and wraps the call."""
+
+    def test_inlines_support_and_wraps_call(self) -> None:
+        code = _generate(
+            ["create-attachment-for-object", "--file", "/tmp/あ.png", "--multibyte-filenames"]
         )
-        assert result.exit_code == 2, full_output(result)
-        assert "does not yet support --debug" in full_output(result)
+        assert "class MultibyteFilenameSupport" in code
+        assert "with MultibyteFilenameSupport():" in code
+        assert "    result = api_instance.create_attachment_for_object(opts)" in code
+
+    def test_no_multibyte_omits_support(self) -> None:
+        code = _generate(["create-attachment-for-object", "--file", "/tmp/x.png"])
+        assert "MultibyteFilenameSupport" not in code
+        assert "result = api_instance.create_attachment_for_object(opts)" in code
