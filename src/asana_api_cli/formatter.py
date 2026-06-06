@@ -13,6 +13,9 @@ import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
 
+from asana_api_cli.codegen import render_python
+from asana_api_cli.session import runtime
+
 
 def make_formatter_options() -> list[click.Option]:
     """Fresh ``click.Option`` instances for the output-formatting flags consumed
@@ -111,6 +114,26 @@ def formatted(f: Any) -> Any:
                 "to enable error filtering.",
                 err=True,
             )
+        if runtime.generate_python:
+            # Code-generation mode: the wrapped callback returns a session-free
+            # ``CallPlan`` (no SDK call, no token). Render it to standalone Python
+            # instead of executing + formatting, writing the output options into
+            # the emitted script. Input-validation ``ClickException``s from
+            # ``build_call_plan`` (bad --body JSON / missing required workspace →
+            # exit 2) propagate as usual; there is no SDK call here, so the
+            # API-error envelope path below does not apply.
+            plan = f(*args, **kwargs)
+            click.echo(
+                render_python(
+                    plan,
+                    output_format=output_format,
+                    jq_query=jq_query,
+                    csv_bom=csv_bom,
+                    exception_output=exception_output,
+                    exception_query=exception_query,
+                )
+            )
+            return
         try:
             data = f(*args, **kwargs)
             # Iterator consumption is done inside the session context in

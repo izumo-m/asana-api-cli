@@ -33,6 +33,11 @@ class _Runtime:
     """
 
     debug: bool = False
+    # CLI-only code-generation mode (``--generate-python``): when set, ``cli.py``
+    # returns the collected ``CallPlan`` and ``formatter.py`` renders it as
+    # standalone Python instead of executing the call. Consumed via the same
+    # ``_consume_global_options`` path as ``--debug``.
+    generate_python: bool = False
     host: str | None = None
     proxy: str | None = None
     verify_ssl: bool | None = None

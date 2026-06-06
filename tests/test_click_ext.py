@@ -188,6 +188,9 @@ class TestGlobalOptionNamesInventory:
 
         expected_names = [
             "debug",
+            # CLI-only code-generation mode flag (not a Configuration knob), but
+            # carried on ``runtime`` and consumed via the same global path.
+            "generate_python",
             "host",
             "proxy",
             "verify_ssl",

@@ -63,6 +63,7 @@ from asana_api_cli.formatter import formatted, formatter_flag_names, make_format
 from asana_api_cli.multibyte_filename import MultibyteFilenameSupport
 from asana_api_cli.session import (
     AsanaSession,
+    runtime,
 )
 from asana_api_cli.structured_arg import (
     click_callback,
@@ -1162,10 +1163,16 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Collect the invocation (session-free) then execute it. Splitting at the
-        # session boundary (``build_call_plan`` / ``execute_call_plan``) keeps the
-        # session — and the ``--debug`` redactor — scoped to the HTTP work.
-        return execute_call_plan(build_call_plan(op, api_cls, kwargs))
+        # Collect the invocation (session-free), then either render or execute it.
+        # Splitting at the session boundary (``build_call_plan`` /
+        # ``execute_call_plan``) keeps the session — and the ``--debug`` redactor —
+        # scoped to the HTTP work. In ``--generate-python`` mode the collected
+        # plan is self-describing, so return it for ``formatted`` to render to
+        # code; no session is opened and no token is needed.
+        plan = build_call_plan(op, api_cls, kwargs)
+        if runtime.generate_python:
+            return plan
+        return execute_call_plan(plan)
 
     callback = formatted(inner_callback)
 
