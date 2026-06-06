@@ -1242,6 +1242,22 @@ _ROOT_EPILOG = (
 )
 
 
+def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """``--version`` callback: print the version and exit.
+
+    A lazy stand-in for ``click.version_option``: ``version_string()`` (three
+    ``importlib.metadata`` lookups) is evaluated only when ``--version`` is
+    actually passed, instead of at import time as
+    ``click.version_option(version_string(), ...)`` would force. The message
+    matches click's default ``%(prog)s, version %(version)s`` format; ``is_eager``
+    keeps the flag order-independent.
+    """
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo(f"asana-api, version {version_string()}")
+    ctx.exit()
+
+
 # Root group. ``LazyGroup`` is a ``GroupWithGlobalOptions``, so the root
 # appends and consumes the global Configuration / ApiClient flags from the
 # single ``_global_option_sections`` source in ``click_ext.py`` — exactly the
@@ -1250,7 +1266,14 @@ _ROOT_EPILOG = (
 # of the tree, and ``--retry-strategy`` is gated on the SDK version in that one
 # source.
 @click.group(name="asana-api", cls=LazyGroup, epilog=_ROOT_EPILOG)
-@click.version_option(version_string(), prog_name="asana-api")
+@click.option(
+    "--version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_version_callback,
+    help="Show the version and exit.",
+)
 def main() -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
