@@ -43,6 +43,7 @@ from __future__ import annotations
 import ast
 import inspect
 import json
+import math
 import pprint
 import shlex
 import sys
@@ -256,6 +257,18 @@ def _returns_iterator(plan: CallPlan) -> bool:
     return runtime.return_page_iterator is not False
 
 
+def _has_non_finite_float(value: object) -> bool:
+    """Whether *value* contains a NaN / Infinity float anywhere (which ``pprint``
+    renders as the non-name tokens ``nan`` / ``inf``)."""
+    if isinstance(value, float):
+        return not math.isfinite(value)
+    if isinstance(value, dict):
+        return any(_has_non_finite_float(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_has_non_finite_float(v) for v in value)
+    return False
+
+
 def _render_body(raw_body: str, needs: _Imports) -> list[str]:
     """Emit code that binds ``body`` from the unresolved ``--body`` string (C-9).
 
@@ -284,6 +297,13 @@ def _render_body(raw_body: str, needs: _Imports) -> list[str]:
         value = json.loads(raw_body)
     except json.JSONDecodeError as exc:
         raise click.BadParameter(f"invalid JSON: {exc}", param_hint="--body") from exc
+    if _has_non_finite_float(value):
+        # json.loads accepts NaN / Infinity / -Infinity (as does resolve_body), but
+        # pprint would render them as the bare tokens ``nan`` / ``inf`` — not valid
+        # Python names, so the inlined literal would NameError at run time. Reproduce
+        # the CLI's parse instead so the body round-trips identically.
+        needs.stdlib.add("json")
+        return [f"body = json.loads({raw_body!r})"]
     return [f"body = {pprint.pformat(value, sort_dicts=False)}"]
 
 

@@ -286,6 +286,19 @@ class TestBodyForms:
         seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
         assert seen["args"][0] == {"data": {"name": "FromStdin"}}
 
+    def test_non_finite_json_literal_round_trips(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # json.loads accepts NaN / Infinity (so does resolve_body), but pprint
+        # would inline them as the bare tokens nan / inf — a NameError at run time.
+        # codegen falls back to json.loads so the body round-trips and runs.
+        import math
+
+        code = _generate(["create-task", "--body", '{"data": {"x": NaN, "y": Infinity}}'])
+        assert "body = json.loads(" in code  # the fallback, not a bare nan/inf literal
+        seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
+        body = seen["args"][0]["data"]
+        assert math.isnan(body["x"])  # nan != nan, so compare structurally
+        assert body["y"] == float("inf")
+
 
 class TestIteratorMaterialization:
     """``list(...)`` exactly when the live ``isinstance`` gate would fire."""
@@ -588,8 +601,8 @@ class TestQueryEquivalence:
 
 
 def _api_exception() -> Any:
-    """A representative ApiException (5-field envelope, with a nested headers dict
-    and a non-ASCII body)."""
+    """A representative ApiException (5-field envelope, nested headers dict,
+    non-ASCII *str* body)."""
     from asana.rest import ApiException
 
     exc = ApiException(status=412, reason="Precondition Failed")
@@ -598,22 +611,37 @@ def _api_exception() -> Any:
     return exc
 
 
-def _envelope_for(exc: Exception) -> dict[str, Any]:
-    """The envelope dict the CLI builds for *exc* — the reference the generated
-    script's envelope must match (mirrors ``formatter._handle_exception``)."""
+def _api_exception_bytes_body() -> Any:
+    """An ApiException with a *bytes* body — exercises the utf-8 decode branch
+    that both ``_handle_exception`` and the generated script perform."""
     from asana.rest import ApiException
 
-    from asana_api_cli.formatter import _qualified_exception_name
+    exc = ApiException(status=500, reason="Server Error")
+    exc.body = '{"errors":[{"message":"boom: あ"}]}'.encode()
+    exc.headers = {"Content-Type": "application/json"}
+    return exc
 
-    if isinstance(exc, ApiException):
-        return {
-            "exception": _qualified_exception_name(exc),
-            "status": exc.status,
-            "reason": exc.reason,
-            "body": exc.body,
-            "headers": dict(exc.headers) if exc.headers is not None else None,
-        }
-    return {"exception": _qualified_exception_name(exc), "reason": str(exc)}
+
+def _cli_envelope_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+    exc: Exception,
+    *,
+    exception_output: str,
+    exception_query: str | None = None,
+) -> bytes:
+    """The CLI's own error-envelope bytes for *exc*, by driving the real
+    ``formatter._handle_exception`` (build envelope → render → ``sys.exit(3)``)
+    through the faithful byte stream. Ties the generated script's envelope to the
+    actual CLI source — not a hand-maintained copy — so a change to
+    ``_handle_exception``'s schema would fail this equivalence test too."""
+    from asana_api_cli.formatter import _handle_exception
+
+    cap = _CaptureStdout()
+    monkeypatch.setattr(sys, "stdout", cap)
+    with pytest.raises(SystemExit) as exit_info:
+        _handle_exception(exc, exception_output=exception_output, exception_query=exception_query)
+    assert exit_info.value.code == 3
+    return cap.buffer.getvalue()
 
 
 class TestErrorEnvelopeEquivalence:
@@ -632,21 +660,20 @@ class TestErrorEnvelopeEquivalence:
         "make_exc",
         [
             pytest.param(lambda: ValueError("boom"), id="generic"),
-            pytest.param(_api_exception, id="api"),
+            pytest.param(_api_exception, id="api-str-body"),
+            pytest.param(_api_exception_bytes_body, id="api-bytes-body"),
         ],
     )
     def test_envelope_matches_cli(
         self, monkeypatch: pytest.MonkeyPatch, fmt: str, make_exc: Any
     ) -> None:
-        # Compare to ``_format_output`` over the same envelope dict (the
-        # CRLF-faithful reference) rather than a CliRunner invoke, so the csv
-        # envelope is byte-exact too.
+        # Reference = the real ``_handle_exception`` output (byte-faithful stream),
+        # so the generated script's envelope is pinned to the CLI source, not a
+        # test-local copy of the schema.
         factory = self._raise(make_exc())
         code = _generate(["get-task", "--task", "1", "--exception-output", fmt])
         gen_bytes, gen_exit = _exec_expecting_exit(monkeypatch, code, "get-task", factory)
-        ref = _format_reference(
-            monkeypatch, _envelope_for(make_exc()), output_format=fmt, csv_bom=False
-        )
+        ref = _cli_envelope_bytes(monkeypatch, make_exc(), exception_output=fmt)
         assert gen_exit == 3
         assert gen_bytes == ref
 
@@ -658,12 +685,8 @@ class TestErrorEnvelopeEquivalence:
         code = _generate(["get-task", *flags])
         assert "import jq" in code
         gen_bytes, gen_exit = _exec_expecting_exit(monkeypatch, code, "get-task", factory)
-        ref = _format_reference(
-            monkeypatch,
-            _envelope_for(_api_exception()),
-            output_format="json",
-            csv_bom=False,
-            jq_query=".status",
+        ref = _cli_envelope_bytes(
+            monkeypatch, _api_exception(), exception_output="json", exception_query=".status"
         )
         assert gen_exit == 3
         assert gen_bytes == ref
@@ -732,3 +755,67 @@ class TestUploadLayer:
         )
         assert "MultibyteFilenameSupport" in namespace
         assert seen["args"] == ({"file": "/tmp/x.png"},)
+
+
+class TestLayerCombinations:
+    """The deepest emitted structure — ``try/except`` (error envelope) around
+    ``with HttpClientAuthRedactor()`` (--debug) around ``with
+    MultibyteFilenameSupport()`` (--multibyte) around the call — stays correctly
+    nested, reachable, and equivalent when the layers combine."""
+
+    @staticmethod
+    def _guard_debuglevel(monkeypatch: pytest.MonkeyPatch) -> None:
+        # The exec'd ``configuration.debug = True`` flips the process-global
+        # http.client debuglevel (the one-shot script never restores it); snapshot
+        # it so monkeypatch rolls it back after the test.
+        import http.client
+
+        monkeypatch.setattr(http.client.HTTPConnection, "debuglevel", 0)
+
+    def test_debug_multibyte_envelope_nests_and_matches_cli(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._guard_debuglevel(monkeypatch)
+        flags = [
+            "--file",
+            "/tmp/x.png",
+            "--multibyte-filenames",
+            "--debug",
+            "--exception-output",
+            "json",
+        ]
+        code = _generate(["create-attachment-for-object", *flags])
+        for marker in (
+            "try:",
+            "with HttpClientAuthRedactor():",
+            "with MultibyteFilenameSupport():",
+        ):
+            assert marker in code, marker
+
+        def raising() -> Any:
+            raise ValueError("boom")
+
+        gen_bytes, gen_exit = _exec_expecting_exit(
+            monkeypatch, code, "create-attachment-for-object", raising
+        )
+        ref = _cli_envelope_bytes(monkeypatch, ValueError("boom"), exception_output="json")
+        assert gen_exit == 3
+        assert gen_bytes == ref
+
+    def test_debug_multibyte_success_call_reachable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._guard_debuglevel(monkeypatch)
+        code = _generate(
+            [
+                "create-attachment-for-object",
+                "--file",
+                "/tmp/x.png",
+                "--multibyte-filenames",
+                "--debug",
+            ]
+        )
+        seen, _, _ = _exec_generated(
+            monkeypatch, code, "create-attachment-for-object", lambda: {"gid": "a"}
+        )
+        # The call is reached (result stays bound across the with/with nesting),
+        # with opts intact.
+        assert seen["args"][0] == {"file": "/tmp/x.png"}
