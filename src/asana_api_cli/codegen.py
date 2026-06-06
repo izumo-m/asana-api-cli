@@ -42,11 +42,14 @@ from __future__ import annotations
 
 import ast
 import inspect
+import json
 import pprint
 import shlex
 import sys
 from types import ModuleType
 from typing import TYPE_CHECKING
+
+import click
 
 from asana_api_cli import formatter, multibyte_filename, redactor, version
 from asana_api_cli.session import _CONFIG_KNOBS, ACCESS_TOKEN_ENV, runtime
@@ -253,11 +256,35 @@ def _returns_iterator(plan: CallPlan) -> bool:
     return runtime.return_page_iterator is not False
 
 
-def _render_call_setup(plan: CallPlan) -> list[str]:
+def _render_body(raw_body: str, needs: _Imports) -> list[str]:
+    """Emit code that binds ``body`` from the unresolved ``--body`` string (C-9).
+
+    Each input form is reproduced rather than flattened: ``-`` and ``@file`` read
+    stdin / the file in the *generated* script (never here), so the script stays
+    re-runnable against a different payload; a JSON literal is validated now
+    (exit 2 on bad JSON, matching ``resolve_body``) and inlined as a Python
+    literal. Mirrors ``cli.resolve_body``'s three branches.
+    """
+    if raw_body == "-":
+        needs.stdlib |= {"sys", "json"}
+        return ["body = json.load(sys.stdin)"]
+    if raw_body.startswith("@"):
+        needs.stdlib.add("json")
+        path = raw_body[1:]
+        return [f'with open({path!r}, encoding="utf-8") as f:', "    body = json.load(f)"]
+    try:
+        value = json.loads(raw_body)
+    except json.JSONDecodeError as exc:
+        raise click.BadParameter(f"invalid JSON: {exc}", param_hint="--body") from exc
+    return [f"body = {pprint.pformat(value, sort_dicts=False)}"]
+
+
+def _render_call_setup(plan: CallPlan, needs: _Imports) -> list[str]:
     """The API instance and the body / opts literals — everything before the call."""
     lines = [f"api_instance = asana.{plan.api_cls.__name__}(api_client)"]
     if plan.has_body:
-        lines.append(f"body = {pprint.pformat(plan.body, sort_dicts=False)}")
+        assert plan.raw_body is not None  # has_body ⟺ a required --body was given
+        lines += _render_body(plan.raw_body, needs)
     if plan.has_opts:
         lines.append(f"opts = {pprint.pformat(plan.opts, sort_dicts=False)}")
     return lines
@@ -497,7 +524,7 @@ def render_python(
     converters = _render_converters({output_format, exception_output}, needs)
     support = _render_support(plan)
     config = _render_config(needs)
-    setup = _render_call_setup(plan)
+    setup = _render_call_setup(plan, needs)
     call_block = _render_call_block(plan, exception_output, exception_query, needs)
     success = _render_render("result", output_format, jq_query, csv_bom, needs)
     prints = output_format != "none" or exception_output != "none"

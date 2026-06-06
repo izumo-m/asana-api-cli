@@ -235,6 +235,48 @@ class TestCallEquivalence:
         assert gen_call == cli_call
 
 
+class TestBodyForms:
+    """``--body`` is rendered per input form (C-9): a JSON literal is inlined,
+    while ``@file`` / ``-`` (stdin) become code that reads at the generated
+    script's run time — never read at generation."""
+
+    def test_literal_is_inlined(self) -> None:
+        code = _generate(["create-task", "--body", '{"data": {"name": "X", "done": false}}'])
+        assert "body = {'data': {'name': 'X', 'done': False}}" in code
+        assert "json.load" not in code
+
+    def test_file_reads_at_runtime(self) -> None:
+        code = _generate(["create-task", "--body", "@payload.json"])
+        assert "with open('payload.json', encoding=\"utf-8\") as f:" in code
+        assert "    body = json.load(f)" in code
+
+    def test_stdin_reads_at_runtime(self) -> None:
+        code = _generate(["create-task", "--body", "-"])
+        assert "body = json.load(sys.stdin)" in code
+
+    def test_file_not_read_at_generation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A nonexistent @file still generates fine — the read is deferred to the
+        # generated script (execute mode would exit 2; generation does not read it).
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        code = _generate(["create-task", "--body", "@/no/such/file.json"])
+        assert "body = json.load(f)" in code
+
+    def test_generated_file_body_reads_the_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+    ) -> None:
+        payload = tmp_path / "body.json"
+        payload.write_text('{"data": {"name": "FromFile"}}', encoding="utf-8")
+        code = _generate(["create-task", "--body", f"@{payload}"])
+        seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
+        assert seen["args"][0] == {"data": {"name": "FromFile"}}
+
+    def test_generated_stdin_body_reads_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        code = _generate(["create-task", "--body", "-"])
+        monkeypatch.setattr(sys, "stdin", io.StringIO('{"data": {"name": "FromStdin"}}'))
+        seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
+        assert seen["args"][0] == {"data": {"name": "FromStdin"}}
+
+
 class TestIteratorMaterialization:
     """``list(...)`` exactly when the live ``isinstance`` gate would fire."""
 

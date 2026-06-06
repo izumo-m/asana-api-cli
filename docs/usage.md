@@ -151,9 +151,11 @@ The emitted script is self-contained — it never imports `asana_api_cli`, only
   `--user-agent`, …), applied to `asana.Configuration` / `ApiClient` exactly as
   the CLI would.
 - **The call** — `api_instance.<method>(...)` with the same positional args,
-  `opts`, and per-call kwargs. The `--body` value is resolved at generation
-  time — a JSON literal, `@file`, or `-` (stdin) alike — and inlined as a Python
-  literal. Endpoints that auto-paginate are wrapped in `list(...)`.
+  `opts`, and per-call kwargs. A `--body` JSON literal is inlined as a Python
+  literal; a `--body @file` / `--body -` is emitted as code that reads the file
+  or stdin **when the generated script runs** (not at generation time), so the
+  script stays re-runnable against a different payload. Endpoints that
+  auto-paginate are wrapped in `list(...)`.
 - **Output** — the `--output` format, `--query` (adds an `import jq`), and
   `--csv-bom` are written into the script, so running it prints what the command
   would have printed.

@@ -898,18 +898,21 @@ class CallPlan:
     keeps the session — and the ``--debug`` redactor — scoped to the actual HTTP
     work.
 
-    ``body`` is the already-resolved body value (``@file`` / ``-`` / JSON literal
-    parsed by :func:`resolve_body`); ``has_body`` distinguishes "no body
-    positional" from a body that legitimately parsed to ``None`` (``--body
-    null``). ``api_cls`` is the class, not an instance — instantiation needs the
-    session's client and happens in :func:`execute_call_plan`.
+    ``raw_body`` is the unresolved ``--body`` string (a ``@file`` path, ``-`` for
+    stdin, or a JSON literal); ``has_body`` distinguishes "no body positional"
+    from one that is present. Resolution (:func:`resolve_body` — reading the file
+    / stdin, parsing the JSON) is deferred to :func:`execute_call_plan` so the
+    generate path can emit per-form code (inline a literal, or read ``@file`` /
+    stdin at the generated script's run time) without reading anything itself.
+    ``api_cls`` is the class, not an instance — instantiation needs the session's
+    client and happens in :func:`execute_call_plan`.
     """
 
     api_cls: type
     method_name: str
     has_opts: bool
     has_body: bool
-    body: JsonValue
+    raw_body: str | None
     path_call_args: list[Any]
     opts: dict[str, Any]
     method_kwargs: dict[str, Any]
@@ -929,11 +932,11 @@ class CallPlan:
 def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> CallPlan:
     """Collect everything needed to call ``op`` from the parsed ``kwargs``.
 
-    Session-free: needs no client and no token. It does read local input
-    (``@file`` / stdin for ``--body``, the ``ASANA_DEFAULT_WORKSPACE`` env var),
-    but nothing that requires the SDK client — that is what makes it separable
-    from :func:`execute_call_plan`. Consumes ``kwargs`` by popping each value,
-    mirroring the original single-pass collection.
+    Session-free: needs no client and no token. The ``--body`` string is carried
+    unresolved (so the generate path never reads ``@file`` / stdin); only the
+    ``ASANA_DEFAULT_WORKSPACE`` env-var fallback for workspace is read here.
+    Consumes ``kwargs`` by popping each value, mirroring the original single-pass
+    collection.
     """
     # Common per-call kwargs (rendered as per-command options): pop into locals
     # so they do not fall through into the opts dict.
@@ -949,17 +952,16 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     # into their canonical replacements.
     effective_item_limit = _apply_deprecated_aliases(kwargs, item_limit)
 
-    # Resolve the body (``@file`` / stdin / JSON literal) before workspace, the
-    # same order as the original closure. Both reads are session-free, so they
-    # belong on the collection side of the split. ``--body`` is click-required,
-    # so the pop always yields a value when ``has_body``.
-    body = resolve_body(kwargs.pop("body")) if op.has_body else None
+    # Carry the raw ``--body`` string unresolved: ``execute_call_plan`` resolves
+    # it (reads ``@file`` / stdin, parses the JSON) at call time, and the generate
+    # renderer emits per-form code instead — neither reads it here. ``--body`` is
+    # click-required, so the pop always yields a value when ``has_body``.
+    raw_body = kwargs.pop("body") if op.has_body else None
 
     # Workspace resolution is session-free (an explicit value or the
     # ``ASANA_DEFAULT_WORKSPACE`` env-var fallback — no client, no token), so it
     # belongs here. ``resolve_workspace(required=True)`` can still raise when a
-    # required workspace is omitted and the env var is unset; it ran here, after
-    # body resolution, in the original closure too, so the order is preserved.
+    # required workspace is omitted and the env var is unset.
     if op.has_workspace:
         resolved_workspace = resolve_workspace(
             kwargs.pop("workspace", None), required=op.workspace_required
@@ -1009,7 +1011,7 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
         method_name=op.method_name,
         has_opts=op.has_opts,
         has_body=op.has_body,
-        body=body,
+        raw_body=raw_body,
         path_call_args=path_call_args,
         opts=opts,
         method_kwargs=method_kwargs,
@@ -1023,14 +1025,18 @@ def execute_call_plan(plan: CallPlan) -> Any:
 
     Opens a session, builds the API instance, invokes the method, and
     materializes a lazy iterator while the session — and the ``--debug``
-    redactor — are still active. Everything session-free (argument collection,
-    body / workspace resolution) already happened in :func:`build_call_plan`.
+    redactor — are still active. Argument collection already happened in
+    :func:`build_call_plan`; the ``--body`` value is resolved here (reading
+    ``@file`` / stdin, parsing the JSON), session-free, before the session opens.
     """
-    # Body is always the first positional in python-asana. ``has_body`` (not
-    # ``body is not None``) is the gate, so a body that parsed to ``None``
-    # (``--body null``) is still passed through.
+    # Body is always the first positional in python-asana. ``has_body`` (not the
+    # resolved value) is the gate, so a body that parses to ``None`` (``--body
+    # null``) is still passed through. ``resolve_body`` reads ``@file`` / stdin
+    # and may raise ``click.BadParameter`` (exit 2) — before the session opens,
+    # so a bad body never reaches the token check.
     if plan.has_body:
-        call_args: list[Any] = [plan.body, *plan.path_call_args]
+        assert plan.raw_body is not None  # has_body ⟺ a required --body was given
+        call_args: list[Any] = [resolve_body(plan.raw_body), *plan.path_call_args]
     else:
         call_args = list(plan.path_call_args)
 

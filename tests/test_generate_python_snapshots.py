@@ -69,6 +69,10 @@ _CASES: dict[str, list[str]] = {
         "--body",
         '{"data": {"name": "New", "completed": false}}',
     ],
+    # body @file: read at the generated script's run time (C-9)
+    "create_task_body_file": ["tasks", "create-task", "--body", "@new-task.json"],
+    # body - : read stdin at the generated script's run time (C-9)
+    "create_task_body_stdin": ["tasks", "create-task", "--body", "-"],
     # csv converters inlined (Any import, byte-write)
     "output_csv": ["tasks", "get-tasks", "--workspace", "111", "--output", "csv"],
     # text converters inlined
