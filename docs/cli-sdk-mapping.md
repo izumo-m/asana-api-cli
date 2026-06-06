@@ -68,6 +68,7 @@ In the **"SDK destination"** column:
 | `--debug` | `Configuration.debug = True` | Direct property, but assigned on session entry (`AsanaSession.open`, not `__init__`) because it flips a process-global debuglevel reversed on exit; `HttpClientAuthRedactor` is installed there too, paired so both reverse together (security override, constitution #2 — see [`sdk-deviations.md`](sdk-deviations.md)) |
 | `--return-page-iterator / --no-return-page-iterator` | `Configuration.return_page_iterator` | Via `runtime`, applied in `AsanaSession.__init__`; tri-state |
 | `--page-limit N` | `Configuration.page_limit` | Via `runtime`, applied in `AsanaSession.__init__` |
+| `--generate-python` | *(none)* | CLI-only mode: consumed into `runtime.generate_python`; switches the leaf callback to emit equivalent SDK code via `codegen.render_python` instead of executing. Behavior in [`usage.md`](usage.md#generating-python-code); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
 
 `--retry-strategy` and `--header-params` accept a shared structured-value format
 (`k=v` / JSON / `@file`); the syntax is documented in

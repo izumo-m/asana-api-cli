@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **New `--generate-python` mode prints equivalent `python-asana` code instead
+  of running the call.** A global flag (valid anywhere in the command path) that
+  emits a self-contained script — config, the SDK call, and your `--output` /
+  `--query` / `--exception-output` / `--debug` / `--multibyte-filenames`
+  choices — making no network call and needing no token, so a working
+  invocation becomes copy-pasteable SDK code. `--access-token`, when passed, is
+  transcribed verbatim (pass a dummy; see SECURITY.md). See
+  [docs/usage.md](docs/usage.md#generating-python-code).
+
 ### Fixed
 
 - **CSV output is now RFC 4180-compliant and byte-identical on every platform.**

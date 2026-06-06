@@ -100,6 +100,7 @@ Extensions with no SDK counterpart (`(asana-api: extension)`).
 
 | Flag | Effect |
 |---|---|
+| `--generate-python` | Print equivalent python-asana code instead of running the call; valid at any point in the command path. No token, no network — see [Generating Python code](#generating-python-code) |
 | `--multibyte-filenames` | Upload commands only: preserve non-ASCII attachment names — see [File uploads](#file-uploads) |
 | `--all-items` *(deprecated)* | Paginatable commands only; no-op (walking every page is the default) — see [Deprecated aliases](#deprecated-aliases) |
 | `--page-size N` *(deprecated)* | Paginatable commands only; use `--limit N` — see [Deprecated aliases](#deprecated-aliases) |
@@ -129,6 +130,49 @@ asana-api tasks delete-task --task <TASK_GID> --output none
 
 `--query` runs and validates even under `--output none`, so a broken jq
 expression still surfaces (exit `2`) regardless of the chosen format.
+
+## Generating Python code
+
+`--generate-python` prints a standalone `python-asana` script equivalent to the
+command instead of running it. It is global (valid anywhere in the command
+path), makes no network call, and needs no token — so it is a quick way to turn
+a working CLI invocation into copy-pasteable SDK code.
+
+```bash
+asana-api --generate-python tasks get-tasks --workspace <WS> --opt-fields name
+asana-api tasks get-task --task <TASK_GID> --generate-python > fetch_task.py
+```
+
+The emitted script is self-contained — it never imports `asana_api_cli`, only
+`asana` and the standard library (plus `jq` when you use `--query`, and
+`tabulate` for `--output table`). It reproduces:
+
+- **Configuration** — every global option you passed (`--host`, `--retry-strategy`,
+  `--user-agent`, …), applied to `asana.Configuration` / `ApiClient` exactly as
+  the CLI would.
+- **The call** — `api_instance.<method>(...)` with the same positional args,
+  `opts`, and per-call kwargs. The `--body` value is resolved at generation
+  time — a JSON literal, `@file`, or `-` (stdin) alike — and inlined as a Python
+  literal. Endpoints that auto-paginate are wrapped in `list(...)`.
+- **Output** — the `--output` format, `--query` (adds an `import jq`), and
+  `--csv-bom` are written into the script, so running it prints what the command
+  would have printed.
+- **Errors** — `--exception-output` / `--exception-query` reproduce the error
+  envelope and exit `3`; under the default `none` the script lets exceptions
+  propagate.
+- **`--debug`** — emits the request/response trace with the `Authorization`
+  header masked, the same as the CLI.
+- **`--multibyte-filenames`** — reproduces the RFC 5987 upload patch.
+
+The access token is read from `os.environ["ASANA_ACCESS_TOKEN"]` unless you pass
+`--access-token`, whose value is transcribed into the script **verbatim** —
+pass a dummy when generating, and treat the script like any other file that may
+carry a secret (see [SECURITY.md](../SECURITY.md)). Input validation still runs
+during generation: a malformed `--body` literal or a missing required
+`--workspace` exits `2`, just as when executing.
+
+`asana-api --generate-python --version` emits a script that prints the version
+string (rather than printing it directly).
 
 ## Error handling
 

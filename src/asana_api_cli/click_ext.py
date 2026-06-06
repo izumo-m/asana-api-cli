@@ -287,7 +287,7 @@ def _global_option_sections() -> list[tuple[str, list[click.Option]]]:
                     help=(
                         "Print standalone python-asana code equivalent to this "
                         "command instead of running it. Makes no network call and "
-                        "needs no access token."
+                        "needs no access token. (asana-api: extension)"
                     ),
                 ),
             ],
