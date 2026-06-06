@@ -1271,7 +1271,8 @@ _ROOT_EPILOG = (
 
 
 def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
-    """``--version`` callback: print the version and exit.
+    """``--version`` callback: print the version (or, under ``--generate-python``,
+    generate code that prints it) and exit.
 
     A lazy stand-in for ``click.version_option``: ``version_string()`` (three
     ``importlib.metadata`` lookups) is evaluated only when ``--version`` is
@@ -1279,10 +1280,20 @@ def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -
     ``click.version_option(version_string(), ...)`` would force. The message
     matches click's default ``%(prog)s, version %(version)s`` format; ``is_eager``
     keeps the flag order-independent.
+
+    ``--version`` is eager and exits before global options are consumed, so
+    ``runtime.generate_python`` is not yet set here; ``--generate-python`` is
+    detected directly in ``sys.argv`` instead, which stays order-independent
+    (``--version --generate-python`` and the reverse both generate). C-15.
     """
     if not value or ctx.resilient_parsing:
         return
-    click.echo(f"asana-api, version {version_string()}")
+    if "--generate-python" in sys.argv:
+        from asana_api_cli.codegen import render_version
+
+        click.echo(render_version())
+    else:
+        click.echo(f"asana-api, version {version_string()}")
     ctx.exit()
 
 
