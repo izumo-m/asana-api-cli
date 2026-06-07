@@ -47,9 +47,9 @@ environment variable. Treat this token as a secret:
 ## Generated scripts can carry your token
 
 `asana-api --generate-python` prints a standalone Python script instead of
-running the call. When you pass a literal `--access-token`, its value is written
+running the call. When you pass a non-empty `--access-token`, its value is written
 into the emitted script verbatim (`configuration.access_token = "..."`). When
-`--access-token` is omitted, the script instead reads
+`--access-token` is omitted or empty, the script instead reads
 `os.environ["ASANA_ACCESS_TOKEN"]` and embeds no secret.
 
 - Generate with a dummy token (or omit `--access-token`) when you intend to

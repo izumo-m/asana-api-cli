@@ -116,12 +116,15 @@ These options control how a successful response is printed.
 | `--query EXPR` | Filter the response through `jq`; each result is rendered per `--output`. Mirrors `aws --query` |
 | `--csv-bom` | Prepend a UTF-8 BOM to CSV output (for Excel on Windows). Off by default so Unix pipelines stay clean |
 
-Pair a non-JSON format with `--query '.data'` to unwrap the `{"data": [...]}`
-envelope into one row per item:
+Non-JSON formats render a list of dicts as one row per item. The default
+auto-paginating output is already a flat list, so it is directly rowable; under
+`--full-payload` (a single raw response dict) pair the format with
+`--query '.data'` to unwrap the `{"data": [...]}` envelope first:
 
 ```bash
-asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output table
-asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --output table
+asana-api tasks get-tasks --project <PROJECT_GID> --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --full-payload --query '.data' --output table
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # Side-effect-only call: only the exit code matters
@@ -168,10 +171,10 @@ when you use `--multibyte-filenames`). It reproduces:
   header masked, the same as the CLI.
 - **`--multibyte-filenames`** — reproduces the RFC 5987 upload patch.
 
-The access token is read from `os.environ["ASANA_ACCESS_TOKEN"]` unless you pass
-`--access-token`, whose value is transcribed into the script **verbatim** —
-pass a dummy when generating, and treat the script like any other file that may
-carry a secret (see [SECURITY.md](../SECURITY.md)). Input validation still runs
+The access token is read from `os.environ["ASANA_ACCESS_TOKEN"]` unless you pass a
+non-empty `--access-token`, whose value is transcribed into the script
+**verbatim** — pass a dummy when generating, and treat the script like any other
+file that may carry a secret (see [SECURITY.md](../SECURITY.md)). Input validation still runs
 during generation: a malformed `--body` literal or a missing required
 `--workspace` exits `2`, just as when executing.
 

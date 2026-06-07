@@ -11,8 +11,8 @@ What the emitted script reproduces:
 * **Config / client** (C-8 / C-4): an ``asana.Configuration`` built from the
   same global flags the CLI applies — only options the user passed are written,
   using the shared ``_CONFIG_KNOBS`` table so the two cannot drift. The access
-  token is ``os.environ[...]`` unless ``--access-token`` was given (then it is
-  transcribed literally; the user is expected to pass a dummy).
+  token is ``os.environ[...]`` unless a non-empty ``--access-token`` was given
+  (then it is transcribed literally; the user is expected to pass a dummy).
 * **Call** (C-9 body / C-10 iterator): ``asana.<Api>(api_client).<method>(...)``
   with the body inlined as a Python literal, the ``opts`` dict, and the
   per-call kwargs. Array endpoints are wrapped in ``list(...)`` — predicted
@@ -214,12 +214,15 @@ def _render_converters(formats: set[str], needs: _Imports) -> list[str]:
 def _render_config(needs: _Imports) -> list[str]:
     """Emit the ``Configuration`` / ``ApiClient`` setup (C-8 / C-4).
 
-    Mirrors ``AsanaSession.__init__``: the same ``_CONFIG_KNOBS`` table under the
-    same apply condition (so only user-set options appear and there is no drift),
-    the token, then the ``ApiClient``-instance settings.
+    Mirrors ``AsanaSession``: the same ``_CONFIG_KNOBS`` table under the same
+    apply condition (so only user-set options appear and there is no drift), then
+    the ``ApiClient``-instance settings. The token follows ``from_env``'s
+    resolution — a truthy ``--access-token`` is transcribed verbatim, otherwise
+    the script reads ``$ASANA_ACCESS_TOKEN`` — so an explicit empty
+    ``--access-token`` falls back to the env var, like the live CLI.
     """
     lines = ["configuration = asana.Configuration()"]
-    if runtime.access_token is not None:
+    if runtime.access_token:
         lines.append(f"configuration.access_token = {runtime.access_token!r}")
     else:
         needs.stdlib.add("os")
@@ -569,7 +572,13 @@ def render_python(
     # on a bad expression even under ``--output none`` — so a truthy ``jq_query``
     # also needs the reconfigure (``exception_query`` does not: its envelope, and
     # thus its jq error, is only rendered when ``exception_output`` is not none).
-    writes_a_stream = output_format != "none" or exception_output != "none" or bool(jq_query)
+    # ``--debug`` writes too: it sets ``configuration.debug = True``, which flips
+    # ``http.client``'s wire-level tracing — printed to stdout via ``print`` — so a
+    # non-ASCII trace would raise ``UnicodeEncodeError`` on cp932 Windows without
+    # the reconfigure, just as the live CLI reconfigures unconditionally (#5).
+    writes_a_stream = (
+        output_format != "none" or exception_output != "none" or bool(jq_query) or runtime.debug
+    )
     reconfigure = _render_reconfigure(needs) if writes_a_stream else []
 
     equivalent = [arg for arg in sys.argv[1:] if arg != "--generate-python"]

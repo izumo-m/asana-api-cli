@@ -7,7 +7,7 @@ from importlib.metadata import version
 
 
 def version_string() -> str:
-    """Return a version string including the python-asana SDK and click versions."""
+    """Return a version string with the CLI, python-asana SDK, and click versions."""
     cli_ver = version("asana-api-cli")
     sdk_ver = version("asana")
     click_ver = version("click")

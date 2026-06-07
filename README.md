@@ -167,10 +167,11 @@ asana-api tasks get-task --task <TASK_GID>
 # Create a task (body is a JSON string)
 asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PROJECT_GID>"]}}'
 
-# Output formats — pair non-JSON formats with `--query '.data'` to unwrap the
-# `{"data": [...]}` envelope into one row per item.
-asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output table
-asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output csv
+# Output formats — non-JSON formats render one row per item. The default
+# auto-paginating output is a flat list, so it is directly rowable; under
+# --full-payload, unwrap the `{"data": [...]}` envelope first with `--query '.data'`.
+asana-api tasks get-tasks --project <PROJECT_GID> --output table
+asana-api tasks get-tasks --project <PROJECT_GID> --full-payload --query '.data' --output csv
 
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
 # Windows, which otherwise displays non-ASCII characters as garbled text.

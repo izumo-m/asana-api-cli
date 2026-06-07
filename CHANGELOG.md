@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emits a self-contained script — config, the SDK call, and your `--output` /
   `--query` / `--exception-output` / `--debug` / `--multibyte-filenames`
   choices — making no network call and needing no token, so a working
-  invocation becomes copy-pasteable SDK code. `--access-token`, when passed, is
+  invocation becomes copy-pasteable SDK code. A non-empty `--access-token` is
   transcribed verbatim (pass a dummy; see SECURITY.md). See
   [docs/usage.md](docs/usage.md#generating-python-code).
 

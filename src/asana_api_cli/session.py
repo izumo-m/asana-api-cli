@@ -75,7 +75,7 @@ runtime = _Runtime()
 # ``AsanaSession.__init__``. Each entry is ``(attr, apply_when_truthy)``: the
 # Configuration attribute name matches the ``_Runtime`` field 1:1, and the
 # condition follows each knob's SDK semantics.
-# ``apply_when_truthy`` is True for only the four URL/directory strings where an
+# ``apply_when_truthy`` is True for only the four host/path strings where an
 # empty value is meaningless (``host`` / ``proxy`` / ``ssl_ca_cert`` /
 # ``temp_folder_path``, skipped when empty); it is False for every other field —
 # including the path-like ``cert_file`` / ``key_file`` / ``logger_file`` — which

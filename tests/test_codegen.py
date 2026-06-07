@@ -412,6 +412,14 @@ class TestConfigEquivalence:
         code = _generate(["get-tasks", "--workspace", "1"])
         assert "configuration.access_token = os.environ['ASANA_ACCESS_TOKEN']" in code
 
+    def test_access_token_empty_falls_back_to_env(self) -> None:
+        # An explicit empty ``--access-token`` is falsy, so the live CLI's
+        # ``from_env`` (``token = runtime.access_token or os.environ[...]``) reads
+        # the env var; the generated script must do the same, not transcribe ''.
+        code = _generate(["get-tasks", "--access-token", "", "--workspace", "1"])
+        assert "configuration.access_token = os.environ['ASANA_ACCESS_TOKEN']" in code
+        assert "configuration.access_token = ''" not in code
+
     @pytest.mark.skipif(
         not _SDK_HAS_RETRY_STRATEGY,
         reason="installed python-asana has no Configuration.retry_strategy",
@@ -726,6 +734,14 @@ class TestDebugLayer:
         # The inlined redactor is byte-identical to redactor.py (getsource), so it
         # masks by construction; just confirm it exec'd and is callable here.
         assert "HttpClientAuthRedactor" in namespace
+
+    def test_output_none_debug_keeps_reconfigure(self) -> None:
+        # ``--debug`` flips http.client's wire tracing, printed to stdout — so the
+        # script must reconfigure stdout to UTF-8 even under --output none, or a
+        # non-ASCII trace would raise UnicodeEncodeError on cp932 Windows (#5).
+        code = _generate(["get-task", "--task", "5", "--output", "none", "--debug"])
+        assert "configuration.debug = True" in code
+        assert 'reconfigure(encoding="utf-8")' in code
 
 
 class TestUploadLayer:
