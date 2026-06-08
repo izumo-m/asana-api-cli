@@ -18,6 +18,9 @@ asana-api tasks get-tasks --project 123 --opt-fields name,assignee.name
 asana.TasksApi(client).get_tasks({"project": "123", "opt_fields": "name,assignee.name"})
 ```
 
+Or skip the translation entirely: `asana-api --generate-python …` writes that
+Python for you (see [Usage](#usage)).
+
 ## Why asana-api-cli
 
 - **Explore the whole API from the shell.** Every method of every `*Api`
@@ -182,6 +185,40 @@ asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks
 # still runs, so jq syntax errors are caught even when output is silenced.
 asana-api tasks delete-task --task <TASK_GID> --output none
 ```
+
+Don't hand-translate the call yourself — `--generate-python` does it for you. It
+prints a standalone `python-asana` script equivalent to the command instead of
+running it (no token, no network), turning a working shell call into
+ready-to-paste SDK code:
+
+```bash
+asana-api --generate-python tasks get-task --task <TASK_GID>
+```
+
+```python
+# Generated equivalent (header and stdio-setup boilerplate trimmed):
+import json
+import os
+
+import asana
+
+configuration = asana.Configuration()
+configuration.access_token = os.environ['ASANA_ACCESS_TOKEN']
+api_client = asana.ApiClient(configuration)
+
+api_instance = asana.TasksApi(api_client)
+opts = {}
+
+result = api_instance.get_task('<TASK_GID>', opts)
+
+print(json.dumps(result, indent=2, ensure_ascii=False))
+```
+
+Redirect it to a file (`asana-api … --generate-python > fetch_task.py`) to keep
+the script. It reproduces your configuration, output format, `--query`, `--debug`
+(with the auth token masked), and uploads — see
+[Generating Python code](https://github.com/izumo-m/asana-api-cli/blob/main/docs/usage.md#generating-python-code)
+for the full behavior.
 
 For the complete option reference — global options, pagination, output formats,
 workspace resolution, error handling, and exit codes — see
