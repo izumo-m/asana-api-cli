@@ -565,7 +565,7 @@ def _discover_project_gid(workspace_gid: str, name: str) -> str:
     )
     if result.exit_code != 0:
         pytest.fail(f"failed to list projects: {full_output(result)}")
-    projects = json.loads(full_output(result))
+    projects = json.loads(result.stdout)
     target = next((p for p in projects if p.get("name") == name), None)
     if target is None:
         pytest.skip(
@@ -671,7 +671,7 @@ def attachment_parent_task(pagination_project_gid: str, created_tasks: list[str]
 
 
 @pytest.fixture(autouse=True)
-def _ensure_token(request: pytest.FixtureRequest):
+def _ensure_token(request: pytest.FixtureRequest) -> Generator[None, None, None]:
     """Inject a dummy ASANA_ACCESS_TOKEN in replay mode if none is set.
 
     The CLI refuses to start without a token; replay does not actually use it

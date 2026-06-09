@@ -25,6 +25,7 @@ import os
 import re
 import sys
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Callable, TypeVar, cast
 
@@ -112,9 +113,15 @@ def _client() -> asana.ApiClient:
 
 
 def _find_project(projects_api: asana.ProjectsApi, workspace_gid: str, name: str) -> str | None:
-    projects = cast(
-        "list[dict[str, Any]]",
-        _retry(projects_api.get_projects_for_workspace, workspace_gid, {"opt_fields": "name"}),
+    # ``list()`` inside ``_retry``: the SDK returns a lazy page iterator, so
+    # the HTTP calls happen during iteration, not at the method call.
+    projects = _retry(
+        lambda: list(
+            cast(
+                "Iterable[dict[str, Any]]",
+                projects_api.get_projects_for_workspace(workspace_gid, {"opt_fields": "name"}),
+            )
+        )
     )
     for p in projects:
         if p.get("name") == name:
@@ -136,13 +143,14 @@ def _create_project(projects_api: asana.ProjectsApi, workspace_gid: str, name: s
 
 
 def _all_tasks(tasks_api: asana.TasksApi, project_gid: str) -> list[dict[str, Any]]:
-    return list(
-        cast(
-            "list[dict[str, Any]]",
-            _retry(
-                tasks_api.get_tasks,
-                {"project": project_gid, "opt_fields": "name", "limit": 100},
-            ),
+    # Same as ``_find_project``: iterate inside ``_retry`` so the backoff
+    # covers the actual page requests.
+    return _retry(
+        lambda: list(
+            cast(
+                "Iterable[dict[str, Any]]",
+                tasks_api.get_tasks({"project": project_gid, "opt_fields": "name", "limit": 100}),
+            )
         )
     )
 

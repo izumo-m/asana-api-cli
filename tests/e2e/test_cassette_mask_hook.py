@@ -10,8 +10,9 @@ teardown for the test has finished.
 
 * U-1..U-4 cover the hook wiring itself.
 * The ``mask_users_in_batch_subresponses`` cases (N-2 / N-3 from the
-  spec, a positive baseline, and a non-batch-interaction negative
-  case) verify that the first L3 helper masks only what it should.
+  spec, a positive baseline, a user-collection action, and a
+  non-batch-interaction negative case) verify that the first L3 helper
+  masks only what it should.
 """
 
 from __future__ import annotations
@@ -114,6 +115,32 @@ def test_mask_users_replaces_name_with_user_name_binding() -> None:
     mask_users_in_batch_subresponses(cassette)
     body = json.loads(cassette["interactions"][0]["response"]["body"]["string"])
     assert body["data"][0]["body"]["data"]["name"] == "E2E User"
+
+
+def test_mask_users_handles_user_collection_action() -> None:
+    """A ``/users?workspace=...`` collection action masks every entry's name."""
+    cassette = {
+        "interactions": [
+            _batch_interaction(
+                actions=[{"relative_path": "/users?workspace=123", "method": "get"}],
+                sub_results=[
+                    {
+                        "status_code": 200,
+                        "headers": [],
+                        "body": {
+                            "data": [
+                                {"gid": "1", "name": "izumoma"},
+                                {"gid": "2", "name": "second user"},
+                            ]
+                        },
+                    },
+                ],
+            ),
+        ],
+    }
+    mask_users_in_batch_subresponses(cassette)
+    body = json.loads(cassette["interactions"][0]["response"]["body"]["string"])
+    assert [u["name"] for u in body["data"][0]["body"]["data"]] == ["E2E User", "E2E User"]
 
 
 def test_n2_mask_users_skips_non_user_sub_actions() -> None:
