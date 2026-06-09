@@ -403,7 +403,11 @@ class TestConfigEquivalence:
         assert gen_client.user_agent == ref_client.user_agent
         assert gen_client.default_headers == ref_client.default_headers
 
-    def test_access_token_literal_is_transcribed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_short_access_token_is_transcribed_verbatim(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Too short to be a real token → a dummy by construction, kept verbatim
+        # so the documented dummy-token workflow round-trips (SECURITY.md).
         code = _generate(["get-tasks", "--access-token", "dummy-pat", "--workspace", "1"])
         assert "configuration.access_token = 'dummy-pat'" in code
         assert "os.environ" not in code
@@ -440,6 +444,157 @@ class TestConfigEquivalence:
         # written, not skipped like an unset (None) knob.
         code = _generate(["get-tasks", "--no-return-page-iterator"])
         assert "configuration.return_page_iterator = False" in code
+
+
+class TestCredentialMasking:
+    """Constitution #2: a credential must not survive into the emitted text —
+    not in the config lines, not in the call, not in the ``# Equivalent to:``
+    comment. Driven through the real ``main`` tree with ``sys.argv`` set so
+    the comment path is exercised end-to-end."""
+
+    # A long opaque stand-in, well above the 16-char mask threshold. Kept
+    # deliberately NOT Asana-PAT-shaped (``2/<gid>/<gid>:<hex>``): a realistic
+    # PAT shape trips GitHub push protection's secret scanner even though the
+    # value is synthetic, and ``_mask_secret`` is shape-agnostic (length only).
+    _TOKEN = "dummy-opaque-credential-padding-padding-Qz7x42"
+
+    def _generate_main(self, monkeypatch: pytest.MonkeyPatch, argv: list[str]) -> str:
+        monkeypatch.setattr(sys, "argv", ["asana-api", "--generate-python", *argv])
+        result = make_runner().invoke(main, ["--generate-python", *argv])
+        assert result.exit_code == 0, full_output(result)
+        return result.stdout
+
+    def test_long_access_token_is_masked_everywhere(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            ["tasks", "get-tasks", "--access-token", self._TOKEN, "--workspace", "1"],
+        )
+        assert self._TOKEN not in code
+        assert f"configuration.access_token = '...{self._TOKEN[-6:]}'" in code
+        # The header comment shows the same mask, in both flag spellings.
+        assert f"--access-token ...{self._TOKEN[-6:]}" in code
+
+    def test_access_token_equals_spelling_masked_in_comment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            ["tasks", "get-tasks", f"--access-token={self._TOKEN}", "--workspace", "1"],
+        )
+        assert self._TOKEN not in code
+        assert f"--access-token=...{self._TOKEN[-6:]}" in code
+
+    def test_default_header_authorization_is_masked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            [
+                "tasks",
+                "get-tasks",
+                "--set-default-header",
+                f"Authorization=Bearer {self._TOKEN}",
+                "--workspace",
+                "1",
+            ],
+        )
+        assert self._TOKEN not in code
+        # Scheme prefix stays visible, like the --debug trace mask.
+        expected = f"api_client.set_default_header('Authorization', 'Bearer ...{self._TOKEN[-6:]}')"
+        assert expected in code
+
+    def test_default_header_proxy_authorization_basic_fully_masked(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The proxy credential header is a credential by definition too, and
+        # a Basic value gets no partial reveal (base64 of user:password).
+        code = self._generate_main(
+            monkeypatch,
+            [
+                "tasks",
+                "get-tasks",
+                "--set-default-header",
+                f"Proxy-Authorization=Basic {self._TOKEN}",
+                "--workspace",
+                "1",
+            ],
+        )
+        assert self._TOKEN not in code
+        assert self._TOKEN[-6:] not in code  # no tail reveal either
+        expected = "api_client.set_default_header('Proxy-Authorization', 'Basic <REDACTED>')"
+        assert expected in code
+
+    def test_default_header_other_names_stay_verbatim(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            [
+                "tasks",
+                "get-tasks",
+                "--set-default-header",
+                "X-Api-Key=0123456789abcdef0123",
+                "--workspace",
+                "1",
+            ],
+        )
+        assert "api_client.set_default_header('X-Api-Key', '0123456789abcdef0123')" in code
+
+    def test_header_params_authorization_is_masked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Lowercase key: the name match is case-insensitive.
+        code = self._generate_main(
+            monkeypatch,
+            [
+                "tasks",
+                "get-tasks",
+                "--workspace",
+                "1",
+                "--header-params",
+                f"authorization={self._TOKEN}",
+            ],
+        )
+        assert self._TOKEN not in code
+        assert f"header_params={{'authorization': '...{self._TOKEN[-6:]}'}}" in code
+
+    def test_header_params_json_form_masked_wholesale_in_comment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A non-single-pair shape that mentions authorization is replaced
+        # wholesale in the comment; the call's header_params dict still gets
+        # the precise per-name mask.
+        value = f'{{"Authorization": "{self._TOKEN}", "X-Trace": "abc"}}'
+        code = self._generate_main(
+            monkeypatch,
+            ["tasks", "get-tasks", "--workspace", "1", "--header-params", value],
+        )
+        assert self._TOKEN not in code
+        assert "--header-params '<masked>'" in code
+        assert f"'Authorization': '...{self._TOKEN[-6:]}'" in code
+        assert "'X-Trace': 'abc'" in code
+
+    def test_proxy_password_is_masked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            [
+                "tasks",
+                "get-tasks",
+                "--proxy",
+                "http://user:secretpassword123@proxy.test:8080",
+                "--workspace",
+                "1",
+            ],
+        )
+        assert "secretpassword123" not in code
+        assert "configuration.proxy = 'http://user:***@proxy.test:8080'" in code
+        # shlex quotes the masked URL (it contains ``*``).
+        assert "--proxy 'http://user:***@proxy.test:8080'" in code
+
+    def test_proxy_without_credentials_stays_verbatim(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            ["tasks", "get-tasks", "--proxy", "http://proxy.test:8080", "--workspace", "1"],
+        )
+        assert "configuration.proxy = 'http://proxy.test:8080'" in code
 
 
 class TestGeneratedScriptHygiene:

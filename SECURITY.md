@@ -44,22 +44,36 @@ environment variable. Treat this token as a secret:
 - When sharing command output, scrub any GIDs or data you do not want to
   disclose; `asana-api-cli` prints raw API responses by default.
 
-## Generated scripts can carry your token
+## Generated scripts mask your credentials
 
 `asana-api --generate-python` prints a standalone Python script instead of
-running the call. When you pass a non-empty `--access-token`, its value is written
-into the emitted script verbatim (`configuration.access_token = "..."`). When
-`--access-token` is omitted or empty, the script instead reads
-`os.environ["ASANA_ACCESS_TOKEN"]` and embeds no secret.
+running the call. Credential-bearing values are masked in the emitted text —
+in the configuration lines and in the `# Equivalent to:` header comment alike:
 
-- Generate with a dummy token (or omit `--access-token`) when you intend to
-  share, commit, or paste the script.
-- Treat any script generated with a real `--access-token` — or with a
-  credential-bearing `--proxy` / `--set-default-header` / `--header-params`,
-  which are likewise transcribed verbatim — as a secret-bearing file: keep it
-  out of source control and out of issues, logs, and screenshots.
-- Rotate the token at <https://app.asana.com/0/my-apps> if such a script may
-  have been exposed.
+- a non-empty `--access-token` is embedded in masked form (`...` plus the
+  last 6 characters, the same presentation as the `--debug` trace); the
+  script then fails with 401 instead of silently using a different
+  credential — edit in a token, or omit `--access-token` when generating so
+  the script reads `os.environ["ASANA_ACCESS_TOKEN"]` instead;
+- an `Authorization` / `Proxy-Authorization` header given via
+  `--set-default-header` or `--header-params` is masked too — the scheme
+  prefix stays visible; a `Bearer` value keeps its last 6 characters, while
+  a `Basic` credential is fully masked (`Basic <REDACTED>`): it is base64 of
+  `user:password`, where even a tail reveal would expose password
+  characters;
+- the password in a `--proxy` URL (`http://user:pass@host`) is replaced
+  with `***`.
+
+A value too short to be a real Asana token (fewer than 16 characters) is kept
+verbatim, so generating with a dummy token still produces a script with the
+dummy in place.
+
+Everything else is transcribed verbatim. If a secret rides in a `--body`
+payload or in a custom header under any name other than `Authorization` /
+`Proxy-Authorization` (for example an `X-Api-Key`), the script carries it in
+clear text: keep such a script out of source control and out of issues, logs,
+and screenshots, and rotate any credential it may have exposed (Asana tokens
+at <https://app.asana.com/0/my-apps>).
 
 ## Secrets on the command line
 
@@ -85,21 +99,21 @@ clear or scrub your shell history, and rotate a token you suspect has leaked.
 `asana-api --debug` turns on the SDK's HTTP debug output. Mirroring the
 SDK, the `http.client` wire trace (request and response headers) goes to
 stdout and the SDK / urllib3 debug log (connection, status line, response
-body) to stderr. The CLI masks only the request `Authorization` header in
-the stdout wire trace (it carries the personal access token); everything
-else — on either stream — is shown verbatim, so scrub both streams before
-sharing.
+body) to stderr. The CLI masks only the request `Authorization` header
+(it carries the personal access token) and the `Proxy-Authorization`
+header in the stdout wire trace; everything else — on either stream — is
+shown verbatim, so scrub both streams before sharing.
 
 This masking lives in the CLI, not the SDK. Direct use of the SDK's
 HTTP debug logging from Python leaves the `Authorization` header in
 clear text.
 
-### Custom request headers are not masked
+### Custom request headers other than (Proxy-)Authorization are not masked
 
 `--header-params VALUE` (per call) and the session-wide `--user-agent` /
 `--set-default-header NAME=VALUE` (repeatable) let you inject arbitrary HTTP
-request headers. The `--debug` redactor masks **only** the `Authorization`
-header; any value passed via these flags is logged verbatim. If a custom
-header carries a secret — an API key, signing token, or other credential —
-treat the `--debug` log as containing that value in clear text and scrub it
-before sharing.
+request headers. The `--debug` redactor masks the `Authorization` and
+`Proxy-Authorization` headers whatever their source or scheme; a header under
+any **other** name is logged verbatim. If such a header carries a secret — an
+API key, signing token, or other credential — treat the `--debug` log as
+containing that value in clear text and scrub it before sharing.

@@ -12,7 +12,14 @@ What the emitted script reproduces:
   same global flags the CLI applies — only options the user passed are written,
   using the shared ``_CONFIG_KNOBS`` table so the two cannot drift. The access
   token is ``os.environ[...]`` unless a non-empty ``--access-token`` was given
-  (then it is transcribed literally; the user is expected to pass a dummy).
+  (then its masked form is embedded — see the credential masking note below).
+* **Credential masking** (constitution #2): values that carry a credential —
+  the ``--access-token`` value, an ``Authorization`` / ``Proxy-Authorization``
+  header given via ``--set-default-header`` / ``--header-params``, and the
+  password in a ``--proxy`` URL — are masked everywhere they would appear in
+  the emitted text (the config lines, the call's ``header_params``, and the
+  ``# Equivalent to:`` comment). A value too short to be a real token is
+  kept verbatim so the documented dummy-token workflow round-trips.
 * **Call** (C-9 body / C-10 iterator): ``asana.<Api>(api_client).<method>(...)``
   with the body inlined as a Python literal, the ``opts`` dict, and the
   per-call kwargs. Array endpoints are wrapped in ``list(...)`` — predicted
@@ -45,8 +52,10 @@ import inspect
 import json
 import math
 import pprint
+import re
 import shlex
 import sys
+from collections.abc import Callable
 from types import ModuleType
 from typing import TYPE_CHECKING
 
@@ -211,19 +220,128 @@ def _render_converters(formats: set[str], needs: _Imports) -> list[str]:
     return "\n\n".join(sources).split("\n")
 
 
+# ---------- credential masking ----------------------------------------------
+#
+# Constitution #2: a credential must not survive into the emitted text. The
+# policy constants are shared with the ``--debug`` trace mask in ``redactor.py``
+# so the two presentations stay recognizably the same (``...<last 6>``); the
+# short-value branch differs on purpose — the trace conservatively redacts a
+# short token, while here a value too short to be a real Asana token is a
+# dummy by construction and is kept verbatim so the documented dummy-token
+# workflow round-trips.
+
+
+def _mask_secret(value: str) -> str:
+    """Mask a credential for embedding in generated output; a value too
+    short to be a real token is kept verbatim."""
+    if len(value) < redactor._MASK_MIN_LEN:
+        return value
+    return f"...{value[-redactor._MASK_SUFFIX_LEN :]}"
+
+
+# Header names whose value is a credential by definition.
+_AUTH_HEADER_NAMES = frozenset({"authorization", "proxy-authorization"})
+
+_AUTH_SCHEME_RE = re.compile(r"^(Bearer|Basic)\s+(.+)$", re.IGNORECASE | re.DOTALL)
+
+
+def _mask_authorization(value: str) -> str:
+    """Mask an ``Authorization`` / ``Proxy-Authorization`` header value,
+    keeping a ``Bearer`` / ``Basic`` scheme prefix visible like the
+    ``--debug`` trace mask. A ``Basic`` credential is fully masked — the
+    value is base64 of ``user:password``, so even a tail reveal would
+    expose password characters."""
+    m = _AUTH_SCHEME_RE.match(value)
+    if m is None:
+        return _mask_secret(value)
+    if m.group(1).lower() == "basic":
+        return f"{m.group(1)} {redactor._BASIC_MASK}"
+    return f"{m.group(1)} {_mask_secret(m.group(2))}"
+
+
+_PROXY_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://[^/@:]*):([^/@]*)@")
+
+
+def _mask_proxy(value: str) -> str:
+    """Mask the password component of a proxy URL's userinfo."""
+    return _PROXY_USERINFO_RE.sub(r"\1:***@", value)
+
+
+def _mask_header_params(value: dict[str, object]) -> dict[str, object]:
+    """A copy of a ``header_params`` dict with credential-header values masked."""
+    return {
+        name: _mask_authorization(v)
+        if name.lower() in _AUTH_HEADER_NAMES and isinstance(v, str)
+        else v
+        for name, v in value.items()
+    }
+
+
+def _mask_header_arg(value: str) -> str:
+    """Mask the ``Authorization`` value inside a header flag's raw argument.
+
+    The plain single-pair ``Name=Value`` form is masked precisely; any other
+    shape that mentions ``authorization`` (a JSON object, a multi-pair list)
+    is replaced wholesale — over-masking is safe for a provenance comment.
+    An ``@path`` value carries no secret in argv and passes through.
+    """
+    if value.startswith("@") or "authorization" not in value.lower():
+        return value
+    name, sep, rest = value.partition("=")
+    if sep and name.strip().lower() in _AUTH_HEADER_NAMES:
+        return f"{name}={_mask_authorization(rest)}"
+    return "<masked>"
+
+
+# ``--flag VALUE`` flags whose value can carry a credential, with the mask to
+# apply in the ``# Equivalent to:`` argv transcription. The ``--flag=VALUE``
+# spelling is handled too (see ``_mask_argv``).
+_SENSITIVE_FLAG_MASKS: dict[str, Callable[[str], str]] = {
+    "--access-token": _mask_secret,
+    "--proxy": _mask_proxy,
+    "--set-default-header": _mask_header_arg,
+    "--header-params": _mask_header_arg,
+}
+
+
+def _mask_argv(args: list[str]) -> list[str]:
+    """*args* with every credential-bearing flag value masked
+    (``_SENSITIVE_FLAG_MASKS``), in both the ``--flag VALUE`` and
+    ``--flag=VALUE`` spellings."""
+    masked: list[str] = []
+    pending: Callable[[str], str] | None = None
+    for arg in args:
+        if pending is not None:
+            masked.append(pending(arg))
+            pending = None
+            continue
+        flag, sep, inline = arg.partition("=")
+        mask = _SENSITIVE_FLAG_MASKS.get(flag)
+        if mask is None:
+            masked.append(arg)
+        elif sep:
+            masked.append(f"{flag}={mask(inline)}")
+        else:
+            masked.append(arg)
+            pending = mask
+    return masked
+
+
 def _render_config(needs: _Imports) -> list[str]:
     """Emit the ``Configuration`` / ``ApiClient`` setup (C-8 / C-4).
 
     Mirrors ``AsanaSession``: the same ``_CONFIG_KNOBS`` table under the same
     apply condition (so only user-set options appear and there is no drift), then
     the ``ApiClient``-instance settings. The token follows ``from_env``'s
-    resolution — a truthy ``--access-token`` is transcribed verbatim, otherwise
+    resolution — a truthy ``--access-token`` embeds its masked form, otherwise
     the script reads ``$ASANA_ACCESS_TOKEN`` — so an explicit empty
-    ``--access-token`` falls back to the env var, like the live CLI.
+    ``--access-token`` falls back to the env var, like the live CLI. A script
+    carrying a masked token fails with 401 rather than silently using a
+    different credential.
     """
     lines = ["configuration = asana.Configuration()"]
     if runtime.access_token:
-        lines.append(f"configuration.access_token = {runtime.access_token!r}")
+        lines.append(f"configuration.access_token = {_mask_secret(runtime.access_token)!r}")
     else:
         needs.stdlib.add("os")
         lines.append(f"configuration.access_token = os.environ[{ACCESS_TOKEN_ENV!r}]")
@@ -231,6 +349,8 @@ def _render_config(needs: _Imports) -> list[str]:
         value = getattr(runtime, attr)
         applies = value if apply_when_truthy else value is not None
         if applies:
+            if attr == "proxy":
+                value = _mask_proxy(value)
             lines.append(f"configuration.{attr} = {value!r}")
     if runtime.debug:
         # Not a ``_CONFIG_KNOBS`` entry: ``AsanaSession`` sets this in ``open()``
@@ -243,6 +363,8 @@ def _render_config(needs: _Imports) -> list[str]:
     lines.append("api_client = asana.ApiClient(configuration)")
     if runtime.default_headers:
         for name, value in runtime.default_headers.items():
+            if name.lower() in _AUTH_HEADER_NAMES:
+                value = _mask_authorization(value)
             lines.append(f"api_client.set_default_header({name!r}, {value!r})")
     if runtime.user_agent is not None:
         lines.append(f"api_client.user_agent = {runtime.user_agent!r}")
@@ -330,7 +452,11 @@ def _call_expression(plan: CallPlan) -> str:
     positional += [repr(arg) for arg in plan.path_call_args]
     if plan.has_opts:
         positional.append("opts")
-    keyword = [f"{name}={value!r}" for name, value in plan.method_kwargs.items()]
+    keyword: list[str] = []
+    for name, value in plan.method_kwargs.items():
+        if name == "header_params" and isinstance(value, dict):
+            value = _mask_header_params(value)
+        keyword.append(f"{name}={value!r}")
     call = f"api_instance.{plan.method_name}({', '.join(positional + keyword)})"
     return f"list({call})" if _returns_iterator(plan) else call
 
@@ -510,14 +636,14 @@ def _header(equivalent_args: list[str]) -> list[str]:
     each argument but leaves embedded newlines literal, so a multiline argument
     (e.g. a multiline ``--query`` program) is wrapped across continuation lines
     each re-prefixed with ``#`` — otherwise the newline would end the comment and
-    drop the rest into the script as source. No secret sanitizing: any secret the
-    user put on the command line already appears in the transcribed body, so the
-    comment adds no new exposure.
+    drop the rest into the script as source. Credential-bearing flag values are
+    masked (``_mask_argv``), matching the masking the transcribed body applies
+    (constitution #2).
     """
     # ``splitlines`` (not ``split("\n")``) so a bare ``\r`` — which Python's
     # tokenizer also treats as a line end, and which shlex.join leaves literal —
     # cannot end the comment either. ``joined`` is never empty (always "asana-api").
-    first, *rest = shlex.join(["asana-api", *equivalent_args]).splitlines()
+    first, *rest = shlex.join(["asana-api", *_mask_argv(equivalent_args)]).splitlines()
     return [
         f"# Generated by asana-api {version.version_string()}",
         f"# Equivalent to: {first}",

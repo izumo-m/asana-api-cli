@@ -170,7 +170,8 @@ def _global_option_sections() -> list[tuple[str, list[click.Option]]]:
                     help=(
                         "Add an HTTP header sent on every request, given as NAME=VALUE; "
                         "repeatable. Unlike per-call --header-params it applies to all "
-                        "calls. Not redacted in --debug output — see SECURITY.md. "
+                        "calls. Only Authorization / Proxy-Authorization values are "
+                        "redacted in --debug output — see SECURITY.md. "
                         "(ApiClient: set_default_header)"
                     ),
                 ),

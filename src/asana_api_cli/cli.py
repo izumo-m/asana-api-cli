@@ -690,8 +690,9 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
             help=(
                 "Custom HTTP request headers merged into the request. VALUE: "
                 "'k1=v1,k2=v2,...', JSON object, or @path. Use cases include "
-                "Asana-Enable/-Disable deprecation opt-in. Not redacted in "
-                f"--debug output — see SECURITY.md. {_sdk_dest('kwargs', 'header_params')}"
+                "Asana-Enable/-Disable deprecation opt-in. Only Authorization / "
+                "Proxy-Authorization values are redacted in --debug output — see "
+                f"SECURITY.md. {_sdk_dest('kwargs', 'header_params')}"
             ),
         ),
         click.Option(

@@ -65,9 +65,9 @@ Client-wide; valid at any point in the command path.
 | `--cert-file FILE` / `--key-file FILE` | Client certificate / private key for mTLS |
 | `--assert-hostname` / `--no-assert-hostname` | Verify the cert hostname; unspecified → urllib3 default |
 | `--user-agent VALUE` | Override the `User-Agent` header on every request — see [Debugging and headers](#debugging-and-headers) |
-| `--set-default-header NAME=VALUE` | Session-wide header, repeatable; **not** redacted — see [Debugging and headers](#debugging-and-headers) |
+| `--set-default-header NAME=VALUE` | Session-wide header, repeatable; only `Authorization` / `Proxy-Authorization` are redacted — see [Debugging and headers](#debugging-and-headers) |
 | `--retry-strategy VALUE` | Override urllib3 `Retry` fields (structured value) — see [Structured values](#structured-values) |
-| `--debug` | SDK HTTP debug to stdout/stderr, `Authorization` masked — see [Debugging and headers](#debugging-and-headers) |
+| `--debug` | SDK HTTP debug to stdout/stderr, `Authorization` / `Proxy-Authorization` masked — see [Debugging and headers](#debugging-and-headers) |
 | `--logger-format FMT` / `--logger-file PATH` | SDK logging format string / output file |
 | `--temp-folder-path DIR` | Directory for temporary downloads |
 | `--safe-chars-for-path-param CHARS` | Characters left unescaped in path parameters |
@@ -83,7 +83,7 @@ the command path.
 |---|---|
 | `--item-limit N` | Stop after N items have been collected — see [Pagination](#pagination) |
 | `--full-payload` | Return the raw single-page response dict instead of auto-paginating — see [Pagination](#pagination) |
-| `--header-params VALUE` | Extra HTTP headers for this call (structured value; **not** redacted) — see [Structured values](#structured-values) |
+| `--header-params VALUE` | Extra HTTP headers for this call (structured value; only `Authorization` / `Proxy-Authorization` are redacted) — see [Structured values](#structured-values) |
 | `--request-timeout SECONDS` | Per-request timeout; propagated to every page request |
 | `--output {json\|table\|csv\|text\|none}` | Success render format (default `json`) — see [Output formats](#output-formats) |
 | `--query EXPR` | `jq` filter over the success payload — see [Output formats](#output-formats) |
@@ -167,14 +167,21 @@ when you use `--multibyte-filenames`). It reproduces:
 - **Errors** — `--exception-output` / `--exception-query` reproduce the error
   envelope and exit `3`; under the default `none` the script lets exceptions
   propagate.
-- **`--debug`** — emits the request/response trace with the `Authorization`
-  header masked, the same as the CLI.
+- **`--debug`** — emits the request/response trace with the `Authorization` /
+  `Proxy-Authorization` headers masked, the same as the CLI.
 - **`--multibyte-filenames`** — reproduces the RFC 5987 upload patch.
 
-The access token is read from `os.environ["ASANA_ACCESS_TOKEN"]` unless you pass a
-non-empty `--access-token`, whose value is transcribed into the script
-**verbatim** — pass a dummy when generating, and treat the script like any other
-file that may carry a secret (see [SECURITY.md](../SECURITY.md)). Input validation still runs
+The access token is read from `os.environ["ASANA_ACCESS_TOKEN"]` unless you pass
+a non-empty `--access-token`, which is embedded in **masked** form (`...` plus
+the last 6 characters; a value too short to be a real token — a dummy — stays
+verbatim, so the masked script fails with 401 instead of silently using a
+different credential). An `Authorization` / `Proxy-Authorization` header given
+via `--set-default-header` / `--header-params` and the password in a `--proxy`
+URL are masked the same way (a `Basic` credential entirely, with no tail
+reveal) — in the configuration lines and in the `# Equivalent to:` comment
+alike. Everything else (including other custom
+headers and the `--body` payload) is transcribed verbatim — see
+[SECURITY.md](../SECURITY.md). Input validation still runs
 during generation: a malformed `--body` literal or a missing required
 `--workspace` exits `2`, just as when executing.
 
@@ -315,9 +322,10 @@ pipe via process substitution instead: `--retry-strategy @<(echo '{"total":3}')`
 
 ## Debugging and headers
 
-`--debug` turns on the SDK's HTTP debug output, with the `Authorization` header
-masked. Mirroring the SDK, the wire trace (request/response headers) goes to
-stdout and the connection/response log to stderr:
+`--debug` turns on the SDK's HTTP debug output, with the `Authorization` and
+`Proxy-Authorization` headers masked. Mirroring the SDK, the wire trace
+(request/response headers) goes to stdout and the connection/response log to
+stderr:
 
 ```bash
 asana-api --debug tasks get-tasks --project <PROJECT_GID>
@@ -341,8 +349,11 @@ dedicated `--user-agent` wins.
 
 For a header set on both sides, the session-wide `--set-default-header` wins over a
 per-call `--header-params` of the same name (the SDK merges defaults on top).
-Like `--header-params`, these custom headers are **not** redacted in `--debug`
-output — see [SECURITY.md](../SECURITY.md).
+The `--debug` redactor masks the `Authorization` and `Proxy-Authorization`
+headers whatever their source or scheme (a `Bearer` / opaque value keeps its
+last 6 characters for distinguishability; a `Basic` credential is fully
+masked); custom headers under any **other** name are shown verbatim — see
+[SECURITY.md](../SECURITY.md).
 
 ## Workspace resolution
 

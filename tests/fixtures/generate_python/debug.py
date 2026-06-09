@@ -19,16 +19,20 @@ from typing import Any
 # ---------- module-level constants ------------------------------------------
 
 
-# Match ``Authorization: <scheme> <token>`` inside an HTTP request-headers
-# chunk. We never apply this regex to user-controlled data (request body or
+# Match an ``Authorization`` / ``Proxy-Authorization`` header value inside an
+# HTTP request-headers chunk (the latter appears in proxied requests and in
+# the ``CONNECT`` tunnel-establishment chunk, which ``_HTTP_METHODS`` also
+# covers). We never apply this regex to user-controlled data (request body or
 # response body), so the value side just needs to terminate cleanly at the
-# next header boundary: any run of non-whitespace, non-backslash characters
+# next header boundary: any run of non-backslash, non-CR/LF characters
 # stops at real CR/LF (raw form) and at the leading ``\\`` of literal
-# ``\\r\\n`` (``repr`` form). The character class is intentionally not
-# tied to a specific token shape — many APIs declare that token formats
-# are opaque and may change.
+# ``\\r\\n`` (``repr`` form). A ``Bearer`` / ``Basic`` scheme prefix is
+# captured separately so it stays visible in the masked output; any other
+# value — a custom scheme or a bare token — is masked whole. The value
+# class is intentionally not tied to a specific token shape — many APIs
+# declare that token formats are opaque and may change.
 _AUTH_HEADER_RE = re.compile(
-    r"(Authorization:\s*(?:Bearer|Basic))\s+([^\s\\]+)",
+    r"((?:Proxy-)?Authorization:\s*)((?:Bearer|Basic)\s+)?([^\s\\][^\\\r\n]*)",
     re.IGNORECASE,
 )
 
@@ -51,9 +55,13 @@ _HTTP_METHODS: tuple[str, ...] = (
 # Default mask reveals the last ``_MASK_SUFFIX_LEN`` characters of the
 # token, but only when the token is at least ``_MASK_MIN_LEN`` long. The
 # threshold caps the leak ratio at 6/16 = 37.5% for unexpectedly short
-# tokens.
+# tokens. ``Basic`` credentials never get the partial reveal (see
+# ``_redact_match`` in ``install``): the value is base64 of
+# ``user:password``, so even a tail reveal would expose password
+# characters — unlike an opaque random token.
 _MASK_MIN_LEN = 16
 _MASK_SUFFIX_LEN = 6
+_BASIC_MASK = "<REDACTED>"
 
 # Marker / inner-function attributes set on the wrapper installed at
 # ``http.client.print``. Used for idempotent install across multiple
@@ -159,7 +167,12 @@ class HttpClientAuthRedactor:
         mask_fn = self._mask_fn
 
         def _redact_match(m: re.Match[str]) -> str:
-            return f"{m.group(1)} {mask_fn(m.group(2))}"
+            scheme = m.group(2) or ""
+            # A Basic credential is fully redacted, bypassing ``mask_fn``:
+            # the partial reveal is only safe for opaque random tokens.
+            if scheme.rstrip().lower() == "basic":
+                return f"{m.group(1)}{scheme}{_BASIC_MASK}"
+            return f"{m.group(1)}{scheme}{mask_fn(m.group(3))}"
 
         def _redact_print(*args: Any, **kwargs: Any) -> None:
             if len(args) >= 2 and args[0] == "send:" and _looks_like_request_headers(str(args[1])):

@@ -93,7 +93,23 @@ _CASES: dict[str, list[str]] = {
         "/tmp/あ.png",
         "--multibyte-filenames",
     ],
-    # bulk config: literal token, host, user-agent, default header
+    # credential masking: long token / Authorization header / proxy password
+    # all masked, in the config lines and the "# Equivalent to:" comment alike.
+    # Tokens are opaque, deliberately NOT Asana-PAT-shaped — a realistic PAT
+    # shape trips GitHub push protection even though the value is synthetic.
+    "config_masked": [
+        "--access-token",
+        "dummy-opaque-access-token-padding-padding-Zx9Q7w",
+        "--set-default-header",
+        "Authorization=Bearer dummy-opaque-bearer-token-padding-7h3nd9",
+        "--proxy",
+        "http://user:secretpassword123@proxy.test:8080",
+        "tasks",
+        "get-task",
+        "--task",
+        "1",
+    ],
+    # bulk config: dummy token (short → verbatim), host, user-agent, default header
     "config_heavy": [
         "--access-token",
         "DUMMY-TOKEN",

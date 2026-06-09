@@ -14,9 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emits a self-contained script — config, the SDK call, and your `--output` /
   `--query` / `--exception-output` / `--debug` / `--multibyte-filenames`
   choices — making no network call and needing no token, so a working
-  invocation becomes copy-pasteable SDK code. A non-empty `--access-token` is
-  transcribed verbatim (pass a dummy; see SECURITY.md). See
+  invocation becomes copy-pasteable SDK code. Credential-bearing values are
+  masked in the emitted script (see the Security entry below). See
   [docs/usage.md](docs/usage.md#generating-python-code).
+
+### Security
+
+- **`--generate-python` masks credentials in the emitted script.** A non-empty
+  `--access-token`, an `Authorization` / `Proxy-Authorization` header given
+  via `--set-default-header` / `--header-params`, and the password in a
+  `--proxy` URL never appear in the generated text — neither in the
+  configuration lines nor in the `# Equivalent to:` comment. Tokens keep only
+  their last 6 characters (`...abc123`), matching the `--debug` trace mask;
+  `Basic` credentials and proxy passwords are fully masked (no tail reveal);
+  a value too short to be a real token (a dummy) stays verbatim. See
+  SECURITY.md.
+- **`--debug` now masks `Authorization` / `Proxy-Authorization` headers of any
+  scheme.** Previously only `Authorization: Bearer` / `Basic` values were
+  masked in the wire trace; an `Authorization` header carrying a custom
+  scheme or a bare token (e.g. set via `--set-default-header`) passed through
+  verbatim, and `Proxy-Authorization` masking is now an explicit, tested
+  contract (including the proxy `CONNECT` tunnel chunk). A `Basic` credential
+  is now fully masked with no last-6 reveal: its value is base64 of
+  `user:password`, so a tail reveal would expose password characters.
 
 ## [3.1.3] - 2026-06-06
 
