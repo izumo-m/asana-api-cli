@@ -20,7 +20,6 @@ from asana_api_cli.click_ext import (
     GLOBAL_OPTION_NAMES,
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
-    LazyGroup,
 )
 from asana_api_cli.session import _Runtime, runtime
 
@@ -46,15 +45,15 @@ def _count_option_appearances(output: str, flag: str) -> int:
 def _build_cli() -> click.Group:
     """Build a 3-level CLI mirroring the real ``asana-api`` shape.
 
-    Like the real ``main``, the root is a ``LazyGroup`` (a
-    ``GroupWithGlobalOptions``): it appends and consumes the global options from
-    the single ``_global_option_sections`` source, so no global flag is declared
+    Like the real ``main``, the root is a ``GroupWithGlobalOptions``: it
+    appends and consumes the global options from the single
+    ``_global_option_sections`` source, so no global flag is declared
     here by hand. ``--host`` / ``--debug`` / ``--access-token`` used in these
     tests are real globals that source provides at every level; the leaf reads
     them back off ``runtime`` (written by ``_consume_global_options``).
     """
 
-    @click.group(cls=LazyGroup)
+    @click.group(cls=GroupWithGlobalOptions)
     def root() -> None:
         pass
 
@@ -311,13 +310,13 @@ class TestGlobalOptionsSingleSource:
             }
 
         # A leaf command appends the globals via CommandWithGlobalOptions; the
-        # root (main, a LazyGroup → GroupWithGlobalOptions) appends them too.
+        # root (main, a GroupWithGlobalOptions) appends them too.
         leaf = CommandWithGlobalOptions(name="probe")
         root_sigs = _global_sigs(main)
         leaf_sigs = _global_sigs(leaf)
 
         assert set(root_sigs) == GLOBAL_OPTION_NAMES, (
-            "root is missing global options (LazyGroup did not append the source):\n"
+            "root is missing global options (GroupWithGlobalOptions did not append the source):\n"
             f"  expected: {sorted(GLOBAL_OPTION_NAMES)}\n"
             f"  got:      {sorted(n for n in root_sigs if n is not None)}"
         )

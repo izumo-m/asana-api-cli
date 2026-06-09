@@ -9,7 +9,7 @@ Runtime-introspection wrapper around `python-asana`. API group stubs are registe
 | `cli.py` | Runtime introspection + Click command tree; body / workspace input resolution |
 | `session.py` | SDK client (`Configuration` + `ApiClient`); on context-manager entry (`open`) installs the `--debug` side effects (the `http.client` debuglevel + asana/urllib3 logger flips and the `Authorization` redactor), reverses them on exit (`close`) |
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
-| `click_ext.py` | `LazyGroup` for cheap top-level `--help`; the `_GlobalOptionsMixin` mixin and its concrete subclasses propagating global options to subgroups (`GroupWithGlobalOptions`) and leaf commands (`CommandWithGlobalOptions`) |
+| `click_ext.py` | The `_GlobalOptionsMixin` mixin and its concrete subclasses propagating global options to the root group and subgroups (`GroupWithGlobalOptions`) and leaf commands (`CommandWithGlobalOptions`) |
 | `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |
 | `multibyte_filename.py` | `MultibyteFilenameSupport` — patches `urllib3` multipart encoding to add the RFC 5987 `filename*=` parameter for non-ASCII filenames; backs the upload-only `--multibyte-filenames` flag |
 | `structured_arg.py` | Hybrid value parser for structured options (`k=v,k=v` / JSON object / `@path`) |

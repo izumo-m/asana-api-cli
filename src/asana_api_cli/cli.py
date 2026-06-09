@@ -57,7 +57,6 @@ import click
 from asana_api_cli.click_ext import (
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
-    LazyGroup,
 )
 from asana_api_cli.formatter import formatted, formatter_flag_names, make_formatter_options
 from asana_api_cli.multibyte_filename import MultibyteFilenameSupport
@@ -1304,14 +1303,13 @@ def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -
     ctx.exit()
 
 
-# Root group. ``LazyGroup`` is a ``GroupWithGlobalOptions``, so the root
-# appends and consumes the global Configuration / ApiClient flags from the
-# single ``_global_option_sections`` source in ``click_ext.py`` — exactly the
-# way every subgroup (``_ApiGroup``) and leaf command (``CommandWithGlobalOptions``)
-# does. There is no separate root-level declaration; the flags work at any level
-# of the tree, and ``--retry-strategy`` is gated on the SDK version in that one
-# source.
-@click.group(name="asana-api", cls=LazyGroup, epilog=_ROOT_EPILOG)
+# Root group. ``GroupWithGlobalOptions`` appends and consumes the global
+# Configuration / ApiClient flags from the single ``_global_option_sections``
+# source in ``click_ext.py`` — exactly the way every subgroup (``_ApiGroup``)
+# and leaf command (``CommandWithGlobalOptions``) does. There is no separate
+# root-level declaration; the flags work at any level of the tree, and
+# ``--retry-strategy`` is gated on the SDK version in that one source.
+@click.group(name="asana-api", cls=GroupWithGlobalOptions, epilog=_ROOT_EPILOG)
 @click.option(
     "--version",
     is_flag=True,
@@ -1332,8 +1330,7 @@ def main() -> None:
     #
     # The global flags are parsed into the root context and written to
     # ``runtime`` by ``GroupWithGlobalOptions.invoke`` → ``_consume_global_options``
-    # (inherited by ``LazyGroup``) before this callback runs, so there is nothing
-    # to apply here.
+    # before this callback runs, so there is nothing to apply here.
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
