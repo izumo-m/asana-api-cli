@@ -58,7 +58,7 @@ Client-wide; valid at any point in the command path.
 |---|---|
 | `--access-token TOKEN` | Bearer token. Default `$ASANA_ACCESS_TOKEN` — see [Authentication](#authentication) |
 | `--host URL` | API base URL (default `https://app.asana.com/api/1.0`) |
-| `--proxy URL` | HTTP/HTTPS proxy |
+| `--proxy URL` | HTTP/HTTPS proxy; credentials in the URL are **not** sent — see [Proxies](#proxies) |
 | `--connection-pool-maxsize N` | Max urllib3 connections cached per host (default cpu×5) |
 | `--verify-ssl` / `--no-verify-ssl` | Verify TLS certificates (default on; `--no-verify-ssl` is insecure) |
 | `--ssl-ca-cert FILE` | PEM bundle of trusted CA certs |
@@ -354,6 +354,55 @@ headers whatever their source or scheme (a `Bearer` / opaque value keeps its
 last 6 characters for distinguishability; a `Basic` credential is fully
 masked); custom headers under any **other** name are shown verbatim — see
 [SECURITY.md](../SECURITY.md).
+
+## Proxies
+
+`--proxy URL` routes every API request through an HTTP/HTTPS forward proxy
+(the SDK builds a urllib3 `ProxyManager` from the URL):
+
+```bash
+asana-api --proxy http://proxy.corp.test:3128 users get-user --user me
+```
+
+Mirroring the SDK, `--proxy` is the only way to configure a proxy — the
+`HTTP_PROXY` / `HTTPS_PROXY` environment variables are not read.
+
+### Credentials in the proxy URL are discarded
+
+As of `python-asana` 5.2.4 — the latest version checked —
+`--proxy http://user:pass@host:port` parses, but the credentials are **never
+sent**: the SDK stack (`python-asana` → urllib3) does not turn URL userinfo
+into a `Proxy-Authorization` header. urllib3's only built-in proxy-credential
+mechanism is its `proxy_headers` argument, which `python-asana` does not
+expose (there is no `Configuration.proxy_headers`). A later SDK that wires
+`proxy_headers` through would lift this limitation. Against a proxy that
+requires authentication, the call therefore fails with `407 Proxy
+Authentication Required` — a urllib3 `ProxyError` wrapped in
+`urllib3.exceptions.MaxRetryError` (for a plain-`http://` host, an
+`ApiException` with status 407) — handled like any other SDK error
+([Error handling](#error-handling)).
+
+What you can do instead, in order of preference:
+
+1. **Use a proxy endpoint that does not require credentials** — for
+   example one that allowlists your source address.
+2. **Run a local chaining proxy that holds the credential** and
+   authenticates to the upstream proxy for you (e.g. `cntlm` for NTLM
+   proxies, or `squid` with a `cache_peer ... login=user:password`
+   upstream), then point `--proxy` at the local, credential-free port.
+3. Only when your `--host` is plain `http://`: send the header yourself
+   with `--set-default-header "Proxy-Authorization=Basic <base64>"`. This
+   **cannot** work for the real (HTTPS) Asana API: with an HTTPS target the
+   proxy authenticates at the `CONNECT` tunnel step, and per-request
+   headers travel inside the TLS tunnel where the proxy never sees them.
+
+Even though the credentials are discarded, a `--proxy URL` containing them
+is still exposed to the local process list and your shell history — see
+[SECURITY.md](../SECURITY.md#secrets-on-the-command-line). In `--debug`
+output a `Proxy-Authorization` header is masked
+([Debugging and headers](#debugging-and-headers)), and in
+`--generate-python` output the proxy password is masked
+([Generating Python code](#generating-python-code)).
 
 ## Workspace resolution
 

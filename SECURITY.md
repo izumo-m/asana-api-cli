@@ -84,7 +84,10 @@ feature. The values to watch are:
 
 - the `--access-token` value — prefer the `ASANA_ACCESS_TOKEN` environment
   variable, which keeps the token off the command line entirely;
-- a `--proxy` URL that embeds credentials (`http://user:pass@host`);
+- a `--proxy` URL that embeds credentials (`http://user:pass@host`) — they
+  are never sent to the proxy (see
+  [docs/usage.md](docs/usage.md#proxies)), but they are still exposed
+  locally;
 - a credential carried by `--header-params VALUE` or the session-wide
   `--set-default-header NAME=VALUE` (for example an `Authorization` header).
   `--header-params` accepts a `@file` form (`--header-params @headers.json`)
