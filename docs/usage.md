@@ -113,7 +113,7 @@ These options control how a successful response is printed.
 | Option | Effect |
 |---|---|
 | `--output {json\|table\|csv\|text\|none}` | Render format. Default `json` (canonical, lossless). `none` suppresses the success payload — useful for side-effect-only calls (delete/update) where only the exit code matters |
-| `--query EXPR` | Filter the response through `jq`; each result is rendered per `--output`. Mirrors `aws --query` |
+| `--query EXPR` | Filter the response through `jq`; each result is rendered per `--output`. Plays the role of `aws --query`, but the expression language is jq, not JMESPath |
 | `--csv-bom` | Prepend a UTF-8 BOM to CSV output (for Excel on Windows). Off by default so Unix pipelines stay clean |
 
 Non-JSON formats render a list of dicts as one row per item. The default
@@ -276,8 +276,8 @@ asana-api tasks get-tasks --project <PROJECT_GID> --offset <TOKEN>
 ### Deprecated aliases
 
 Retained as deprecation aliases; each emits a stderr warning and forwards to its
-v3 flag. Like the pagination flags they replace, they exist only on paginatable
-commands. Scheduled for removal in a future release.
+v3 flag. They exist only on paginatable commands. Scheduled for removal in a
+future release.
 
 | Deprecated | Replacement |
 |---|---|

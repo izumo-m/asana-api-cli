@@ -151,7 +151,7 @@ asana-api tasks get-tasks --help
 # List workspaces
 asana-api workspaces get-workspaces
 
-# List up to 50 projects
+# List up to 50 projects (workspace comes from $ASANA_DEFAULT_WORKSPACE)
 asana-api projects get-projects-for-workspace --item-limit 50
 asana-api projects get-projects --workspace <WORKSPACE_GID> --item-limit 50
 
