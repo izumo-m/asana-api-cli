@@ -27,7 +27,10 @@ binding value by the ``resource_type``-aware response hook so the
 cassette never contains the real email / name / photo. Identifiers
 without a named binding are auto-hashed to synthetic gids wrapped in
 ``${GID:<synthetic>}`` markers (unwrapped at load time) so that no bare
-numeric gid survives into a committed cassette.
+numeric gid survives into a committed cassette. After all masking, a
+record-time gate runs the shared ``_leakscan`` detectors and refuses to
+write a cassette that still carries an identifier (even behind base64 /
+percent-encoding), a credential shape, or a live environment value.
 
 See ``tests/e2e/README.md`` for the full workflow.
 """
@@ -49,6 +52,7 @@ from _cli_runner import full_output, make_runner
 from vcr.serializers import yamlserializer
 
 from asana_api_cli.cli import main
+from e2e import _leakscan
 
 WORKSPACE_ENV = "ASANA_PYTEST_WORKSPACE"
 
@@ -345,6 +349,36 @@ def _mask_sync_tokens(obj: Any) -> Any:
     return _walk(obj, lambda s: _SYNC_TOKEN_RE.sub(_replace_sync_token, s))
 
 
+# Hex digit -> letter, so a synthetic carries no digit run at all and the
+# "every 16-digit run is wrapped" hygiene rule can never fire on one.
+_HEX_TO_ALPHA = str.maketrans("0123456789", "ghijklmnop")
+
+
+def _synthetic_jwt(token: str) -> str:
+    """Digit-free deterministic stand-in for an opaque JWT-shaped cursor.
+
+    Same token → same synthetic, so a cursor echoed between a response
+    body and the next request URL keeps vcrpy's request-matching
+    invariant at replay; distinct cursors stay distinct, so paged
+    requests remain distinguishable.
+    """
+    digest = hashlib.sha256(token.encode("ascii")).hexdigest()[:40]
+    return "masked-jwt-" + digest.translate(_HEX_TO_ALPHA)
+
+
+def _mask_jwt_tokens(obj: Any) -> Any:
+    """Replace each JWT-shaped string with a deterministic synthetic.
+
+    Asana's pagination ``offset`` cursors are HS256 JWTs whose base64url
+    payload carries *real* task / project gids (``border_rank``) — the
+    plain-text gid masking cannot see through the encoding, so the whole
+    token is replaced. Like sync tokens, cursors are account-coupled
+    opaque strings (short-lived, useless without ``Authorization``) that
+    need not survive into a committed cassette.
+    """
+    return _walk(obj, lambda s: _leakscan._JWT_RE.sub(lambda m: _synthetic_jwt(m.group(0)), s))
+
+
 def _auto_hash_gids(cassette_dict: Any) -> Any:
     """Replace each discovered identifier with a marked synthetic gid.
 
@@ -397,7 +431,7 @@ def _auto_hash_gids(cassette_dict: Any) -> Any:
 # serialize time):
 #
 #   L1 — universal value/format pass: ``${VAR}`` templating,
-#        ``_auto_hash_gids``, ``_mask_sync_tokens``.
+#        ``_auto_hash_gids``, ``_mask_sync_tokens``, ``_mask_jwt_tokens``.
 #   L2 — schema-aware response hook: ``_before_record_response`` /
 #        ``_mask_object`` dispatch on ``resource_type``.
 #   L3 — per-test/API hook (this list): when L2's ``resource_type``-keyed
@@ -485,6 +519,18 @@ _orig_yaml_serialize = yamlserializer.serialize
 _orig_yaml_deserialize = yamlserializer.deserialize
 
 
+def _live_secret_values() -> list[str]:
+    """The recording environment's real values that must never be written:
+    the access token, the real workspace gid, and every fixture-discovered
+    gid bound during the test. (The fixed bindings are excluded — they are
+    the public *replacement* literals, expected to appear.)"""
+    return [
+        os.environ.get("ASANA_ACCESS_TOKEN", ""),
+        os.environ.get(WORKSPACE_ENV, ""),
+        *_dynamic_bindings.values(),
+    ]
+
+
 def _templated_yaml_serialize(cassette_dict):  # type: ignore[no-untyped-def]
     # L3 first so per-test maskers can read the raw recorded values before
     # L1 templating rewrites them (e.g. before USER_NAME becomes ${USER_NAME}).
@@ -492,8 +538,23 @@ def _templated_yaml_serialize(cassette_dict):  # type: ignore[no-untyped-def]
         masker(cassette_dict)
     bindings = _bindings()
     templated = _walk(cassette_dict, lambda s: _template_string(s, bindings))
+    # JWTs first: replacing whole tokens before the gid pass keeps a
+    # ``${GID:...}`` marker from ever being spliced into a token's base64
+    # (which would break both the token match and replay determinism).
+    templated = _mask_jwt_tokens(templated)
     templated = _auto_hash_gids(templated)
     templated = _mask_sync_tokens(templated)
+    # Record-time gate: a cassette that fails the leak scan is never written.
+    # Failing here turns a masking gap into a loud record-time error instead
+    # of a quietly committed leak that only the hygiene tests might catch.
+    findings = _leakscan.scan_cassette(templated)
+    findings += _leakscan.scan_headers(templated)
+    findings += _leakscan.find_secrets(templated, _live_secret_values())
+    if findings:
+        details = "\n  ".join(findings[:20])
+        raise RuntimeError(
+            f"refusing to write cassette — leak scan found {len(findings)} issue(s):\n  {details}"
+        )
     return _orig_yaml_serialize(templated)
 
 

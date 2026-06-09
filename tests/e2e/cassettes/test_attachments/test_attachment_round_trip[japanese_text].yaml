@@ -157,7 +157,7 @@ interactions:
       code: 201
       message: Created
 - request:
-    body: "--167398e62cc543db71b60a3a266626da\r\nContent-Disposition: form-data; name=\"parent\"\r\n\r\n9569462105786115\r\n--167398e62cc543db71b60a3a266626da\r\nContent-Disposition:
+    body: "--167398e62cc543db71b60a3a266626da\r\nContent-Disposition: form-data; name=\"parent\"\r\n\r\n${GID:9569462105786115}\r\n--167398e62cc543db71b60a3a266626da\r\nContent-Disposition:
       form-data; name=\"file\"; filename=\"japanese-text.txt\"\r\nContent-Type: text/plain\r\n\r\n\u3053\u3093\u306B\u3061\u306F\u3001\u4E16\u754C\uFF01\n\r\n--167398e62cc543db71b60a3a266626da--\r\n"
     headers:
       Accept:

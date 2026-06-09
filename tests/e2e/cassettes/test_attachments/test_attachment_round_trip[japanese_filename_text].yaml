@@ -157,7 +157,7 @@ interactions:
       code: 201
       message: Created
 - request:
-    body: "--43d3b4e0c0aa9c28f4e77bdc5e03c470\r\nContent-Disposition: form-data; name=\"parent\"\r\n\r\n2553030826908173\r\n--43d3b4e0c0aa9c28f4e77bdc5e03c470\r\nContent-Disposition:
+    body: "--43d3b4e0c0aa9c28f4e77bdc5e03c470\r\nContent-Disposition: form-data; name=\"parent\"\r\n\r\n${GID:2553030826908173}\r\n--43d3b4e0c0aa9c28f4e77bdc5e03c470\r\nContent-Disposition:
       form-data; name=\"file\"; filename=\"\u65E5\u672C\u8A9E\u30C6\u30AD\u30B9\u30C8.txt\";
       filename*=utf-8''%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88.txt\r\nContent-Type:
       text/plain\r\n\r\n\u3053\u3093\u306B\u3061\u306F\u3001\u4E16\u754C\uFF01\n\r\n--43d3b4e0c0aa9c28f4e77bdc5e03c470--\r\n"
