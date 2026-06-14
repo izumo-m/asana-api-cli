@@ -29,7 +29,7 @@ def test_workspaces_get_workspace(workspace_gid: str) -> None:
         main, ["workspaces", "get-workspace", "--workspace", workspace_gid]
     )
     assert result.exit_code == 0, full_output(result)
-    ws = json.loads(full_output(result))
+    ws = json.loads(result.stdout)
     assert ws["resource_type"] == "workspace"
     # Returned gid round-trips to whatever we asked for.
     assert ws["gid"] == workspace_gid
@@ -50,7 +50,7 @@ def test_workspaces_get_workspaces(workspace_gid: str) -> None:
     """
     result = make_runner().invoke(main, ["workspaces", "get-workspaces"])
     assert result.exit_code == 0, full_output(result)
-    workspaces = json.loads(full_output(result))
+    workspaces = json.loads(result.stdout)
     assert isinstance(workspaces, list)
     for ws in workspaces:
         assert ws.get("resource_type") == "workspace"

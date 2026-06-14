@@ -11,6 +11,11 @@ synthetic in ``${GID:...}`` is what makes "all gids are masked" provable:
 ``test_no_bare_gids`` and ``test_every_16_digit_run_is_wrapped`` both go
 red the moment a future ``--record`` lets a raw gid through, instead of
 the leak hiding as a real-looking 16-digit number.
+
+``test_leak_scan_clean`` runs the shared ``_leakscan`` detectors — the
+same checks the record-time gate in ``conftest`` enforces — which also
+look one encoding layer deep (base64 / percent-encoding), so an
+identifier hidden inside e.g. a JWT pagination cursor cannot pass.
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from e2e import _leakscan
 from e2e import conftest as cf
 
 _CASSETTE_DIR = Path(__file__).parent / "cassettes"
@@ -98,6 +104,19 @@ def test_no_plaintext_pii(path: Path) -> None:
     emails = [e for e in _EMAIL_RE.findall(raw) if not e.lower().endswith(".invalid")]
     assert not emails, f"non-.invalid email in {path.name}: {emails[:3]}"
     assert not _SIGNED_URL_RE.search(raw), f"presigned asanausercontent URL (query) in {path.name}"
+
+
+@pytest.mark.parametrize("path", _CASSETTES, ids=_IDS)
+def test_leak_scan_clean(path: Path) -> None:
+    """The shared leak detectors find nothing in a committed cassette.
+
+    Same checks as the record-time gate, applied to what is actually in
+    the repo — catches a cassette that predates the gate or was edited
+    by hand.
+    """
+    doc = _load(path)
+    findings = _leakscan.scan_cassette(doc) + _leakscan.scan_headers(doc)
+    assert findings == [], f"leak scan findings in {path.name}:\n  " + "\n  ".join(findings[:10])
 
 
 def test_gid_wrap_unwrap_round_trip() -> None:

@@ -51,6 +51,8 @@ class TestDefaultMaskToken:
     def test_distinguishes_two_long_tokens(self) -> None:
         # The whole point of partial reveal: a user juggling two
         # accounts can tell which token a debug line refers to.
+        # Built by concatenation (never a single PAT-shaped literal) so the
+        # synthetic value does not trip GitHub push protection's scanner.
         t1 = "2/1200000000000001:" + "A" * 30 + "abc123"
         t2 = "2/1200000099999999:" + "B" * 30 + "xyz789"
         assert _default_mask_token(t1) != _default_mask_token(t2)
@@ -62,17 +64,19 @@ class TestDefaultMaskToken:
 
 
 class TestAuthHeaderRegex:
-    """``_AUTH_HEADER_RE`` captures the Authorization scheme prefix and
-    the opaque token value across raw and ``repr()`` forms.
+    """``_AUTH_HEADER_RE`` captures the Authorization scheme prefix (when
+    it is ``Bearer`` / ``Basic``) and the opaque value across raw and
+    ``repr()`` forms; a custom-scheme or bare value is captured whole.
 
-    The character class is intentionally not tied to any specific PAT
+    The value class is intentionally not tied to any specific PAT
     or OAuth shape — token formats are opaque and may change."""
 
     def test_captures_bearer_in_raw_text(self) -> None:
         m = _AUTH_HEADER_RE.search("Authorization: Bearer 2/123456/789:abcdef\r\nNext: ok\r\n")
         assert m is not None
-        assert m.group(1) == "Authorization: Bearer"
-        assert m.group(2) == "2/123456/789:abcdef"
+        assert m.group(1) == "Authorization: "
+        assert m.group(2) == "Bearer "
+        assert m.group(3) == "2/123456/789:abcdef"
 
     def test_captures_bearer_in_http_client_repr(self) -> None:
         # http.client's debug print emits ``repr(bytes)``, so the header
@@ -86,20 +90,44 @@ class TestAuthHeaderRegex:
         )
         m = _AUTH_HEADER_RE.search(raw)
         assert m is not None
-        assert m.group(2) == "2/abcdef:0123"
+        assert m.group(3) == "2/abcdef:0123"
 
     def test_captures_basic_auth(self) -> None:
         m = _AUTH_HEADER_RE.search("Authorization: Basic dXNlcjpwYXNz\r\n")
         assert m is not None
-        assert m.group(1) == "Authorization: Basic"
-        assert m.group(2) == "dXNlcjpwYXNz"
+        assert m.group(2) == "Basic "
+        assert m.group(3) == "dXNlcjpwYXNz"
+
+    def test_captures_proxy_authorization(self) -> None:
+        # Proxied requests (and the CONNECT tunnel chunk) carry the proxy
+        # credential under Proxy-Authorization — same masking contract.
+        m = _AUTH_HEADER_RE.search("Proxy-Authorization: Basic dXNlcjpwYXNz\r\n")
+        assert m is not None
+        assert m.group(1) == "Proxy-Authorization: "
+        assert m.group(2) == "Basic "
+        assert m.group(3) == "dXNlcjpwYXNz"
+
+    def test_captures_custom_scheme_value_whole(self) -> None:
+        # A non-Bearer/Basic scheme is part of the opaque value: no scheme
+        # group, the whole value (spaces included) is captured for masking.
+        m = _AUTH_HEADER_RE.search(r"Authorization: MyScheme abc def\r\nNext: x")
+        assert m is not None
+        assert m.group(2) is None
+        assert m.group(3) == "MyScheme abc def"
+
+    def test_captures_bare_token_whole(self) -> None:
+        # A scheme-less value (a raw token) is captured whole.
+        m = _AUTH_HEADER_RE.search(r"Authorization: rawtoken0123456789\r\nNext: x")
+        assert m is not None
+        assert m.group(2) is None
+        assert m.group(3) == "rawtoken0123456789"
 
     def test_captures_token_with_unusual_characters(self) -> None:
-        # The character class accepts any non-whitespace, non-backslash run.
+        # The value class accepts any non-backslash, non-CR/LF run.
         raw = r"Authorization: Bearer ~!@#$%^&*()_+{}|<>?,abc\r\nNext: x"
         m = _AUTH_HEADER_RE.search(raw)
         assert m is not None
-        assert m.group(2) == "~!@#$%^&*()_+{}|<>?,abc"
+        assert m.group(3) == "~!@#$%^&*()_+{}|<>?,abc"
 
     def test_no_match_for_bearer_word_in_payload(self) -> None:
         # The word "Bearer" alone in a payload must not trigger redaction.
@@ -200,6 +228,73 @@ class TestHttpClientAuthRedactor:
         assert "1234567890ABCDEFGH" not in joined
         # Partial reveal: only the last six characters survive.
         assert "...CDEFGH" in joined
+
+    def test_basic_credential_never_gets_partial_reveal(
+        self, _clean_http_client_print: None
+    ) -> None:
+        """A long Basic credential is fully redacted — base64 of
+        ``user:password``, so a last-6 reveal would expose password
+        characters. The partial reveal is reserved for Bearer / opaque
+        tokens."""
+        seen: list[tuple[Any, ...]] = []
+
+        def _capture(*args: Any, **kwargs: Any) -> None:
+            seen.append(args)
+
+        cred = "dXNlcjpodW5ic2VjcmV0cGFzc3dvcmQx"  # >= 16 chars
+        http.client.print = _capture  # pyright: ignore[reportAttributeAccessIssue]
+        with HttpClientAuthRedactor():
+            wrapper = http.client.__dict__["print"]
+            wrapper("send:", rf"b'GET / HTTP/1.1\r\nAuthorization: Basic {cred}\r\n'")
+        joined = " ".join(str(a) for a in seen[0])
+        assert cred not in joined
+        assert cred[-6:] not in joined  # no tail reveal either
+        assert "Authorization: Basic <REDACTED>" in joined
+
+    def test_redacts_proxy_authorization_in_connect_chunk(
+        self, _clean_http_client_print: None
+    ) -> None:
+        """The CONNECT tunnel-establishment chunk (``http.client._tunnel``
+        sends it through the same debug-printing ``send()``) is a
+        request-headers chunk too; a Proxy-Authorization credential in it
+        must be masked."""
+        seen: list[tuple[Any, ...]] = []
+
+        def _capture(*args: Any, **kwargs: Any) -> None:
+            seen.append(args)
+
+        http.client.print = _capture  # pyright: ignore[reportAttributeAccessIssue]
+        with HttpClientAuthRedactor():
+            wrapper = http.client.__dict__["print"]
+            wrapper(
+                "send:",
+                r"b'CONNECT app.asana.com:443 HTTP/1.0\r\n"
+                r"Proxy-Authorization: Basic dXNlcjpzZWNyZXRwYXNzMTIz\r\n\r\n'",
+            )
+        joined = " ".join(str(a) for a in seen[0])
+        assert "dXNlcjpzZWNyZXRwYXNzMTIz" not in joined
+        assert "Proxy-Authorization: Basic <REDACTED>" in joined
+
+    def test_redacts_scheme_less_authorization_value(self, _clean_http_client_print: None) -> None:
+        """A custom-scheme / bare Authorization value (e.g. injected via
+        ``--set-default-header``) is masked whole, and the neighboring
+        header survives."""
+        seen: list[tuple[Any, ...]] = []
+
+        def _capture(*args: Any, **kwargs: Any) -> None:
+            seen.append(args)
+
+        http.client.print = _capture  # pyright: ignore[reportAttributeAccessIssue]
+        with HttpClientAuthRedactor():
+            wrapper = http.client.__dict__["print"]
+            wrapper(
+                "send:",
+                r"b'GET / HTTP/1.1\r\nAuthorization: token-ABCDEFGHIJKLMNOP\r\nNext: x\r\n'",
+            )
+        joined = " ".join(str(a) for a in seen[0])
+        assert "token-ABCDEFGHIJKLMNOP" not in joined
+        assert "...KLMNOP" in joined
+        assert "Next: x" in joined
 
     def test_uninstall_noop_when_wrapped_by_another(self, _clean_http_client_print: None) -> None:
         """If another library wraps us after we installed, our

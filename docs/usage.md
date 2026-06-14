@@ -58,16 +58,16 @@ Client-wide; valid at any point in the command path.
 |---|---|
 | `--access-token TOKEN` | Bearer token. Default `$ASANA_ACCESS_TOKEN` — see [Authentication](#authentication) |
 | `--host URL` | API base URL (default `https://app.asana.com/api/1.0`) |
-| `--proxy URL` | HTTP/HTTPS proxy |
+| `--proxy URL` | HTTP/HTTPS proxy; credentials in the URL are **not** sent — see [Proxies](#proxies) |
 | `--connection-pool-maxsize N` | Max urllib3 connections cached per host (default cpu×5) |
 | `--verify-ssl` / `--no-verify-ssl` | Verify TLS certificates (default on; `--no-verify-ssl` is insecure) |
 | `--ssl-ca-cert FILE` | PEM bundle of trusted CA certs |
 | `--cert-file FILE` / `--key-file FILE` | Client certificate / private key for mTLS |
 | `--assert-hostname` / `--no-assert-hostname` | Verify the cert hostname; unspecified → urllib3 default |
 | `--user-agent VALUE` | Override the `User-Agent` header on every request — see [Debugging and headers](#debugging-and-headers) |
-| `--set-default-header NAME=VALUE` | Session-wide header, repeatable; **not** redacted — see [Debugging and headers](#debugging-and-headers) |
+| `--set-default-header NAME=VALUE` | Session-wide header, repeatable; only `Authorization` / `Proxy-Authorization` are redacted — see [Debugging and headers](#debugging-and-headers) |
 | `--retry-strategy VALUE` | Override urllib3 `Retry` fields (structured value) — see [Structured values](#structured-values) |
-| `--debug` | SDK HTTP debug to stdout/stderr, `Authorization` masked — see [Debugging and headers](#debugging-and-headers) |
+| `--debug` | SDK HTTP debug to stdout/stderr, `Authorization` / `Proxy-Authorization` masked — see [Debugging and headers](#debugging-and-headers) |
 | `--logger-format FMT` / `--logger-file PATH` | SDK logging format string / output file |
 | `--temp-folder-path DIR` | Directory for temporary downloads |
 | `--safe-chars-for-path-param CHARS` | Characters left unescaped in path parameters |
@@ -83,7 +83,7 @@ the command path.
 |---|---|
 | `--item-limit N` | Stop after N items have been collected — see [Pagination](#pagination) |
 | `--full-payload` | Return the raw single-page response dict instead of auto-paginating — see [Pagination](#pagination) |
-| `--header-params VALUE` | Extra HTTP headers for this call (structured value; **not** redacted) — see [Structured values](#structured-values) |
+| `--header-params VALUE` | Extra HTTP headers for this call (structured value; only `Authorization` / `Proxy-Authorization` are redacted) — see [Structured values](#structured-values) |
 | `--request-timeout SECONDS` | Per-request timeout; propagated to every page request |
 | `--output {json\|table\|csv\|text\|none}` | Success render format (default `json`) — see [Output formats](#output-formats) |
 | `--query EXPR` | `jq` filter over the success payload — see [Output formats](#output-formats) |
@@ -100,6 +100,7 @@ Extensions with no SDK counterpart (`(asana-api: extension)`).
 
 | Flag | Effect |
 |---|---|
+| `--generate-python` | Print equivalent python-asana code instead of running the call; valid at any point in the command path. No token, no network — see [Generating Python code](#generating-python-code) |
 | `--multibyte-filenames` | Upload commands only: preserve non-ASCII attachment names — see [File uploads](#file-uploads) |
 | `--all-items` *(deprecated)* | Paginatable commands only; no-op (walking every page is the default) — see [Deprecated aliases](#deprecated-aliases) |
 | `--page-size N` *(deprecated)* | Paginatable commands only; use `--limit N` — see [Deprecated aliases](#deprecated-aliases) |
@@ -112,15 +113,18 @@ These options control how a successful response is printed.
 | Option | Effect |
 |---|---|
 | `--output {json\|table\|csv\|text\|none}` | Render format. Default `json` (canonical, lossless). `none` suppresses the success payload — useful for side-effect-only calls (delete/update) where only the exit code matters |
-| `--query EXPR` | Filter the response through `jq`; each result is rendered per `--output`. Mirrors `aws --query` |
+| `--query EXPR` | Filter the response through `jq`; each result is rendered per `--output`. Plays the role of `aws --query`, but the expression language is jq, not JMESPath |
 | `--csv-bom` | Prepend a UTF-8 BOM to CSV output (for Excel on Windows). Off by default so Unix pipelines stay clean |
 
-Pair a non-JSON format with `--query '.data'` to unwrap the `{"data": [...]}`
-envelope into one row per item:
+Non-JSON formats render a list of dicts as one row per item. The default
+auto-paginating output is already a flat list, so it is directly rowable; under
+`--full-payload` (a single raw response dict) pair the format with
+`--query '.data'` to unwrap the `{"data": [...]}` envelope first:
 
 ```bash
-asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output table
-asana-api tasks get-tasks --project <PROJECT_GID> --query '.data' --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --output table
+asana-api tasks get-tasks --project <PROJECT_GID> --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --full-payload --query '.data' --output table
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # Side-effect-only call: only the exit code matters
@@ -129,6 +133,60 @@ asana-api tasks delete-task --task <TASK_GID> --output none
 
 `--query` runs and validates even under `--output none`, so a broken jq
 expression still surfaces (exit `2`) regardless of the chosen format.
+
+## Generating Python code
+
+`--generate-python` prints a standalone `python-asana` script equivalent to the
+command instead of running it. It is global (valid anywhere in the command
+path), makes no network call, and needs no token — so it is a quick way to turn
+a working CLI invocation into copy-pasteable SDK code.
+
+```bash
+asana-api --generate-python tasks get-tasks --workspace <WS> --opt-fields name
+asana-api tasks get-task --task <TASK_GID> --generate-python > fetch_task.py
+```
+
+The emitted script is self-contained — it never imports `asana_api_cli`, only
+`asana` and the standard library (plus `jq` when you use `--query` or
+`--exception-query`, `tabulate` when you use the `table` format for `--output`
+or `--exception-output`, and `urllib3` — already a `python-asana` dependency —
+when you use `--multibyte-filenames`). It reproduces:
+
+- **Configuration** — every global option you passed (`--host`, `--retry-strategy`,
+  `--user-agent`, …), applied to `asana.Configuration` / `ApiClient` exactly as
+  the CLI would.
+- **The call** — `api_instance.<method>(...)` with the same positional args,
+  `opts`, and per-call kwargs. A `--body` JSON literal is inlined as a Python
+  literal; a `--body @file` / `--body -` is emitted as code that reads the file
+  or stdin **when the generated script runs** (not at generation time), so the
+  script stays re-runnable against a different payload. Endpoints that
+  auto-paginate are wrapped in `list(...)`.
+- **Output** — the `--output` format, `--query` (adds an `import jq`), and
+  `--csv-bom` are written into the script, so running it prints what the command
+  would have printed.
+- **Errors** — `--exception-output` / `--exception-query` reproduce the error
+  envelope and exit `3`; under the default `none` the script lets exceptions
+  propagate.
+- **`--debug`** — emits the request/response trace with the `Authorization` /
+  `Proxy-Authorization` headers masked, the same as the CLI.
+- **`--multibyte-filenames`** — reproduces the RFC 5987 upload patch.
+
+The access token is read from `os.environ["ASANA_ACCESS_TOKEN"]` unless you pass
+a non-empty `--access-token`, which is embedded in **masked** form (`...` plus
+the last 6 characters; a value too short to be a real token — a dummy — stays
+verbatim, so the masked script fails with 401 instead of silently using a
+different credential). An `Authorization` / `Proxy-Authorization` header given
+via `--set-default-header` / `--header-params` and the password in a `--proxy`
+URL are masked the same way (a `Basic` credential entirely, with no tail
+reveal) — in the configuration lines and in the `# Equivalent to:` comment
+alike. Everything else (including other custom
+headers and the `--body` payload) is transcribed verbatim — see
+[SECURITY.md](../SECURITY.md). Input validation still runs
+during generation: a malformed `--body` literal or a missing required
+`--workspace` exits `2`, just as when executing.
+
+`asana-api --generate-python --version` emits a script that prints the version
+string (rather than printing it directly).
 
 ## Error handling
 
@@ -225,8 +283,8 @@ asana-api tasks get-tasks --project <PROJECT_GID> --offset <TOKEN>
 ### Deprecated aliases
 
 Retained as deprecation aliases; each emits a stderr warning and forwards to its
-v3 flag. Like the pagination flags they replace, they exist only on paginatable
-commands. Scheduled for removal in a future release.
+v3 flag. They exist only on paginatable commands. Scheduled for removal in a
+future release.
 
 | Deprecated | Replacement |
 |---|---|
@@ -264,9 +322,10 @@ pipe via process substitution instead: `--retry-strategy @<(echo '{"total":3}')`
 
 ## Debugging and headers
 
-`--debug` turns on the SDK's HTTP debug output, with the `Authorization` header
-masked. Mirroring the SDK, the wire trace (request/response headers) goes to
-stdout and the connection/response log to stderr:
+`--debug` turns on the SDK's HTTP debug output, with the `Authorization` and
+`Proxy-Authorization` headers masked. Mirroring the SDK, the wire trace
+(request/response headers) goes to stdout and the connection/response log to
+stderr:
 
 ```bash
 asana-api --debug tasks get-tasks --project <PROJECT_GID>
@@ -290,8 +349,60 @@ dedicated `--user-agent` wins.
 
 For a header set on both sides, the session-wide `--set-default-header` wins over a
 per-call `--header-params` of the same name (the SDK merges defaults on top).
-Like `--header-params`, these custom headers are **not** redacted in `--debug`
-output — see [SECURITY.md](../SECURITY.md).
+The `--debug` redactor masks the `Authorization` and `Proxy-Authorization`
+headers whatever their source or scheme (a `Bearer` / opaque value keeps its
+last 6 characters for distinguishability; a `Basic` credential is fully
+masked); custom headers under any **other** name are shown verbatim — see
+[SECURITY.md](../SECURITY.md).
+
+## Proxies
+
+`--proxy URL` routes every API request through an HTTP/HTTPS forward proxy
+(the SDK builds a urllib3 `ProxyManager` from the URL):
+
+```bash
+asana-api --proxy http://proxy.corp.test:3128 users get-user --user me
+```
+
+Mirroring the SDK, `--proxy` is the only way to configure a proxy — the
+`HTTP_PROXY` / `HTTPS_PROXY` environment variables are not read.
+
+### Credentials in the proxy URL are discarded
+
+As of `python-asana` 5.2.4 — the latest version checked —
+`--proxy http://user:pass@host:port` parses, but the credentials are **never
+sent**: the SDK stack (`python-asana` → urllib3) does not turn URL userinfo
+into a `Proxy-Authorization` header. urllib3's only built-in proxy-credential
+mechanism is its `proxy_headers` argument, which `python-asana` does not
+expose (there is no `Configuration.proxy_headers`). A later SDK that wires
+`proxy_headers` through would lift this limitation. Against a proxy that
+requires authentication, the call therefore fails with `407 Proxy
+Authentication Required` — a urllib3 `ProxyError` wrapped in
+`urllib3.exceptions.MaxRetryError` (for a plain-`http://` host, an
+`ApiException` with status 407) — handled like any other SDK error
+([Error handling](#error-handling)).
+
+What you can do instead, in order of preference:
+
+1. **Use a proxy endpoint that does not require credentials** — for
+   example one that allowlists your source address.
+2. **Run a local chaining proxy that holds the credential** and
+   authenticates to the upstream proxy for you (e.g. `cntlm` for NTLM
+   proxies, or `squid` with a `cache_peer ... login=user:password`
+   upstream), then point `--proxy` at the local, credential-free port.
+3. Only when your `--host` is plain `http://`: send the header yourself
+   with `--set-default-header "Proxy-Authorization=Basic <base64>"`. This
+   **cannot** work for the real (HTTPS) Asana API: with an HTTPS target the
+   proxy authenticates at the `CONNECT` tunnel step, and per-request
+   headers travel inside the TLS tunnel where the proxy never sees them.
+
+Even though the credentials are discarded, a `--proxy URL` containing them
+is still exposed to the local process list and your shell history — see
+[SECURITY.md](../SECURITY.md#secrets-on-the-command-line). In `--debug`
+output a `Proxy-Authorization` header is masked
+([Debugging and headers](#debugging-and-headers)), and in
+`--generate-python` output the proxy password is masked
+([Generating Python code](#generating-python-code)).
 
 ## Workspace resolution
 

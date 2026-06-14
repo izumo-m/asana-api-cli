@@ -1,12 +1,8 @@
-"""Click extensions: lazy subcommand loading and global-option propagation.
+"""Click extensions: global-option propagation across the command tree.
 
-Three concerns live here:
+Two concerns live here:
 
-1. ``LazyGroup`` — a ``click.Group`` that resolves subcommands on demand by
-   import path, so ``--help`` and tab completion do not need to import every
-   ``*Api`` module up front.
-
-2. ``GroupWithGlobalOptions`` / ``CommandWithGlobalOptions`` — accept the
+1. ``GroupWithGlobalOptions`` / ``CommandWithGlobalOptions`` — accept the
    global options (``--debug``, ``--access-token``, ...) — declared once in
    ``_global_option_sections`` and applied identically to the root group and
    every subcommand — at any level of the command tree, so
@@ -15,7 +11,7 @@ Three concerns live here:
    line are written to the shared ``runtime`` singleton; defaults are ignored
    so they cannot clobber values already set at a higher level.
 
-3. Both subclasses surface those options grouped by semantic category in
+2. Both subclasses surface those options grouped by semantic category in
    ``--help`` so they remain discoverable from any subcommand. On the root
    they render as top-level sections (``Authentication:``, ``Connection:``,
    ``TLS:`` ...); on subcommands the same sections nest under a single
@@ -25,7 +21,6 @@ Three concerns live here:
 
 from __future__ import annotations
 
-import importlib
 import textwrap
 from typing import Any
 
@@ -175,7 +170,8 @@ def _global_option_sections() -> list[tuple[str, list[click.Option]]]:
                     help=(
                         "Add an HTTP header sent on every request, given as NAME=VALUE; "
                         "repeatable. Unlike per-call --header-params it applies to all "
-                        "calls. Not redacted in --debug output — see SECURITY.md. "
+                        "calls. Only Authorization / Proxy-Authorization values are "
+                        "redacted in --debug output — see SECURITY.md. "
                         "(ApiClient: set_default_header)"
                     ),
                 ),
@@ -273,6 +269,21 @@ def _global_option_sections() -> list[tuple[str, list[click.Option]]]:
                     help=(
                         "Extra chars treated as safe when percent-encoding path "
                         "parameters. (Configuration: safe_chars_for_path_param)"
+                    ),
+                ),
+            ],
+        ),
+        (
+            "Code generation",
+            [
+                click.Option(
+                    ["--generate-python", "generate_python"],
+                    is_flag=True,
+                    default=False,
+                    help=(
+                        "Print standalone python-asana code equivalent to this "
+                        "command instead of running it. Makes no network call and "
+                        "needs no access token. (asana-api: extension)"
                     ),
                 ),
             ],
@@ -498,8 +509,10 @@ class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):
 class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):
     """A ``click.Group`` that also accepts the shared global options.
 
-    Children created via ``@group.command(...)`` default to
-    ``CommandWithGlobalOptions`` so they inherit the same behavior.
+    Used for the root group and every subgroup: the global flags come from
+    the single ``_global_option_sections`` source at every level, with no
+    separate root declaration. Children created via ``@group.command(...)``
+    default to ``CommandWithGlobalOptions`` so they inherit the same behavior.
     """
 
     command_class = CommandWithGlobalOptions
@@ -512,59 +525,3 @@ class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):
     def invoke(self, ctx: click.Context) -> Any:
         _consume_global_options(ctx)
         return super().invoke(ctx)
-
-
-class LazyGroup(GroupWithGlobalOptions):
-    """A ``GroupWithGlobalOptions`` that loads subcommand modules only when invoked.
-
-    ``lazy_subcommands`` maps a subcommand name to a ``(import_path, short_help)``
-    tuple. ``import_path`` is the standard ``"package.module:attr"`` form. The
-    ``short_help`` is shown in the parent's command listing without importing
-    the target module, which keeps top-level ``--help`` cheap.
-
-    Used as the root group. Global-option handling (the params append in
-    ``__init__`` and the ``_consume_global_options`` call in ``invoke``) is
-    inherited from ``GroupWithGlobalOptions``, so the root accepts and applies
-    the same global flags as every subcommand, all from the single
-    ``_global_option_sections`` source — there is no separate root declaration.
-    """
-
-    def __init__(
-        self,
-        *args: Any,
-        lazy_subcommands: dict[str, tuple[str, str]] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self.lazy_subcommands: dict[str, tuple[str, str]] = lazy_subcommands or {}
-
-    def list_commands(self, ctx: click.Context) -> list[str]:
-        return sorted({*self.commands, *self.lazy_subcommands})
-
-    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
-        if cmd_name in self.lazy_subcommands:
-            import_path, _ = self.lazy_subcommands[cmd_name]
-            modname, _, attr = import_path.partition(":")
-            if not attr:
-                raise ValueError(
-                    f"lazy_subcommands import path must be 'module:attr', got {import_path!r}"
-                )
-            module = importlib.import_module(modname)
-            return getattr(module, attr)
-        return super().get_command(ctx, cmd_name)
-
-    def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        rows: list[tuple[str, str]] = []
-        for name in self.list_commands(ctx):
-            if name in self.lazy_subcommands:
-                _, short_help = self.lazy_subcommands[name]
-            else:
-                cmd = self.commands.get(name)
-                if cmd is None:
-                    continue
-                short_help = cmd.get_short_help_str()
-            rows.append((name, short_help))
-
-        if rows:
-            with formatter.section("Commands"):
-                formatter.write_dl(rows)

@@ -47,6 +47,7 @@ import json
 import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -56,12 +57,12 @@ import click
 from asana_api_cli.click_ext import (
     CommandWithGlobalOptions,
     GroupWithGlobalOptions,
-    LazyGroup,
 )
 from asana_api_cli.formatter import formatted, formatter_flag_names, make_formatter_options
 from asana_api_cli.multibyte_filename import MultibyteFilenameSupport
 from asana_api_cli.session import (
     AsanaSession,
+    runtime,
 )
 from asana_api_cli.structured_arg import (
     click_callback,
@@ -397,6 +398,17 @@ def _parse_summary(doc: str) -> str:
     return ""
 
 
+def _parse_return_type(doc: str) -> str | None:
+    """Return the SDK ``:return:`` type token (e.g. ``TaskResponseArray``).
+
+    python-asana's codegen emits ``:return: <Type>`` on its own line. Returns
+    ``None`` when absent. Feeds :attr:`_Operation.returns_iterator`: a ``*Array``
+    type marks an array-response endpoint that yields a lazy iterator.
+    """
+    m = re.search(r"^\s*:return:\s*(\S+)", doc, re.MULTILINE)
+    return m.group(1) if m else None
+
+
 def _parse_params(doc: str) -> dict[str, _DocParam]:
     """Extract ``:param TYPE NAME: DESC`` entries from *doc*."""
     params: dict[str, _DocParam] = {}
@@ -460,7 +472,15 @@ def _click_type(py_type: str) -> type | None:
 
 
 class _Operation:
-    __slots__ = ("command_name", "has_opts", "method_name", "params", "positional", "summary")
+    __slots__ = (
+        "command_name",
+        "has_opts",
+        "method_name",
+        "params",
+        "positional",
+        "return_type",
+        "summary",
+    )
 
     def __init__(
         self,
@@ -470,6 +490,7 @@ class _Operation:
         positional: list[str],
         params: dict[str, _DocParam],
         has_opts: bool,
+        return_type: str | None,
     ) -> None:
         self.method_name = method_name
         self.command_name = command_name
@@ -477,6 +498,7 @@ class _Operation:
         self.positional = positional
         self.params = params
         self.has_opts = has_opts
+        self.return_type = return_type
 
     @property
     def has_body(self) -> bool:
@@ -520,6 +542,27 @@ class _Operation:
         only affects multipart uploads whose filename is non-ASCII.
         """
         return any(p.name == "file" for p in self.opts_params)
+
+    @property
+    def returns_iterator(self) -> bool:
+        """True iff the SDK method's response is an array.
+
+        Under the default flags (``return_page_iterator`` on, ``full_payload``
+        off) such a method returns a lazy ``PageIterator`` / ``EventIterator``,
+        which the CLI materializes with ``list(...)`` in
+        :func:`execute_call_plan`.
+
+        Detected from the docstring ``:return:`` type ending in ``Array`` (e.g.
+        ``TaskResponseArray``) — python-asana's codegen emits that exactly for
+        array-response endpoints. ``tests/test_sdk_boilerplate.py`` holds this in
+        lockstep with the ground-truth source signal (the ``PageIterator(`` /
+        ``EventIterator(`` construction in the ``*_with_http_info`` sibling), so
+        a future SDK that breaks the correspondence trips that guard.
+
+        Distinct from ``paginatable`` (which keys off a ``limit`` query param):
+        ``events`` returns an iterator yet declares no ``limit``.
+        """
+        return self.return_type is not None and self.return_type.endswith("Array")
 
     @property
     def workspace_positional(self) -> str | None:
@@ -581,6 +624,7 @@ def _extract_operation(method_name: str, fn: object) -> _Operation | None:
         positional=positional,
         params=_parse_params(doc),
         has_opts=has_opts,
+        return_type=_parse_return_type(doc),
     )
 
 
@@ -646,8 +690,9 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
             help=(
                 "Custom HTTP request headers merged into the request. VALUE: "
                 "'k1=v1,k2=v2,...', JSON object, or @path. Use cases include "
-                "Asana-Enable/-Disable deprecation opt-in. Not redacted in "
-                f"--debug output — see SECURITY.md. {_sdk_dest('kwargs', 'header_params')}"
+                "Asana-Enable/-Disable deprecation opt-in. Only Authorization / "
+                "Proxy-Authorization values are redacted in --debug output — see "
+                f"SECURITY.md. {_sdk_dest('kwargs', 'header_params')}"
             ),
         ),
         click.Option(
@@ -823,14 +868,209 @@ def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) ->
     return item_limit
 
 
-def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+def _multibyte_filenames_callback(ctx: click.Context, param: click.Parameter, value: bool) -> bool:
     """``--multibyte-filenames`` callback: install the RFC 5987 multipart patch
     for this command and uninstall it at context teardown. ``with_resource``
     enters the context manager now (install) and exits it when the command
     finishes (uninstall), so the patch is scoped to this one invocation.
+
+    Returns *value* so it reaches the callback's ``kwargs`` (the option is
+    ``expose_value=True``): ``build_call_plan`` records it on the ``CallPlan`` so
+    the ``--generate-python`` renderer can reproduce the patch. The live patch
+    installed here is harmless in generate mode, which makes no upload.
     """
     if value:
         ctx.with_resource(MultibyteFilenameSupport())
+    return value
+
+
+@dataclass
+class CallPlan:
+    """A fully collected SDK method invocation, independent of any session.
+
+    :func:`build_call_plan` produces it from the parsed CLI ``kwargs`` without
+    opening a session or needing a token; :func:`execute_call_plan` consumes it
+    to perform the call. The split is at the session boundary: everything that
+    needs no client — argument collection plus the session-free ``--body`` and
+    workspace resolution — happens in :func:`build_call_plan`, while the API
+    instantiation, the call itself, and lazy-iterator materialization (all of
+    which need the session's client) happen in :func:`execute_call_plan`. This
+    keeps the session — and the ``--debug`` redactor — scoped to the actual HTTP
+    work.
+
+    ``raw_body`` is the unresolved ``--body`` string (a ``@file`` path, ``-`` for
+    stdin, or a JSON literal); ``has_body`` distinguishes "no body positional"
+    from one that is present. Resolution (:func:`resolve_body` — reading the file
+    / stdin, parsing the JSON) is deferred to :func:`execute_call_plan` so the
+    generate path can emit per-form code (inline a literal, or read ``@file`` /
+    stdin at the generated script's run time) without reading anything itself.
+    ``api_cls`` is the class, not an instance — instantiation needs the session's
+    client and happens in :func:`execute_call_plan`.
+    """
+
+    api_cls: type
+    method_name: str
+    has_opts: bool
+    has_body: bool
+    raw_body: str | None
+    path_call_args: list[Any]
+    opts: dict[str, Any]
+    method_kwargs: dict[str, Any]
+    # Static prediction of whether the SDK returns a lazy iterator for this
+    # endpoint (``*Array`` response → ``PageIterator`` / ``EventIterator``). The
+    # generate path needs it to decide ``result = list(...)`` vs ``result = ...``
+    # without calling the SDK; ``execute_call_plan`` instead post-judges the live
+    # result via ``isinstance``. Gated further at render time by
+    # ``return_page_iterator`` / ``full_payload`` (see ``codegen``).
+    returns_iterator: bool
+    # Whether ``--multibyte-filenames`` was passed (upload commands only). The
+    # live RFC 5987 patch is installed by the option callback; the generate path
+    # reads this to inline the patch and wrap the call in its ``with`` block.
+    multibyte: bool
+
+
+def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> CallPlan:
+    """Collect everything needed to call ``op`` from the parsed ``kwargs``.
+
+    Session-free: needs no client and no token. The ``--body`` string is carried
+    unresolved (so the generate path never reads ``@file`` / stdin); only the
+    ``ASANA_DEFAULT_WORKSPACE`` env-var fallback for workspace is read here.
+    Consumes ``kwargs`` by popping each value, mirroring the original single-pass
+    collection.
+    """
+    # Common per-call kwargs (rendered as per-command options): pop into locals
+    # so they do not fall through into the opts dict.
+    item_limit = kwargs.pop("item_limit", None)
+    full_payload = kwargs.pop("full_payload", False)
+    header_params = kwargs.pop("header_params", None)
+    request_timeout = kwargs.pop("request_timeout", None)
+    # Upload-only extension (absent on other commands). The callback already
+    # installed the live patch; this is carried for the generate renderer.
+    multibyte = kwargs.pop("multibyte_filenames", False)
+
+    # Deprecated aliases (--all-items / --page-size / --max-items): warn and fold
+    # into their canonical replacements.
+    effective_item_limit = _apply_deprecated_aliases(kwargs, item_limit)
+
+    # Carry the raw ``--body`` string unresolved: ``execute_call_plan`` resolves
+    # it (reads ``@file`` / stdin, parses the JSON) at call time, and the generate
+    # renderer emits per-form code instead — neither reads it here. ``--body`` is
+    # click-required, so the pop always yields a value when ``has_body``.
+    raw_body = kwargs.pop("body") if op.has_body else None
+
+    # Workspace resolution is session-free (an explicit value or the
+    # ``ASANA_DEFAULT_WORKSPACE`` env-var fallback — no client, no token), so it
+    # belongs here. ``resolve_workspace(required=True)`` can still raise when a
+    # required workspace is omitted and the env var is unset.
+    if op.has_workspace:
+        resolved_workspace = resolve_workspace(
+            kwargs.pop("workspace", None), required=op.workspace_required
+        )
+    else:
+        resolved_workspace = None
+
+    # Non-workspace opts pop straight into the opts dict; the workspace opt is
+    # resolved separately (env-var fallback) and added after.
+    opts: dict[str, Any] = {}
+    for p in op.opts_params:
+        if _is_workspace_param(p.name):
+            continue
+        value = kwargs.pop(p.name, None)
+        if p.required or value is not None:
+            opts[p.name] = value
+    workspace_opt = op.workspace_opt
+    if workspace_opt is not None and resolved_workspace is not None:
+        opts[workspace_opt.name] = resolved_workspace
+
+    # Path positionals in function-signature order. Body is prepended in
+    # :func:`execute_call_plan` (it is always the first positional in python-asana).
+    path_call_args: list[Any] = []
+    for name in op.path_positionals:
+        if _is_workspace_param(name):
+            path_call_args.append(resolved_workspace)
+        else:
+            path_call_args.append(kwargs.pop(_option_name(name)))
+
+    # Forward the common per-call kwargs uniformly. The SDK accepts
+    # ``item_limit`` / ``full_payload`` / ``header_params`` / ``_request_timeout``
+    # on every method (its ``all_params``), so a method that does not act on a
+    # given kwarg simply ignores it. ``_request_timeout`` propagates to every
+    # page request through the SDK ``PageIterator``.
+    method_kwargs: dict[str, Any] = {}
+    if effective_item_limit is not None:
+        method_kwargs["item_limit"] = effective_item_limit
+    if full_payload:
+        method_kwargs["full_payload"] = True
+    if header_params is not None:
+        method_kwargs["header_params"] = header_params
+    if request_timeout is not None:
+        method_kwargs["_request_timeout"] = request_timeout
+
+    return CallPlan(
+        api_cls=api_cls,
+        method_name=op.method_name,
+        has_opts=op.has_opts,
+        has_body=op.has_body,
+        raw_body=raw_body,
+        path_call_args=path_call_args,
+        opts=opts,
+        method_kwargs=method_kwargs,
+        returns_iterator=op.returns_iterator,
+        multibyte=multibyte,
+    )
+
+
+def execute_call_plan(plan: CallPlan) -> Any:
+    """Execute a collected :class:`CallPlan` and return the SDK result.
+
+    Opens a session, builds the API instance, invokes the method, and
+    materializes a lazy iterator while the session — and the ``--debug``
+    redactor — are still active. Argument collection already happened in
+    :func:`build_call_plan`; the ``--body`` value is resolved here (reading
+    ``@file`` / stdin, parsing the JSON), session-free, before the session opens.
+    """
+    # Body is always the first positional in python-asana. ``has_body`` (not the
+    # resolved value) is the gate, so a body that parses to ``None`` (``--body
+    # null``) is still passed through. ``resolve_body`` reads ``@file`` / stdin
+    # and may raise ``click.BadParameter`` (exit 2) — before the session opens,
+    # so a bad body never reaches the token check.
+    if plan.has_body:
+        assert plan.raw_body is not None  # has_body ⟺ a required --body was given
+        call_args: list[Any] = [resolve_body(plan.raw_body), *plan.path_call_args]
+    else:
+        call_args = list(plan.path_call_args)
+
+    with AsanaSession.from_env() as session:
+        api = plan.api_cls(session.client)
+        method = getattr(api, plan.method_name)
+        # ``method_kwargs`` (the common per-call kwargs) is forwarded in both
+        # branches: methods without an ``opts`` parameter still accept the
+        # boilerplate ``**kwargs`` (their ``all_params``), so dropping them here
+        # would silently no-op --request-timeout / --header-params / --item-limit
+        # / --full-payload on every no-opts endpoint.
+        result = (
+            method(*call_args, plan.opts, **plan.method_kwargs)
+            if plan.has_opts
+            else method(*call_args, **plan.method_kwargs)
+        )
+        # Lazy iterator consumption inside the session context.
+        #
+        # Two independent layers:
+        #   - Layer A (session lifecycle): every SDK call runs inside
+        #     ``with AsanaSession.from_env() as session:``, which keeps the
+        #     ``HttpClientAuthRedactor`` installed when ``--debug`` is active.
+        #   - Layer B (this block): when the SDK returns a lazy iterator
+        #     (PageIterator / EventIterator), iterating it issues one HTTP
+        #     request per page. We must consume the iterator *before* leaving
+        #     Layer A's ``with`` block — otherwise pages 2..N are fetched after
+        #     the redactor is uninstalled and leak ``Authorization`` into the
+        #     ``--debug`` log.
+        #
+        # post-judge by return value type: any ``Iterator`` is consumed here
+        # regardless of which endpoint produced it.
+        if isinstance(result, collections.abc.Iterator):
+            result = list(result)
+        return result
 
 
 def _make_command(api_cls: type, op: _Operation) -> click.Command:
@@ -901,8 +1141,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # flag. Off by default to preserve strict SDK parity (the SDK emits
     # ``filename=`` only); see sdk-deviations.md.
     # Its callback installs the patch and scopes it to this command via
-    # ``ctx.with_resource``; ``expose_value=False`` keeps it out of
-    # ``inner_callback``'s ``**kwargs``.
+    # ``ctx.with_resource``; the value is forwarded through ``inner_callback``'s
+    # ``**kwargs`` so ``build_call_plan`` records it on the ``CallPlan`` for the
+    # ``--generate-python`` renderer.
     if does_upload:
         options.append(
             click.Option(
@@ -910,7 +1151,6 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
                 is_flag=True,
                 default=False,
                 callback=_multibyte_filenames_callback,
-                expose_value=False,
                 help=(
                     "Emit RFC 5987 filename*=UTF-8'' on this multipart upload. "
                     "Required when the --file name contains non-ASCII characters; "
@@ -951,104 +1191,16 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
         )
 
     def inner_callback(**kwargs: Any) -> Any:
-        # Common per-call kwargs (rendered as per-command options above): pop
-        # them into locals so they do not fall through into the opts dict, then
-        # forward to the SDK call below.
-        item_limit = kwargs.pop("item_limit", None)
-        full_payload = kwargs.pop("full_payload", False)
-        header_params = kwargs.pop("header_params", None)
-        request_timeout = kwargs.pop("request_timeout", None)
-
-        # Deprecated aliases (--all-items / --page-size / --max-items): warn and
-        # fold into their canonical replacements. Isolated in a helper so their
-        # eventual removal does not touch this hot-path closure.
-        effective_item_limit = _apply_deprecated_aliases(kwargs, item_limit)
-
-        if op.has_body:
-            body_value = kwargs.pop("body")  # click marks --body as required
-            parsed_body = resolve_body(body_value)
-        else:
-            parsed_body = None
-
-        if op.has_workspace:
-            workspace_value = kwargs.pop("workspace", None)
-            resolved_workspace = resolve_workspace(workspace_value, required=op.workspace_required)
-        else:
-            resolved_workspace = None
-
-        with AsanaSession.from_env() as session:
-            api = api_cls(session.client)
-
-            # Non-workspace opts pop straight into the opts dict; the workspace
-            # opt is resolved separately (env-var fallback) and added after.
-            opts: dict[str, Any] = {}
-            for p in op.opts_params:
-                if _is_workspace_param(p.name):
-                    continue
-                value = kwargs.pop(p.name, None)
-                if p.required or value is not None:
-                    opts[p.name] = value
-            workspace_opt = op.workspace_opt
-            if workspace_opt is not None and resolved_workspace is not None:
-                opts[workspace_opt.name] = resolved_workspace
-
-            # Build positional call args in function-signature order. Body is
-            # always the first positional in python-asana (e.g.
-            # ``add_followers_for_task(body, task_gid, opts)``).
-            call_args: list[Any] = []
-            if op.has_body:
-                call_args.append(parsed_body)
-            for name in op.path_positionals:
-                if _is_workspace_param(name):
-                    call_args.append(resolved_workspace)
-                else:
-                    call_args.append(kwargs.pop(_option_name(name)))
-
-            method = getattr(api, op.method_name)
-            # Forward the common per-call kwargs uniformly. The SDK accepts
-            # ``item_limit`` / ``full_payload`` / ``header_params`` /
-            # ``_request_timeout`` on every method (its ``all_params``), so we
-            # pass them without per-method gating; a method that does not act on
-            # a given kwarg simply ignores it. ``_request_timeout`` propagates
-            # to every page request through the SDK ``PageIterator``.
-            method_kwargs: dict[str, Any] = {}
-            if effective_item_limit is not None:
-                method_kwargs["item_limit"] = effective_item_limit
-            if full_payload:
-                method_kwargs["full_payload"] = True
-            if header_params is not None:
-                method_kwargs["header_params"] = header_params
-            if request_timeout is not None:
-                method_kwargs["_request_timeout"] = request_timeout
-            # ``method_kwargs`` (the common per-call kwargs) is forwarded in
-            # both branches: methods without an ``opts`` parameter still accept
-            # the boilerplate ``**kwargs`` (their ``all_params``), so dropping
-            # them here would silently no-op --request-timeout / --header-params
-            # / --item-limit / --full-payload on every no-opts endpoint.
-            result = (
-                method(*call_args, opts, **method_kwargs)
-                if op.has_opts
-                else method(*call_args, **method_kwargs)
-            )
-            # Lazy iterator consumption inside the session context.
-            #
-            # Two independent layers:
-            #   - Layer A (session lifecycle, above): every SDK call runs
-            #     inside ``with AsanaSession.from_env() as session:``, which
-            #     keeps the ``HttpClientAuthRedactor`` installed when ``--debug``
-            #     is active.
-            #   - Layer B (this block): when the SDK returns a lazy iterator
-            #     (PageIterator / EventIterator), iterating it issues one
-            #     HTTP request per page. We must consume the iterator *before*
-            #     leaving Layer A's ``with`` block — otherwise pages 2..N
-            #     are fetched after the redactor is uninstalled and leak
-            #     ``Authorization`` into ``--debug`` log.
-            #
-            # post-judge by return value type: any ``Iterator`` is consumed
-            # here regardless of which endpoint produced it.
-            if isinstance(result, collections.abc.Iterator):
-                result = list(result)
-            return result
+        # Collect the invocation (session-free), then either render or execute it.
+        # Splitting at the session boundary (``build_call_plan`` /
+        # ``execute_call_plan``) keeps the session — and the ``--debug`` redactor —
+        # scoped to the HTTP work. In ``--generate-python`` mode the collected
+        # plan is self-describing, so return it for ``formatted`` to render to
+        # code; no session is opened and no token is needed.
+        plan = build_call_plan(op, api_cls, kwargs)
+        if runtime.generate_python:
+            return plan
+        return execute_call_plan(plan)
 
     callback = formatted(inner_callback)
 
@@ -1125,15 +1277,48 @@ _ROOT_EPILOG = (
 )
 
 
-# Root group. ``LazyGroup`` is a ``GroupWithGlobalOptions``, so the root
-# appends and consumes the global Configuration / ApiClient flags from the
-# single ``_global_option_sections`` source in ``click_ext.py`` — exactly the
-# way every subgroup (``_ApiGroup``) and leaf command (``CommandWithGlobalOptions``)
-# does. There is no separate root-level declaration; the flags work at any level
-# of the tree, and ``--retry-strategy`` is gated on the SDK version in that one
-# source.
-@click.group(name="asana-api", cls=LazyGroup, epilog=_ROOT_EPILOG)
-@click.version_option(version_string(), prog_name="asana-api")
+def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """``--version`` callback: print the version (or, under ``--generate-python``,
+    generate code that prints it) and exit.
+
+    A lazy stand-in for ``click.version_option``: ``version_string()`` (three
+    ``importlib.metadata`` lookups) is evaluated only when ``--version`` is
+    actually passed, instead of at import time as
+    ``click.version_option(version_string(), ...)`` would force. The message
+    matches click's default ``%(prog)s, version %(version)s`` format; ``is_eager``
+    keeps the flag order-independent.
+
+    ``--version`` is eager and exits before global options are consumed, so
+    ``runtime.generate_python`` is not yet set here; ``--generate-python`` is
+    detected directly in ``sys.argv`` instead, which stays order-independent
+    (``--version --generate-python`` and the reverse both generate). C-15.
+    """
+    if not value or ctx.resilient_parsing:
+        return
+    if "--generate-python" in sys.argv:
+        from asana_api_cli.codegen import render_version
+
+        click.echo(render_version())
+    else:
+        click.echo(f"asana-api, version {version_string()}")
+    ctx.exit()
+
+
+# Root group. ``GroupWithGlobalOptions`` appends and consumes the global
+# Configuration / ApiClient flags from the single ``_global_option_sections``
+# source in ``click_ext.py`` — exactly the way every subgroup (``_ApiGroup``)
+# and leaf command (``CommandWithGlobalOptions``) does. There is no separate
+# root-level declaration; the flags work at any level of the tree, and
+# ``--retry-strategy`` is gated on the SDK version in that one source.
+@click.group(name="asana-api", cls=GroupWithGlobalOptions, epilog=_ROOT_EPILOG)
+@click.option(
+    "--version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_version_callback,
+    help="Show the version and exit.",
+)
 def main() -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
     # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
@@ -1146,8 +1331,7 @@ def main() -> None:
     #
     # The global flags are parsed into the root context and written to
     # ``runtime`` by ``GroupWithGlobalOptions.invoke`` → ``_consume_global_options``
-    # (inherited by ``LazyGroup``) before this callback runs, so there is nothing
-    # to apply here.
+    # before this callback runs, so there is nothing to apply here.
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]

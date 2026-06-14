@@ -673,6 +673,32 @@ class TestArgumentForwarding:
         # ``body`` (parsed JSON) is the first positional, opts is the second.
         assert mock.call_args_list[0].args[0] == {"data": {"name": "x"}}
 
+    def test_null_body_is_still_passed_first(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--body null`` parses to ``None`` but must still be passed as the
+        first positional: ``execute_call_plan`` gates on ``has_body``, not the
+        resolved value, so a refactor to ``if body is not None`` would silently
+        drop a null body."""
+        cmd = _build_command("TasksApi", "create_task")
+        mock = _patch(monkeypatch, "TasksApi", "create_task", return_value={"data": {}})
+        result = make_runner().invoke(cmd, ["--body", "null"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[0] is None
+
+    def test_bad_body_exits_2_before_token_check(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """C-9: in execute mode a malformed ``--body`` exits 2 (input error)
+        *before* ``AsanaSession.from_env`` runs the token check — ``resolve_body``
+        runs before the ``with`` block in ``execute_call_plan``, so input errors
+        surface regardless of auth state."""
+        cmd = _build_command("TasksApi", "create_task")
+        mock = _patch(monkeypatch, "TasksApi", "create_task", return_value={"data": {}})
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        runtime.access_token = ""  # restored by the autouse _isolated_runtime fixture
+        result = make_runner().invoke(cmd, ["--body", "{not valid json"])
+        assert result.exit_code == 2, full_output(result)
+        # The body error (not the token error) surfaces -> body resolved first.
+        assert "invalid JSON" in full_output(result)
+        assert mock.call_count == 0
+
     def test_arbitrary_opt_param_reaches_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         mock = _patch(monkeypatch, "TasksApi", "get_task", return_value={"data": {}})

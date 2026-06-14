@@ -25,7 +25,8 @@ tests/
 ├── test_*.py                   # Per-module unit tests (formatter, session, ...)
 ├── e2e/                        # Real-API tests (opt-in); see tests/e2e/README.md
 └── fixtures/
-    └── cli_surface.json        # Canonical CLI surface for the bundled SDK
+    ├── cli_surface.json        # Canonical CLI surface for the bundled SDK
+    └── generate_python/        # Golden snapshots for --generate-python output
 
 tools/
 ├── e2e_init.py                 # One-time fixture provisioner for tests/e2e/

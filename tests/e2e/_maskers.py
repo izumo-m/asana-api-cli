@@ -44,7 +44,7 @@ def _decode(value: Any) -> str | None:
 
 
 def mask_users_in_batch_subresponses(cassette_dict: Any) -> None:
-    """Replace ``user.name`` in ``/batch`` sub-responses for ``/users/*`` actions.
+    """Replace ``user.name`` in ``/batch`` sub-responses for user-endpoint actions.
 
     The batch endpoint mirrors each sub-action's response under
     ``data[i].body.data``. When the action's ``options.fields`` omits
@@ -54,8 +54,10 @@ def mask_users_in_batch_subresponses(cassette_dict: Any) -> None:
     name then leaks into the cassette.
 
     This masker keys off the *request* (``actions[i].relative_path``
-    starting with ``/users/``) instead of the response shape, so it
-    works regardless of which fields were requested. Iteration is
+    targeting ``/users`` — bare, with a query string, or a subpath like
+    ``/users/me``) instead of the response shape, so it works regardless
+    of which fields were requested. Both single-user (dict) and
+    collection (list) sub-response bodies are handled. Iteration is
     zipped index-wise: a sub-response at position ``i`` belongs to the
     action at position ``i``, per Asana's documented contract.
     """
@@ -95,12 +97,15 @@ def mask_users_in_batch_subresponses(cassette_dict: Any) -> None:
         for action, sub in zip(actions, sub_results, strict=False):
             if not (isinstance(action, dict) and isinstance(sub, dict)):
                 continue
-            if not str(action.get("relative_path", "")).startswith("/users/"):
+            path = str(action.get("relative_path", ""))
+            if not (path == "/users" or path.startswith(("/users/", "/users?"))):
                 continue
             sub_data = (sub.get("body") or {}).get("data")
-            if isinstance(sub_data, dict) and "name" in sub_data:
-                sub_data["name"] = name_bind
-                modified = True
+            entries = sub_data if isinstance(sub_data, list) else [sub_data]
+            for entry in entries:
+                if isinstance(entry, dict) and "name" in entry:
+                    entry["name"] = name_bind
+                    modified = True
 
         if not modified:
             continue

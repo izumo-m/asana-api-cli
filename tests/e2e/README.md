@@ -96,12 +96,24 @@ uv run pytest --live --record tests/e2e/<file>::<test>
 
 Re-recording hits the real Asana API and writes the response straight
 into the cassette file. The masking layer covers the common cases,
-but a new field or shape can slip through silently.
+but a new field or shape can slip through silently. Two automated gates
+back it up, both built on the shared detectors in `_leakscan.py`:
 
-`test_cassette_hygiene.py` runs on every `pytest` (no network) and fails
-if a bare gid, an un-redacted `Authorization`, a non-`.invalid` email, or
-a presigned-URL query string survives into a committed cassette — so a
-plain `uv run pytest tests/e2e/test_cassette_hygiene.py` is the first gate.
+- **Record-time gate** — `_templated_yaml_serialize` scans the fully
+  masked cassette *before* writing it; on any finding the write fails
+  with the finding list instead of producing a dirty file. It also
+  verifies that none of the recording environment's live values (the
+  access token, the real workspace gid, fixture-discovered gids)
+  survived masking.
+- **Committed-cassette scan** — `test_cassette_hygiene.py` runs on every
+  `pytest` (no network) and fails if a bare gid, an un-redacted
+  `Authorization`, a non-`.invalid` email, a presigned-URL query string,
+  a credential-shaped value, a cookie header, or an unreviewed request
+  header survives into a committed cassette. The scan also looks one
+  encoding layer down — base64 blobs are decoded and re-scanned, URI
+  percent-encoding is unquoted — so an identifier hidden inside e.g. a
+  JWT pagination cursor cannot pass. A plain
+  `uv run pytest tests/e2e/test_cassette_hygiene.py` is the first gate.
 
 **It still pays to eyeball `git diff tests/e2e/cassettes/` after every
 `--record`** and confirm none of the following from your account survived
@@ -214,6 +226,12 @@ in `conftest.py`):
   vcrpy's request-matching invariant (same real token always hashes to
   the same synthetic, so a test can extract the token from a response
   and send it back in the next request unmodified).
+- Pagination `offset` cursors (HS256 JWTs, `eyJ...`) in request URLs and
+  response bodies are replaced whole with a digit-free synthetic
+  (`masked-jwt-<hash>`). The cursor's base64 payload carries real task /
+  project gids that the plain-text gid pass cannot see, so no part of
+  the token survives. Same cursor → same synthetic, so the
+  response-to-next-request echo keeps matching at replay.
 
 ### Layer 2 — `resource_type`-aware response hook
 
