@@ -342,11 +342,21 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
     option declarations and the dataclass fields are authored together, and the
     inventory tests in ``test_click_ext.py`` (``TestGlobalOptionNamesInventory``)
     pin the ``GLOBAL_OPTION_NAMES`` set against ``_Runtime``'s fields — so a
-    direct ``setattr`` suffices. Every option, ``access_token`` included,
-    follows the same last-wins rule: the command-line value from the deepest
-    level reached overwrites whatever an earlier level wrote. An explicit empty
-    ``--access-token`` therefore clears a value set earlier, and
+    direct ``setattr`` suffices. Every *scalar* option, ``access_token``
+    included, follows the same last-wins rule: the command-line value from the
+    deepest level reached overwrites whatever an earlier level wrote. An
+    explicit empty ``--access-token`` therefore clears a value set earlier, and
     ``AsanaSession.from_env`` then falls back to ``$ASANA_ACCESS_TOKEN``.
+
+    ``default_headers`` is the one exception, because ``--set-default-header`` is
+    the only repeatable (accumulative) global: ``multiple=True`` already merges
+    every occurrence *at one level* into a single dict, so to honor "the later
+    occurrence wins when repeated" (``usage.md``) across levels too, values from
+    different levels are merged per-header rather than replaced wholesale. A
+    header set on the root group thus survives another ``--set-default-header``
+    given at the leaf, and a deeper level's value wins on a key collision. The
+    callback (:func:`structured_arg.default_header_callback`) yields ``None``
+    when the flag is absent, so only non-empty dicts ever reach this branch.
 
     The caller, :func:`_consume_global_options`, only ever passes names drawn
     from ``GLOBAL_OPTION_NAMES`` and only when the parameter source is
@@ -356,6 +366,9 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
     tri-state toggles' (``verify_ssl`` / ``assert_hostname`` /
     ``return_page_iterator``) ``None`` default never reaches here.
     """
+    if name == "default_headers":
+        runtime.default_headers = {**(runtime.default_headers or {}), **value}
+        return
     setattr(runtime, name, value)
 
 

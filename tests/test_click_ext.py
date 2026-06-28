@@ -68,6 +68,35 @@ def _build_cli() -> click.Group:
     return root
 
 
+def _build_cli_echoing_default_headers() -> click.Group:
+    """A 3-level CLI (root → sub → leaf) like :func:`_build_cli` whose leaf echoes
+    the accumulated ``runtime.default_headers``.
+
+    Used to drive the *real* ``--set-default-header`` global through Click
+    parsing at more than one level, so ``_consume_global_options`` and
+    ``_apply_global_to_runtime`` are exercised end-to-end (not called by hand)
+    and the test stays pinned to the option's actual dest.
+    """
+
+    @click.group(cls=GroupWithGlobalOptions)
+    def root() -> None:
+        pass
+
+    @root.group("sub", cls=GroupWithGlobalOptions)
+    def sub() -> None:
+        pass
+
+    @sub.command("act")
+    def act() -> None:
+        h = runtime.default_headers
+        if h is None:
+            click.echo("HEADERS=NONE")
+        else:
+            click.echo("HEADERS=" + "|".join(f"{k}={v}" for k, v in sorted(h.items())))
+
+    return root
+
+
 class TestGlobalOptionsAtAnyLevel:
     def test_debug_on_leaf_command(self) -> None:
         result = make_runner().invoke(_build_cli(), ["tasks", "act", "--debug"])
@@ -225,10 +254,12 @@ class TestGlobalOptionNamesInventory:
 
         # Reverse direction: every global option name must be an actual
         # ``_Runtime`` field. ``_apply_global_to_runtime`` applies values with a
-        # bare ``setattr(runtime, name, value)``; ``_Runtime`` is neither frozen
-        # nor slotted, so a name without a matching field would silently create
-        # a stray attribute (a no-op option) rather than erroring. Pinning the
-        # 1:1 here is what lets that ``setattr`` skip name validation.
+        # bare ``setattr(runtime, name, value)`` (``default_headers`` is the one
+        # exception: it merges into the existing dict, but still writes that same
+        # field); ``_Runtime`` is neither frozen nor slotted, so a name without a
+        # matching field would silently create a stray attribute (a no-op option)
+        # rather than erroring. Pinning the 1:1 here is what lets that ``setattr``
+        # skip name validation.
         runtime_fields = frozenset(f.name for f in dataclasses.fields(_Runtime))
         for name in GLOBAL_OPTION_NAMES:
             assert name in runtime_fields, (
@@ -325,6 +356,58 @@ class TestGlobalOptionsSingleSource:
             for name in set(root_sigs) | set(leaf_sigs)
             if root_sigs.get(name) != leaf_sigs.get(name)
         )
+
+
+class TestDefaultHeadersMergeAcrossLevels:
+    """``--set-default-header`` is the only repeatable (accumulative) global, so
+    unlike the scalar globals — which are last-wins, see
+    ``TestGlobalOptionsAtAnyLevel.test_leaf_overrides_root`` — headers given at
+    different points in the command path must *merge* per-header rather than the
+    inner level's dict replacing the outer one wholesale.
+
+    Driven through a real ``GroupWithGlobalOptions`` tree, so Click parsing,
+    ``_consume_global_options`` and ``_apply_global_to_runtime`` all run end to
+    end and the assertions track the option's real dest."""
+
+    def test_headers_from_different_levels_merge(self) -> None:
+        result = make_runner().invoke(
+            _build_cli_echoing_default_headers(),
+            [
+                "--set-default-header",
+                "X-Root=root",
+                "--set-default-header",
+                "X-Shared=root",
+                "sub",
+                "act",
+                "--set-default-header",
+                "X-Leaf=leaf",
+                "--set-default-header",
+                "X-Shared=leaf",
+            ],
+        )
+        assert result.exit_code == 0, full_output(result)
+        # X-Root (outer) survives; the X-Shared collision resolves to the deeper
+        # (leaf) value; keys are echoed sorted.
+        assert "HEADERS=X-Leaf=leaf|X-Root=root|X-Shared=leaf" in full_output(result)
+
+    def test_outer_header_not_clobbered_when_inner_omits_flag(self) -> None:
+        """A header set at an outer level must persist when an inner level is
+        reached without its own ``--set-default-header`` (the inner level's
+        DEFAULT-sourced empty value is skipped, so nothing overwrites it)."""
+        result = make_runner().invoke(
+            _build_cli_echoing_default_headers(),
+            ["--set-default-header", "X-Root=root", "sub", "act"],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert "HEADERS=X-Root=root" in full_output(result)
+
+    def test_no_header_flag_leaves_runtime_unset(self) -> None:
+        """With the flag absent everywhere, the merge branch is never entered:
+        ``runtime.default_headers`` stays at its ``None`` unset sentinel rather
+        than becoming a stray empty dict."""
+        result = make_runner().invoke(_build_cli_echoing_default_headers(), ["sub", "act"])
+        assert result.exit_code == 0, full_output(result)
+        assert "HEADERS=NONE" in full_output(result)
 
 
 def _bash_complete(cmd: click.Command, args: list[str]) -> list[str]:

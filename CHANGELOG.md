@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The command tree is built by introspecting the installed SDK, so these appear
   automatically when `python-asana >= 5.2.5` is installed.
 
+### Fixed
+
+- **`--set-default-header` given at more than one point in the command path no
+  longer drops the earlier headers.** A header set before the command path (for
+  example on the root) is now merged with one set after it, per header, with the
+  later occurrence winning on a name collision — the same "the later occurrence
+  wins when repeated" rule the other global options follow. Previously a second
+  `--set-default-header` at a different level replaced the whole set, silently
+  discarding the first.
+
 ## [3.2.0] - 2026-06-14
 
 ### Added
