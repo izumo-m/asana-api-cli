@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`agents` and `ooo-entries` command groups**, picked up from the
+  `python-asana` 5.2.5 release. `agents` reads a workspace's AI agents (Asana's
+  AI Teammates): `get-agent`, `get-agents-for-workspace`. `ooo-entries` is full
+  CRUD over a user's out-of-office entries: `create-ooo-entry`,
+  `get-ooo-entries`, `get-ooo-entry`, `update-ooo-entry`, `delete-ooo-entry`.
+  The command tree is built by introspecting the installed SDK, so these appear
+  automatically when `python-asana >= 5.2.5` is installed.
+
 ## [3.2.0] - 2026-06-14
 
 ### Added

@@ -38,13 +38,29 @@ tools/
 
 The CLI surface snapshot test (see
 [`architecture.md`](architecture.md#surface-snapshot-guardrail)) catches
-group/command/option churn introduced by an SDK bump. Procedure:
+group/command/option churn introduced by an SDK bump. The `dependencies` lower
+bound in `pyproject.toml` is kept wide (`asana>=5.0.2,<6`) — the CLI adapts to
+whatever SDK is installed — so a bump tracks the *snapshot*, not the floor.
+Procedure:
 
-1. Edit `dependencies` in `pyproject.toml` to raise the lower bound.
-2. `uv sync` to install the new SDK.
-3. `uv run pytest` — failures in `test_cli_surface.py` print the diff.
+1. `uv sync --upgrade-package asana` to relock and install the new SDK
+   (`uv.lock` moves; `pyproject.toml` stays).
+2. Bump `_SNAPSHOT_ASANA_VERSION` to the new version in **both**
+   `tests/test_cli_surface.py` and `tests/test_generate_python_snapshots.py` —
+   otherwise those snapshot guards silently *skip* on the new version instead
+   of checking it.
+3. `uv run pytest` — failures in `test_cli_surface.py` /
+   `test_generate_python_snapshots.py` print the diff.
 4. Review the diff; describe user-visible changes in `CHANGELOG.md`.
-5. Regenerate the fixture (exact command in `tests/test_cli_surface.py`'s module docstring).
+5. Regenerate the fixtures (exact command in each test's module docstring):
+   - `tests/fixtures/cli_surface.json` — the CLI surface. Besides commands and
+     options it pins each command's `paginatable` / `returns_iterator` /
+     `does_upload` classification, so a new array-response or upload endpoint
+     surfaces here as a fixture diff — there is no separate hand-maintained set.
+     (`tests/test_sdk_boilerplate.py` independently proves those two classifiers
+     still match the SDK source on the installed version.)
+   - `tests/fixtures/generate_python/*.py` via
+     `UPDATE_GENERATE_SNAPSHOTS=1 uv run pytest tests/test_generate_python_snapshots.py`.
 6. Verify Asana auth is still Bearer-token-only — confirm the new SDK still
    wires up only the token scheme:
 
@@ -76,7 +92,10 @@ group/command/option churn introduced by an SDK bump. Procedure:
      [developers.asana.com/llms.txt](https://developers.asana.com/llms.txt)
      (an AI-friendly Markdown index of the reference) and/or the
      individual `/reference/<group>.md` pages.
-8. Commit `pyproject.toml`, `uv.lock`, `tests/fixtures/cli_surface.json`, and `CHANGELOG.md` together.
+8. Commit `uv.lock`, the two `_SNAPSHOT_ASANA_VERSION` bumps, the regenerated
+   fixtures (`tests/fixtures/cli_surface.json` and any `generate_python/*`
+   snapshots), and `CHANGELOG.md` together (plus any group-description edits
+   from step 7).
 
 ## Trying shell completion locally
 

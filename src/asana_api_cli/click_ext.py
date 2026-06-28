@@ -45,7 +45,7 @@ from asana_api_cli.structured_arg import (
 # code path is naturally dead when the flag is hidden. We instantiate
 # ``Configuration()`` because ``retry_strategy`` is an instance attribute
 # set in ``__init__`` — checking ``hasattr`` on the class itself returns
-# False even on 5.2.4.
+# False even on 5.2.5.
 _SDK_HAS_RETRY_STRATEGY: bool = hasattr(asana.Configuration(), "retry_strategy")
 
 

@@ -224,6 +224,7 @@ def _humanize_class_name(name: str) -> str:
 # a release blocker.
 _GROUP_DESCRIPTIONS: dict[str, str] = {
     "AccessRequests": "Manage private-object access requests",
+    "Agents": "Read workspace AI agents (AI Teammates)",
     "Allocations": "Manage user allocations across projects",
     "Attachments": "Upload, list, and remove file attachments",
     "AuditLogAPI": "Read domain audit log events",
@@ -238,6 +239,7 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "Goals": "Manage organizational goals and metrics",
     "Jobs": "Check status of async background jobs",
     "Memberships": "Manage memberships across object types",
+    "OooEntries": "Manage out-of-office (OOO) entries",
     "OrganizationExports": "Trigger and download org-wide exports",
     "PortfolioMemberships": "Read who has access to portfolios",
     "Portfolios": "Manage portfolios (project collections)",
@@ -1383,6 +1385,16 @@ def introspect_to_manifest() -> dict[str, Any]:
                     "positional": list(op.positional),
                     "has_opts": op.has_opts,
                     "paginatable": op.paginatable,
+                    # ``returns_iterator`` (array response → lazy iterator) and
+                    # ``does_upload`` (multipart file upload) pin the two runtime
+                    # classifiers that gate pagination materialization and the
+                    # ``--multibyte-filenames`` flag. Captured here so an SDK bump
+                    # that adds/removes such an endpoint surfaces in this fixture's
+                    # diff (the regen step), instead of in a hand-maintained set.
+                    # ``test_sdk_boilerplate.py`` still proves each classifier
+                    # matches the SDK source on the installed version.
+                    "returns_iterator": op.returns_iterator,
+                    "does_upload": op.does_upload,
                     "params": [
                         {
                             "name": p.name,

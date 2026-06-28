@@ -5,26 +5,31 @@
       "commands": [
         {
           "command": "approve-access-request",
+          "does_upload": false,
           "has_opts": false,
           "method": "approve_access_request",
           "paginatable": false,
           "params": [],
           "positional": [
             "access_request_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-access-request",
+          "does_upload": false,
           "has_opts": false,
           "method": "create_access_request",
           "paginatable": false,
           "params": [],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-access-requests",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_access_requests",
           "paginatable": false,
@@ -42,26 +47,82 @@
           ],
           "positional": [
             "target"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "reject-access-request",
+          "does_upload": false,
           "has_opts": false,
           "method": "reject_access_request",
           "paginatable": false,
           "params": [],
           "positional": [
             "access_request_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "access-requests"
+    },
+    {
+      "class_name": "AgentsApi",
+      "commands": [
+        {
+          "command": "get-agent",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_agent",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "agent_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "command": "get-agents-for-workspace",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_agents_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ],
+          "returns_iterator": true
+        }
+      ],
+      "group": "agents"
     },
     {
       "class_name": "AllocationsApi",
       "commands": [
         {
           "command": "create-allocation",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_allocation",
           "paginatable": false,
@@ -74,20 +135,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-allocation",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_allocation",
           "paginatable": false,
           "params": [],
           "positional": [
             "allocation_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-allocation",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_allocation",
           "paginatable": false,
@@ -100,10 +165,12 @@
           ],
           "positional": [
             "allocation_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-allocations",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_allocations",
           "paginatable": true,
@@ -139,10 +206,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "update-allocation",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_allocation",
           "paginatable": false,
@@ -156,7 +225,8 @@
           "positional": [
             "body",
             "allocation_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "allocations"
@@ -166,6 +236,7 @@
       "commands": [
         {
           "command": "create-attachment-for-object",
+          "does_upload": true,
           "has_opts": true,
           "method": "create_attachment_for_object",
           "paginatable": false,
@@ -206,20 +277,24 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": false
         },
         {
           "command": "delete-attachment",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_attachment",
           "paginatable": false,
           "params": [],
           "positional": [
             "attachment_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-attachment",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_attachment",
           "paginatable": false,
@@ -232,10 +307,12 @@
           ],
           "positional": [
             "attachment_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-attachments-for-object",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_attachments_for_object",
           "paginatable": true,
@@ -258,7 +335,8 @@
           ],
           "positional": [
             "parent"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "attachments"
@@ -268,6 +346,7 @@
       "commands": [
         {
           "command": "get-audit-log-events",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_audit_log_events",
           "paginatable": true,
@@ -315,7 +394,8 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "audit-log-api"
@@ -325,6 +405,7 @@
       "commands": [
         {
           "command": "create-batch-request",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_batch_request",
           "paginatable": false,
@@ -337,7 +418,8 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "batch-api"
@@ -347,26 +429,31 @@
       "commands": [
         {
           "command": "create-budget",
+          "does_upload": false,
           "has_opts": false,
           "method": "create_budget",
           "paginatable": false,
           "params": [],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-budget",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_budget",
           "paginatable": false,
           "params": [],
           "positional": [
             "budget_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-budget",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_budget",
           "paginatable": false,
@@ -379,20 +466,24 @@
           ],
           "positional": [
             "budget_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-budgets",
+          "does_upload": false,
           "has_opts": false,
           "method": "get_budgets",
           "paginatable": false,
           "params": [],
           "positional": [
             "parent"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-budget",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_budget",
           "paginatable": false,
@@ -406,7 +497,8 @@
           "positional": [
             "body",
             "budget_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "budgets"
@@ -416,6 +508,7 @@
       "commands": [
         {
           "command": "get-custom-field-settings-for-goal",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_field_settings_for_goal",
           "paginatable": true,
@@ -438,10 +531,12 @@
           ],
           "positional": [
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-custom-field-settings-for-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_field_settings_for_portfolio",
           "paginatable": true,
@@ -464,10 +559,12 @@
           ],
           "positional": [
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-custom-field-settings-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_field_settings_for_project",
           "paginatable": true,
@@ -490,10 +587,12 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-custom-field-settings-for-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_field_settings_for_team",
           "paginatable": false,
@@ -506,7 +605,8 @@
           ],
           "positional": [
             "team_gid"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "custom-field-settings"
@@ -516,6 +616,7 @@
       "commands": [
         {
           "command": "create-custom-field",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_custom_field",
           "paginatable": false,
@@ -528,10 +629,12 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-enum-option-for-custom-field",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_enum_option_for_custom_field",
           "paginatable": false,
@@ -544,20 +647,24 @@
           ],
           "positional": [
             "custom_field_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-custom-field",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_custom_field",
           "paginatable": false,
           "params": [],
           "positional": [
             "custom_field_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-custom-field",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_field",
           "paginatable": false,
@@ -570,10 +677,12 @@
           ],
           "positional": [
             "custom_field_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-custom-fields-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_fields_for_workspace",
           "paginatable": true,
@@ -596,10 +705,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "insert-enum-option-for-custom-field",
+          "does_upload": false,
           "has_opts": true,
           "method": "insert_enum_option_for_custom_field",
           "paginatable": false,
@@ -612,10 +723,12 @@
           ],
           "positional": [
             "custom_field_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-custom-field",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_custom_field",
           "paginatable": false,
@@ -628,10 +741,12 @@
           ],
           "positional": [
             "custom_field_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-enum-option",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_enum_option",
           "paginatable": false,
@@ -644,7 +759,8 @@
           ],
           "positional": [
             "enum_option_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "custom-fields"
@@ -654,6 +770,7 @@
       "commands": [
         {
           "command": "get-custom-type",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_type",
           "paginatable": false,
@@ -666,10 +783,12 @@
           ],
           "positional": [
             "custom_type_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-custom-types",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_custom_types",
           "paginatable": true,
@@ -692,7 +811,8 @@
           ],
           "positional": [
             "project"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "custom-types"
@@ -702,6 +822,7 @@
       "commands": [
         {
           "command": "get-events",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_events",
           "paginatable": false,
@@ -719,7 +840,8 @@
           ],
           "positional": [
             "resource"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "events"
@@ -729,23 +851,27 @@
       "commands": [
         {
           "command": "create-graph-export",
+          "does_upload": false,
           "has_opts": false,
           "method": "create_graph_export",
           "paginatable": false,
           "params": [],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-resource-export",
+          "does_upload": false,
           "has_opts": false,
           "method": "create_resource_export",
           "paginatable": false,
           "params": [],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "exports"
@@ -755,6 +881,7 @@
       "commands": [
         {
           "command": "add-supporting-relationship",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_supporting_relationship",
           "paginatable": false,
@@ -768,10 +895,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-goal-relationship",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_goal_relationship",
           "paginatable": false,
@@ -784,10 +913,12 @@
           ],
           "positional": [
             "goal_relationship_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-goal-relationships",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_goal_relationships",
           "paginatable": true,
@@ -815,10 +946,12 @@
           ],
           "positional": [
             "supported_goal"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "remove-supporting-relationship",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_supporting_relationship",
           "paginatable": false,
@@ -826,10 +959,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-goal-relationship",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_goal_relationship",
           "paginatable": false,
@@ -843,7 +978,8 @@
           "positional": [
             "body",
             "goal_relationship_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "goal-relationships"
@@ -853,6 +989,7 @@
       "commands": [
         {
           "command": "add-custom-field-setting-for-goal",
+          "does_upload": false,
           "has_opts": false,
           "method": "add_custom_field_setting_for_goal",
           "paginatable": false,
@@ -860,10 +997,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-followers",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_followers",
           "paginatable": false,
@@ -877,10 +1016,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-goal",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_goal",
           "paginatable": false,
@@ -893,10 +1034,12 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-goal-metric",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_goal_metric",
           "paginatable": false,
@@ -910,20 +1053,24 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-goal",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_goal",
           "paginatable": false,
           "params": [],
           "positional": [
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-goal",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_goal",
           "paginatable": false,
@@ -936,10 +1083,12 @@
           ],
           "positional": [
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-goals",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_goals",
           "paginatable": true,
@@ -995,10 +1144,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-parent-goals-for-goal",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_parent_goals_for_goal",
           "paginatable": false,
@@ -1011,10 +1162,12 @@
           ],
           "positional": [
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "remove-custom-field-setting-for-goal",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_custom_field_setting_for_goal",
           "paginatable": false,
@@ -1022,10 +1175,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-followers",
+          "does_upload": false,
           "has_opts": true,
           "method": "remove_followers",
           "paginatable": false,
@@ -1039,10 +1194,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-goal",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_goal",
           "paginatable": false,
@@ -1056,10 +1213,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-goal-metric",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_goal_metric",
           "paginatable": false,
@@ -1073,7 +1232,8 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "goals"
@@ -1083,6 +1243,7 @@
       "commands": [
         {
           "command": "get-job",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_job",
           "paginatable": false,
@@ -1095,7 +1256,8 @@
           ],
           "positional": [
             "job_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "jobs"
@@ -1105,34 +1267,41 @@
       "commands": [
         {
           "command": "create-membership",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_membership",
           "paginatable": false,
           "params": [],
-          "positional": []
+          "positional": [],
+          "returns_iterator": false
         },
         {
           "command": "delete-membership",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_membership",
           "paginatable": false,
           "params": [],
           "positional": [
             "membership_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-membership",
+          "does_upload": false,
           "has_opts": false,
           "method": "get_membership",
           "paginatable": false,
           "params": [],
           "positional": [
             "membership_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-memberships",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_memberships",
           "paginatable": true,
@@ -1168,10 +1337,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "update-membership",
+          "does_upload": false,
           "has_opts": false,
           "method": "update_membership",
           "paginatable": false,
@@ -1179,16 +1350,130 @@
           "positional": [
             "body",
             "membership_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "memberships"
+    },
+    {
+      "class_name": "OooEntriesApi",
+      "commands": [
+        {
+          "command": "create-ooo-entry",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "create_ooo_entry",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "command": "delete-ooo-entry",
+          "does_upload": false,
+          "has_opts": false,
+          "method": "delete_ooo_entry",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "ooo_entry_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "command": "get-ooo-entries",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_ooo_entries",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "end_date",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "start_date",
+              "py_type": "date",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user",
+            "workspace"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "command": "get-ooo-entry",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_ooo_entry",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "ooo_entry_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "command": "update-ooo-entry",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "update_ooo_entry",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "ooo_entry_gid"
+          ],
+          "returns_iterator": false
+        }
+      ],
+      "group": "ooo-entries"
     },
     {
       "class_name": "OrganizationExportsApi",
       "commands": [
         {
           "command": "create-organization-export",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_organization_export",
           "paginatable": false,
@@ -1201,10 +1486,12 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-organization-export",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_organization_export",
           "paginatable": false,
@@ -1217,7 +1504,8 @@
           ],
           "positional": [
             "organization_export_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "organization-exports"
@@ -1227,6 +1515,7 @@
       "commands": [
         {
           "command": "get-portfolio-membership",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_portfolio_membership",
           "paginatable": false,
@@ -1239,10 +1528,12 @@
           ],
           "positional": [
             "portfolio_membership_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-portfolio-memberships",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_portfolio_memberships",
           "paginatable": true,
@@ -1278,10 +1569,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-portfolio-memberships-for-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_portfolio_memberships_for_portfolio",
           "paginatable": true,
@@ -1309,7 +1602,8 @@
           ],
           "positional": [
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "portfolio-memberships"
@@ -1319,6 +1613,7 @@
       "commands": [
         {
           "command": "add-custom-field-setting-for-portfolio",
+          "does_upload": false,
           "has_opts": false,
           "method": "add_custom_field_setting_for_portfolio",
           "paginatable": false,
@@ -1326,10 +1621,12 @@
           "positional": [
             "body",
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-item-for-portfolio",
+          "does_upload": false,
           "has_opts": false,
           "method": "add_item_for_portfolio",
           "paginatable": false,
@@ -1337,10 +1634,12 @@
           "positional": [
             "body",
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-members-for-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_members_for_portfolio",
           "paginatable": false,
@@ -1354,10 +1653,12 @@
           "positional": [
             "body",
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_portfolio",
           "paginatable": false,
@@ -1370,20 +1671,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-portfolio",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_portfolio",
           "paginatable": false,
           "params": [],
           "positional": [
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "duplicate-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "duplicate_portfolio",
           "paginatable": false,
@@ -1396,10 +1701,12 @@
           ],
           "positional": [
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-items-for-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_items_for_portfolio",
           "paginatable": true,
@@ -1422,10 +1729,12 @@
           ],
           "positional": [
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_portfolio",
           "paginatable": false,
@@ -1438,10 +1747,12 @@
           ],
           "positional": [
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-portfolios",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_portfolios",
           "paginatable": true,
@@ -1469,10 +1780,12 @@
           ],
           "positional": [
             "workspace"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "remove-custom-field-setting-for-portfolio",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_custom_field_setting_for_portfolio",
           "paginatable": false,
@@ -1480,10 +1793,12 @@
           "positional": [
             "body",
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-item-for-portfolio",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_item_for_portfolio",
           "paginatable": false,
@@ -1491,10 +1806,12 @@
           "positional": [
             "body",
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-members-for-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "remove_members_for_portfolio",
           "paginatable": false,
@@ -1508,10 +1825,12 @@
           "positional": [
             "body",
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_portfolio",
           "paginatable": false,
@@ -1525,7 +1844,8 @@
           "positional": [
             "body",
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "portfolios"
@@ -1535,6 +1855,7 @@
       "commands": [
         {
           "command": "create-project-brief",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_project_brief",
           "paginatable": false,
@@ -1548,20 +1869,24 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-project-brief",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_project_brief",
           "paginatable": false,
           "params": [],
           "positional": [
             "project_brief_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project-brief",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_brief",
           "paginatable": false,
@@ -1574,10 +1899,12 @@
           ],
           "positional": [
             "project_brief_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-project-brief",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_project_brief",
           "paginatable": false,
@@ -1591,7 +1918,8 @@
           "positional": [
             "body",
             "project_brief_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "project-briefs"
@@ -1601,6 +1929,7 @@
       "commands": [
         {
           "command": "get-project-membership",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_membership",
           "paginatable": false,
@@ -1613,10 +1942,12 @@
           ],
           "positional": [
             "project_membership_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project-memberships-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_memberships_for_project",
           "paginatable": true,
@@ -1644,7 +1975,8 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "project-memberships"
@@ -1654,6 +1986,7 @@
       "commands": [
         {
           "command": "get-project-portfolio-setting",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_portfolio_setting",
           "paginatable": false,
@@ -1666,10 +1999,12 @@
           ],
           "positional": [
             "project_portfolio_setting_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project-portfolio-settings-for-portfolio",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_portfolio_settings_for_portfolio",
           "paginatable": true,
@@ -1692,10 +2027,12 @@
           ],
           "positional": [
             "portfolio_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-project-portfolio-settings-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_portfolio_settings_for_project",
           "paginatable": true,
@@ -1718,10 +2055,12 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-project-portfolio-setting",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_project_portfolio_setting",
           "paginatable": false,
@@ -1735,7 +2074,8 @@
           "positional": [
             "body",
             "project_portfolio_setting_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "project-portfolio-settings"
@@ -1745,6 +2085,7 @@
       "commands": [
         {
           "command": "create-project-status-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_project_status_for_project",
           "paginatable": false,
@@ -1758,20 +2099,24 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-project-status",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_project_status",
           "paginatable": false,
           "params": [],
           "positional": [
             "project_status_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project-status",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_status",
           "paginatable": false,
@@ -1784,10 +2129,12 @@
           ],
           "positional": [
             "project_status_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project-statuses-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_statuses_for_project",
           "paginatable": true,
@@ -1810,7 +2157,8 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "project-statuses"
@@ -1820,16 +2168,19 @@
       "commands": [
         {
           "command": "delete-project-template",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_project_template",
           "paginatable": false,
           "params": [],
           "positional": [
             "project_template_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project-template",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_template",
           "paginatable": false,
@@ -1842,10 +2193,12 @@
           ],
           "positional": [
             "project_template_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project-templates",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_templates",
           "paginatable": true,
@@ -1876,10 +2229,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-project-templates-for-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project_templates_for_team",
           "paginatable": true,
@@ -1902,10 +2257,12 @@
           ],
           "positional": [
             "team_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "instantiate-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "instantiate_project",
           "paginatable": false,
@@ -1918,7 +2275,8 @@
           ],
           "positional": [
             "project_template_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "project-templates"
@@ -1928,6 +2286,7 @@
       "commands": [
         {
           "command": "add-custom-field-setting-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_custom_field_setting_for_project",
           "paginatable": false,
@@ -1941,10 +2300,12 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-followers-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_followers_for_project",
           "paginatable": false,
@@ -1958,10 +2319,12 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-members-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_members_for_project",
           "paginatable": false,
@@ -1975,10 +2338,12 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_project",
           "paginatable": false,
@@ -1991,10 +2356,12 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-project-for-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_project_for_team",
           "paginatable": false,
@@ -2008,10 +2375,12 @@
           "positional": [
             "body",
             "team_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-project-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_project_for_workspace",
           "paginatable": false,
@@ -2025,20 +2394,24 @@
           "positional": [
             "body",
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-project",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_project",
           "paginatable": false,
           "params": [],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "duplicate-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "duplicate_project",
           "paginatable": false,
@@ -2051,10 +2424,12 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_project",
           "paginatable": false,
@@ -2067,10 +2442,12 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-projects",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_projects",
           "paginatable": true,
@@ -2106,10 +2483,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-projects-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_projects_for_task",
           "paginatable": true,
@@ -2132,10 +2511,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-projects-for-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_projects_for_team",
           "paginatable": true,
@@ -2163,10 +2544,12 @@
           ],
           "positional": [
             "team_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-projects-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_projects_for_workspace",
           "paginatable": true,
@@ -2194,10 +2577,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-task-counts-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_task_counts_for_project",
           "paginatable": false,
@@ -2210,10 +2595,12 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "project-save-as-template",
+          "does_upload": false,
           "has_opts": true,
           "method": "project_save_as_template",
           "paginatable": false,
@@ -2227,10 +2614,12 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-custom-field-setting-for-project",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_custom_field_setting_for_project",
           "paginatable": false,
@@ -2238,10 +2627,12 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-followers-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "remove_followers_for_project",
           "paginatable": false,
@@ -2255,10 +2646,12 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-members-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "remove_members_for_project",
           "paginatable": false,
@@ -2272,10 +2665,12 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "search-projects-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "search_projects_for_workspace",
           "paginatable": false,
@@ -2328,10 +2723,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_project",
           "paginatable": false,
@@ -2345,7 +2742,8 @@
           "positional": [
             "body",
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "projects"
@@ -2355,6 +2753,7 @@
       "commands": [
         {
           "command": "create-rate",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_rate",
           "paginatable": false,
@@ -2367,20 +2766,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-rate",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_rate",
           "paginatable": false,
           "params": [],
           "positional": [
             "rate_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-rate",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_rate",
           "paginatable": false,
@@ -2393,10 +2796,12 @@
           ],
           "positional": [
             "rate_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-rates",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_rates",
           "paginatable": true,
@@ -2427,10 +2832,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "update-rate",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_rate",
           "paginatable": false,
@@ -2444,7 +2851,8 @@
           "positional": [
             "body",
             "rate_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "rates"
@@ -2454,6 +2862,7 @@
       "commands": [
         {
           "command": "get-reactions-on-object",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_reactions_on_object",
           "paginatable": true,
@@ -2472,7 +2881,8 @@
           "positional": [
             "target",
             "emoji_base"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "reactions"
@@ -2482,6 +2892,7 @@
       "commands": [
         {
           "command": "create-role",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_role",
           "paginatable": false,
@@ -2494,20 +2905,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-role",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_role",
           "paginatable": false,
           "params": [],
           "positional": [
             "role_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-role",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_role",
           "paginatable": false,
@@ -2520,10 +2935,12 @@
           ],
           "positional": [
             "role_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-roles",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_roles",
           "paginatable": true,
@@ -2554,10 +2971,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "update-role",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_role",
           "paginatable": false,
@@ -2571,7 +2990,8 @@
           "positional": [
             "body",
             "role_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "roles"
@@ -2581,6 +3001,7 @@
       "commands": [
         {
           "command": "trigger-rule",
+          "does_upload": false,
           "has_opts": false,
           "method": "trigger_rule",
           "paginatable": false,
@@ -2588,7 +3009,8 @@
           "positional": [
             "body",
             "rule_trigger_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "rules"
@@ -2598,16 +3020,19 @@
       "commands": [
         {
           "command": "add-task-for-section",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_task_for_section",
           "paginatable": false,
           "params": [],
           "positional": [
             "section_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-section-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_section_for_project",
           "paginatable": false,
@@ -2620,20 +3045,24 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-section",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_section",
           "paginatable": false,
           "params": [],
           "positional": [
             "section_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-section",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_section",
           "paginatable": false,
@@ -2646,10 +3075,12 @@
           ],
           "positional": [
             "section_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-sections-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_sections_for_project",
           "paginatable": true,
@@ -2672,20 +3103,24 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "insert-section-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "insert_section_for_project",
           "paginatable": false,
           "params": [],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-section",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_section",
           "paginatable": false,
@@ -2698,7 +3133,8 @@
           ],
           "positional": [
             "section_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "sections"
@@ -2708,6 +3144,7 @@
       "commands": [
         {
           "command": "create-status-for-object",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_status_for_object",
           "paginatable": true,
@@ -2730,20 +3167,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-status",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_status",
           "paginatable": false,
           "params": [],
           "positional": [
             "status_update_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-status",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_status",
           "paginatable": false,
@@ -2756,10 +3197,12 @@
           ],
           "positional": [
             "status_update_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-statuses-for-object",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_statuses_for_object",
           "paginatable": true,
@@ -2787,7 +3230,8 @@
           ],
           "positional": [
             "parent"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "status-updates"
@@ -2797,6 +3241,7 @@
       "commands": [
         {
           "command": "create-story-for-goal",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_story_for_goal",
           "paginatable": false,
@@ -2810,10 +3255,12 @@
           "positional": [
             "body",
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-story-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_story_for_task",
           "paginatable": false,
@@ -2827,20 +3274,24 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-story",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_story",
           "paginatable": false,
           "params": [],
           "positional": [
             "story_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-stories-for-goal",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_stories_for_goal",
           "paginatable": true,
@@ -2863,10 +3314,12 @@
           ],
           "positional": [
             "goal_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-stories-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_stories_for_task",
           "paginatable": true,
@@ -2889,10 +3342,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-story",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_story",
           "paginatable": false,
@@ -2905,10 +3360,12 @@
           ],
           "positional": [
             "story_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-story",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_story",
           "paginatable": false,
@@ -2922,7 +3379,8 @@
           "positional": [
             "body",
             "story_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "stories"
@@ -2932,6 +3390,7 @@
       "commands": [
         {
           "command": "create-tag",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_tag",
           "paginatable": false,
@@ -2944,10 +3403,12 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-tag-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_tag_for_workspace",
           "paginatable": false,
@@ -2961,20 +3422,24 @@
           "positional": [
             "body",
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-tag",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_tag",
           "paginatable": false,
           "params": [],
           "positional": [
             "tag_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-tag",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tag",
           "paginatable": false,
@@ -2987,10 +3452,12 @@
           ],
           "positional": [
             "tag_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-tags",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tags",
           "paginatable": true,
@@ -3016,10 +3483,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-tags-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tags_for_task",
           "paginatable": true,
@@ -3042,10 +3511,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-tags-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tags_for_workspace",
           "paginatable": true,
@@ -3068,10 +3539,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-tag",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_tag",
           "paginatable": false,
@@ -3085,7 +3558,8 @@
           "positional": [
             "body",
             "tag_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "tags"
@@ -3095,16 +3569,19 @@
       "commands": [
         {
           "command": "delete-task-template",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_task_template",
           "paginatable": false,
           "params": [],
           "positional": [
             "task_template_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-task-template",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_task_template",
           "paginatable": false,
@@ -3117,10 +3594,12 @@
           ],
           "positional": [
             "task_template_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-task-templates",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_task_templates",
           "paginatable": true,
@@ -3146,10 +3625,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "instantiate-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "instantiate_task",
           "paginatable": false,
@@ -3162,7 +3643,8 @@
           ],
           "positional": [
             "task_template_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "task-templates"
@@ -3172,6 +3654,7 @@
       "commands": [
         {
           "command": "add-dependencies-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "add_dependencies_for_task",
           "paginatable": false,
@@ -3179,10 +3662,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-dependents-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "add_dependents_for_task",
           "paginatable": false,
@@ -3190,10 +3675,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-followers-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_followers_for_task",
           "paginatable": false,
@@ -3207,10 +3694,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-project-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "add_project_for_task",
           "paginatable": false,
@@ -3218,10 +3707,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "add-tag-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "add_tag_for_task",
           "paginatable": false,
@@ -3229,10 +3720,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-subtask-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_subtask_for_task",
           "paginatable": false,
@@ -3246,10 +3739,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_task",
           "paginatable": false,
@@ -3262,20 +3757,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_task",
           "paginatable": false,
           "params": [],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "duplicate-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "duplicate_task",
           "paginatable": false,
@@ -3289,10 +3788,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-dependencies-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_dependencies_for_task",
           "paginatable": true,
@@ -3315,10 +3816,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-dependents-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_dependents_for_task",
           "paginatable": true,
@@ -3341,10 +3844,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-subtasks-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_subtasks_for_task",
           "paginatable": true,
@@ -3367,10 +3872,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_task",
           "paginatable": false,
@@ -3383,10 +3890,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-task-for-custom-id",
+          "does_upload": false,
           "has_opts": false,
           "method": "get_task_for_custom_id",
           "paginatable": false,
@@ -3394,10 +3903,12 @@
           "positional": [
             "workspace_gid",
             "custom_id"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-tasks",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tasks",
           "paginatable": true,
@@ -3448,10 +3959,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-tasks-for-project",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tasks_for_project",
           "paginatable": true,
@@ -3479,10 +3992,12 @@
           ],
           "positional": [
             "project_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-tasks-for-section",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tasks_for_section",
           "paginatable": true,
@@ -3510,10 +4025,12 @@
           ],
           "positional": [
             "section_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-tasks-for-tag",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tasks_for_tag",
           "paginatable": true,
@@ -3536,10 +4053,12 @@
           ],
           "positional": [
             "tag_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-tasks-for-user-task-list",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_tasks_for_user_task_list",
           "paginatable": true,
@@ -3567,10 +4086,12 @@
           ],
           "positional": [
             "user_task_list_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "remove-dependencies-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_dependencies_for_task",
           "paginatable": false,
@@ -3578,10 +4099,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-dependents-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_dependents_for_task",
           "paginatable": false,
@@ -3589,10 +4112,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-follower-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "remove_follower_for_task",
           "paginatable": false,
@@ -3606,10 +4131,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-project-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_project_for_task",
           "paginatable": false,
@@ -3617,10 +4144,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "remove-tag-for-task",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_tag_for_task",
           "paginatable": false,
@@ -3628,10 +4157,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "search-tasks-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "search_tasks_for_workspace",
           "paginatable": false,
@@ -3714,10 +4245,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "set-parent-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "set_parent_for_task",
           "paginatable": false,
@@ -3731,10 +4264,12 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_task",
           "paginatable": false,
@@ -3748,7 +4283,8 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "tasks"
@@ -3758,6 +4294,7 @@
       "commands": [
         {
           "command": "get-team-membership",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_team_membership",
           "paginatable": false,
@@ -3770,10 +4307,12 @@
           ],
           "positional": [
             "team_membership_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-team-memberships",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_team_memberships",
           "paginatable": true,
@@ -3809,10 +4348,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-team-memberships-for-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_team_memberships_for_team",
           "paginatable": true,
@@ -3835,10 +4376,12 @@
           ],
           "positional": [
             "team_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-team-memberships-for-user",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_team_memberships_for_user",
           "paginatable": true,
@@ -3862,7 +4405,8 @@
           "positional": [
             "user_gid",
             "workspace"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "team-memberships"
@@ -3872,6 +4416,7 @@
       "commands": [
         {
           "command": "add-user-for-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_user_for_team",
           "paginatable": false,
@@ -3885,10 +4430,12 @@
           "positional": [
             "body",
             "team_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "create-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_team",
           "paginatable": false,
@@ -3901,10 +4448,12 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_team",
           "paginatable": false,
@@ -3917,10 +4466,12 @@
           ],
           "positional": [
             "team_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-teams-for-user",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_teams_for_user",
           "paginatable": true,
@@ -3944,10 +4495,12 @@
           "positional": [
             "user_gid",
             "organization"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-teams-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_teams_for_workspace",
           "paginatable": true,
@@ -3970,10 +4523,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "remove-user-for-team",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_user_for_team",
           "paginatable": false,
@@ -3981,10 +4536,12 @@
           "positional": [
             "body",
             "team_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_team",
           "paginatable": false,
@@ -3998,7 +4555,8 @@
           "positional": [
             "body",
             "team_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "teams"
@@ -4008,6 +4566,7 @@
       "commands": [
         {
           "command": "get-time-period",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_period",
           "paginatable": false,
@@ -4020,10 +4579,12 @@
           ],
           "positional": [
             "time_period_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-time-periods",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_periods",
           "paginatable": true,
@@ -4056,7 +4617,8 @@
           ],
           "positional": [
             "workspace"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "time-periods"
@@ -4066,6 +4628,7 @@
       "commands": [
         {
           "command": "create-time-tracking-category",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_time_tracking_category",
           "paginatable": false,
@@ -4078,20 +4641,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-time-tracking-category",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_time_tracking_category",
           "paginatable": false,
           "params": [],
           "positional": [
             "time_tracking_category_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-time-tracking-categories",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_tracking_categories",
           "paginatable": true,
@@ -4119,10 +4686,12 @@
           ],
           "positional": [
             "workspace"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-time-tracking-category",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_tracking_category",
           "paginatable": false,
@@ -4135,10 +4704,12 @@
           ],
           "positional": [
             "time_tracking_category_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-time-tracking-entries-for-time-tracking-category",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_tracking_entries_for_time_tracking_category",
           "paginatable": true,
@@ -4171,10 +4742,12 @@
           ],
           "positional": [
             "time_tracking_category_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-time-tracking-category",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_time_tracking_category",
           "paginatable": false,
@@ -4188,7 +4761,8 @@
           "positional": [
             "body",
             "time_tracking_category_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "time-tracking-categories"
@@ -4198,6 +4772,7 @@
       "commands": [
         {
           "command": "create-time-tracking-entry",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_time_tracking_entry",
           "paginatable": false,
@@ -4211,20 +4786,24 @@
           "positional": [
             "body",
             "task_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-time-tracking-entry",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_time_tracking_entry",
           "paginatable": false,
           "params": [],
           "positional": [
             "time_tracking_entry_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-time-tracking-entries",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_tracking_entries",
           "paginatable": true,
@@ -4285,10 +4864,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-time-tracking-entries-for-task",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_tracking_entries_for_task",
           "paginatable": true,
@@ -4311,10 +4892,12 @@
           ],
           "positional": [
             "task_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-time-tracking-entry",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_time_tracking_entry",
           "paginatable": false,
@@ -4327,10 +4910,12 @@
           ],
           "positional": [
             "time_tracking_entry_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-time-tracking-entry",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_time_tracking_entry",
           "paginatable": false,
@@ -4344,7 +4929,8 @@
           "positional": [
             "body",
             "time_tracking_entry_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "time-tracking-entries"
@@ -4354,6 +4940,7 @@
       "commands": [
         {
           "command": "create-timesheet-approval-status",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_timesheet_approval_status",
           "paginatable": false,
@@ -4366,10 +4953,12 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-timesheet-approval-status",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_timesheet_approval_status",
           "paginatable": false,
@@ -4382,10 +4971,12 @@
           ],
           "positional": [
             "timesheet_approval_status_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-timesheet-approval-statuses",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_timesheet_approval_statuses",
           "paginatable": true,
@@ -4428,10 +5019,12 @@
           ],
           "positional": [
             "workspace"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-timesheet-approval-status",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_timesheet_approval_status",
           "paginatable": false,
@@ -4445,7 +5038,8 @@
           "positional": [
             "body",
             "timesheet_approval_status_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "timesheet-approval-statuses"
@@ -4455,6 +5049,7 @@
       "commands": [
         {
           "command": "typeahead-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "typeahead_for_workspace",
           "paginatable": false,
@@ -4483,7 +5078,8 @@
           "positional": [
             "workspace_gid",
             "resource_type"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "typeahead"
@@ -4493,6 +5089,7 @@
       "commands": [
         {
           "command": "get-user-task-list",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_user_task_list",
           "paginatable": false,
@@ -4505,10 +5102,12 @@
           ],
           "positional": [
             "user_task_list_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-user-task-list-for-user",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_user_task_list_for_user",
           "paginatable": false,
@@ -4522,7 +5121,8 @@
           "positional": [
             "user_gid",
             "workspace"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "user-task-lists"
@@ -4532,6 +5132,7 @@
       "commands": [
         {
           "command": "get-favorites-for-user",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_favorites_for_user",
           "paginatable": true,
@@ -4556,10 +5157,12 @@
             "user_gid",
             "resource_type",
             "workspace"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-user",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_user",
           "paginatable": false,
@@ -4577,10 +5180,12 @@
           ],
           "positional": [
             "user_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-user-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_user_for_workspace",
           "paginatable": false,
@@ -4594,10 +5199,12 @@
           "positional": [
             "workspace_gid",
             "user_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-users",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_users",
           "paginatable": true,
@@ -4628,10 +5235,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "get-users-for-team",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_users_for_team",
           "paginatable": false,
@@ -4649,10 +5258,12 @@
           ],
           "positional": [
             "team_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-users-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_users_for_workspace",
           "paginatable": false,
@@ -4670,10 +5281,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-user",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_user",
           "paginatable": false,
@@ -4692,10 +5305,12 @@
           "positional": [
             "body",
             "user_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-user-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_user_for_workspace",
           "paginatable": false,
@@ -4710,7 +5325,8 @@
             "body",
             "workspace_gid",
             "user_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "users"
@@ -4720,6 +5336,7 @@
       "commands": [
         {
           "command": "create-webhook",
+          "does_upload": false,
           "has_opts": true,
           "method": "create_webhook",
           "paginatable": false,
@@ -4732,20 +5349,24 @@
           ],
           "positional": [
             "body"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "delete-webhook",
+          "does_upload": false,
           "has_opts": false,
           "method": "delete_webhook",
           "paginatable": false,
           "params": [],
           "positional": [
             "webhook_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-webhook",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_webhook",
           "paginatable": false,
@@ -4758,10 +5379,12 @@
           ],
           "positional": [
             "webhook_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-webhooks",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_webhooks",
           "paginatable": true,
@@ -4789,10 +5412,12 @@
           ],
           "positional": [
             "workspace"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "update-webhook",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_webhook",
           "paginatable": false,
@@ -4806,7 +5431,8 @@
           "positional": [
             "body",
             "webhook_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "webhooks"
@@ -4816,6 +5442,7 @@
       "commands": [
         {
           "command": "get-workspace-membership",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_workspace_membership",
           "paginatable": false,
@@ -4828,10 +5455,12 @@
           ],
           "positional": [
             "workspace_membership_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-workspace-memberships-for-user",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_workspace_memberships_for_user",
           "paginatable": true,
@@ -4854,10 +5483,12 @@
           ],
           "positional": [
             "user_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-workspace-memberships-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_workspace_memberships_for_workspace",
           "paginatable": true,
@@ -4885,7 +5516,8 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         }
       ],
       "group": "workspace-memberships"
@@ -4895,6 +5527,7 @@
       "commands": [
         {
           "command": "add-user-for-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "add_user_for_workspace",
           "paginatable": false,
@@ -4908,10 +5541,12 @@
           "positional": [
             "body",
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_workspace",
           "paginatable": false,
@@ -4924,10 +5559,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "get-workspace-events",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_workspace_events",
           "paginatable": false,
@@ -4940,10 +5577,12 @@
           ],
           "positional": [
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": true
         },
         {
           "command": "get-workspaces",
+          "does_upload": false,
           "has_opts": true,
           "method": "get_workspaces",
           "paginatable": true,
@@ -4964,10 +5603,12 @@
               "required": false
             }
           ],
-          "positional": []
+          "positional": [],
+          "returns_iterator": true
         },
         {
           "command": "remove-user-for-workspace",
+          "does_upload": false,
           "has_opts": false,
           "method": "remove_user_for_workspace",
           "paginatable": false,
@@ -4975,10 +5616,12 @@
           "positional": [
             "body",
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": false
         },
         {
           "command": "update-workspace",
+          "does_upload": false,
           "has_opts": true,
           "method": "update_workspace",
           "paginatable": false,
@@ -4992,7 +5635,8 @@
           "positional": [
             "body",
             "workspace_gid"
-          ]
+          ],
+          "returns_iterator": false
         }
       ],
       "group": "workspaces"

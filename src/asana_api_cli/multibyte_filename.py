@@ -16,7 +16,7 @@ from urllib3.fields import RequestField
 class MultibyteFilenameSupport:
     """Make multipart uploads round-trip filenames with non-ASCII characters.
 
-    In ``python-asana`` 5.2.4 (the latest version checked, and likely later
+    In ``python-asana`` 5.2.5 (the latest version checked, and likely later
     ones too), uploading a file whose name has characters outside ASCII
     stores a garbled (mojibake) name on Asana: the SDK's multipart encoder
     emits only ``filename="..."`` and omits the RFC 5987 ``filename*=``
