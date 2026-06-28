@@ -23,7 +23,11 @@ asana-api workspaces get-workspaces
 asana-api --access-token "2/12345..." workspaces get-workspaces
 ```
 
-No token is needed for `--help` or argument-validation errors.
+No token is needed for `--help` or command-line parsing errors (unknown
+options, a missing required argument, a malformed `NAME=VALUE`). One exception:
+a `--query` / `--exception-query` jq filter is validated against the response
+payload, so a syntactically invalid filter surfaces only *after* the API
+call — which does need a token.
 
 ## Options
 

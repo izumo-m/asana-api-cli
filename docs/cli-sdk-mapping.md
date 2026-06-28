@@ -57,7 +57,7 @@ In the **"SDK destination"** column:
 | `--key-file PATH` | `Configuration.key_file` | Direct property (client TLS key) |
 | `--assert-hostname / --no-assert-hostname` | `Configuration.assert_hostname` | Direct property; tri-state |
 | `--user-agent VALUE` | `ApiClient.user_agent` | Client setter: assigned on the `ApiClient` after construction in `AsanaSession.__init__` |
-| `--set-default-header NAME=VALUE` | `ApiClient.set_default_header(name, value)` | Client setter: repeatable, parsed by `structured_arg.default_header_callback`; each pair applied after construction. Session-wide (rides every request) and overrides per-call `--header-params` on a key collision (SDK merges defaults on top); **not redacted in `--debug`** (see [SECURITY.md](../SECURITY.md)) |
+| `--set-default-header NAME=VALUE` | `ApiClient.set_default_header(name, value)` | Client setter: repeatable, parsed by `structured_arg.default_header_callback`; each pair applied after construction. Session-wide (rides every request) and overrides per-call `--header-params` on a key collision (SDK merges defaults on top); in `--debug` **only `Authorization` / `Proxy-Authorization` values are redacted** — any other header name is logged verbatim (see [SECURITY.md](../SECURITY.md)) |
 | `--retry-strategy VALUE` | `Configuration.retry_strategy` | Struct member: parsed by `structured_arg` (`RETRY_FIELD_SCHEMA`), applied as `retry_strategy.new(**overrides)` so unspecified fields keep the SDK defaults |
 | `--connection-pool-maxsize N` | `Configuration.connection_pool_maxsize` | Direct property |
 | `--access-token TOKEN` | `Configuration.access_token` | Direct property; default source `$ASANA_ACCESS_TOKEN` |
@@ -83,7 +83,7 @@ forwarded straight to the SDK call as a kwarg — no `runtime` round-trip.
 |---|---|---|
 | `--item-limit N` | per-call kwarg `item_limit` | Forwarded by `_make_command` |
 | `--full-payload` | per-call kwarg `full_payload=True` | Forwarded by `_make_command` |
-| `--header-params VALUE` | per-call kwarg `header_params` | Parsed by `structured_arg`; **not redacted in `--debug`** (see SECURITY.md) |
+| `--header-params VALUE` | per-call kwarg `header_params` | Parsed by `structured_arg`; in `--debug` **only `Authorization` / `Proxy-Authorization` values are redacted** — any other header name is logged verbatim (see SECURITY.md) |
 | `--request-timeout SECONDS` | per-call kwarg `_request_timeout` | Forwarded by `_make_command`; propagated to every page request by the SDK `PageIterator` |
 
 The `--limit` / `--offset` flags are docstring-derived (per-method) and appear

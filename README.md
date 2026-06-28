@@ -107,7 +107,9 @@ automatically.
 
 The token can be issued from the
 [Asana Developer Console](https://app.asana.com/0/developer-console).
-No token is needed for `--help` or argument validation errors.
+No token is needed for `--help` or command-line parsing errors. (A `--query`
+jq filter is validated against the response, so it surfaces errors only after
+the API call — which does need a token.)
 
 ```bash
 export ASANA_ACCESS_TOKEN="2/12345..."
