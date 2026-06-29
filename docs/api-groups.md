@@ -33,6 +33,7 @@ CRUD coverage — SDK methods are the ground truth.
 | CLI group                     | Asana reference                                                                                       | Short description (`--help`)               |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | `access-requests`             | [Access Requests](https://developers.asana.com/reference/access-requests)                             | Manage private-object access requests      |
+| `agents`                      | [Agents](https://developers.asana.com/reference/agents)                                               | Read workspace AI agents (AI Teammates)    |
 | `allocations`                 | [Allocations](https://developers.asana.com/reference/allocations)                                     | Manage user allocations across projects    |
 | `attachments`                 | [Attachments](https://developers.asana.com/reference/attachments)                                     | Upload, list, and remove file attachments  |
 | `audit-log-api`               | [Audit Log API](https://developers.asana.com/reference/audit-log-api)                                 | Read domain audit log events               |
@@ -47,6 +48,7 @@ CRUD coverage — SDK methods are the ground truth.
 | `goals`                       | [Goals](https://developers.asana.com/reference/goals)                                                 | Manage organizational goals and metrics    |
 | `jobs`                        | [Jobs](https://developers.asana.com/reference/jobs)                                                   | Check status of async background jobs      |
 | `memberships`                 | [Memberships](https://developers.asana.com/reference/memberships)                                     | Manage memberships across object types     |
+| `ooo-entries`                 | [Out-of-Office Entries](https://developers.asana.com/reference/ooo-entries)                           | Manage out-of-office (OOO) entries         |
 | `organization-exports`        | [Organization Exports](https://developers.asana.com/reference/organization-exports)                   | Trigger and download org-wide exports      |
 | `portfolio-memberships`       | [Portfolio Memberships](https://developers.asana.com/reference/portfolio-memberships)                 | Read who has access to portfolios          |
 | `portfolios`                  | [Portfolios](https://developers.asana.com/reference/portfolios)                                       | Manage portfolios (project collections)    |

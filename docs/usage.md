@@ -23,7 +23,11 @@ asana-api workspaces get-workspaces
 asana-api --access-token "2/12345..." workspaces get-workspaces
 ```
 
-No token is needed for `--help` or argument-validation errors.
+No token is needed for `--help` or command-line parsing errors (unknown
+options, a missing required argument, a malformed `NAME=VALUE`). One exception:
+a `--query` / `--exception-query` jq filter is validated against the response
+payload, so a syntactically invalid filter surfaces only *after* the API
+call — which does need a token.
 
 ## Options
 
@@ -369,7 +373,7 @@ Mirroring the SDK, `--proxy` is the only way to configure a proxy — the
 
 ### Credentials in the proxy URL are discarded
 
-As of `python-asana` 5.2.4 — the latest version checked —
+As of `python-asana` 5.2.5 — the latest version checked —
 `--proxy http://user:pass@host:port` parses, but the credentials are **never
 sent**: the SDK stack (`python-asana` → urllib3) does not turn URL userinfo
 into a `Proxy-Authorization` header. urllib3's only built-in proxy-credential
@@ -420,7 +424,7 @@ like `--project` that the Asana API accepts in place of a workspace.
 
 ## File uploads
 
-In `python-asana` 5.2.4 — the latest version checked, and most likely later
+In `python-asana` 5.2.5 — the latest version checked, and most likely later
 ones too — uploading a file whose name contains non-ASCII characters (accented
 letters, Japanese, emoji, …) stores a garbled (mojibake) filename on Asana.
 This is a long-standing bug in the SDK — see the

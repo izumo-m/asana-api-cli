@@ -19,13 +19,27 @@ bump fails loudly and forces a conscious classification — a global flag
 (Configuration) or a common per-command ``(kwargs: ...)`` option, with the
 matching SDK-destination label (see ``docs/cli-sdk-mapping.md``).
 
-A third guard pins which methods perform a multipart file upload. The CLI
-exposes the ``--multibyte-filenames`` extension flag only on upload commands,
-detected at runtime by a cheap proxy (an op declaring a ``file`` opt — see
-``_Operation.does_upload``). ``test_upload_detection_matches_multipart_population``
-proves that proxy equals the true signal (a source scan for assignment into
-``local_var_files``), so a future SDK that adds or renames an upload endpoint
-fails here rather than silently dropping the flag from a command that needs it.
+Two further guards prove the CLI's runtime *classifiers* still agree with the
+SDK source on the installed version — each derives both sides from the SDK, so
+neither needs maintenance across a bump:
+
+* ``test_upload_detection_matches_multipart_population`` — the
+  ``--multibyte-filenames`` flag is exposed only on upload commands, detected by
+  a cheap proxy (an op declaring a ``file`` opt — see ``_Operation.does_upload``).
+  The test proves that proxy equals the true signal (a source scan for assignment
+  into ``local_var_files``).
+* ``test_iterator_detection_matches_source_construction`` — array-response
+  endpoints return a lazy ``PageIterator`` / ``EventIterator`` the runtime
+  materializes with ``list(...)``; the runtime detects them by a cheap proxy
+  (``:return:`` type ending in ``Array`` — see ``_Operation.returns_iterator``).
+  The test proves that proxy equals the true signal (a source scan for the
+  iterator constructor).
+
+The *which-commands* question — the exact set of upload / iterator endpoints —
+is snapshotted per-command in ``tests/fixtures/cli_surface.json`` (the
+``does_upload`` / ``returns_iterator`` fields), so an SDK bump that adds or
+removes such an endpoint surfaces in that fixture's diff during the normal regen
+step, with no hand-maintained set to update here.
 """
 
 from __future__ import annotations
@@ -40,7 +54,7 @@ import asana
 
 from asana_api_cli.cli import _enumerate_api_classes, _operations_for
 
-# Identical across all ``*_with_http_info`` methods in python-asana 5.2.4.
+# Identical across all ``*_with_http_info`` methods in python-asana 5.2.5.
 EXPECTED_ALL_PARAMS: frozenset[str] = frozenset(
     {
         "async_req",
@@ -95,102 +109,6 @@ EXPECTED_CONFIGURATION_ATTRS: frozenset[str] = frozenset(
         "temp_folder_path",
         "username",
         "verify_ssl",
-    }
-)
-
-# The one python-asana method that performs a multipart file upload — i.e. it
-# assigns into ``local_var_files`` (every other method has only the empty
-# ``local_var_files = {}`` boilerplate). The CLI exposes ``--multibyte-filenames``
-# only on upload commands, detected at runtime by a cheap proxy (an op declaring
-# a ``file`` opt; see ``_Operation.does_upload``). This anchor plus the
-# proxy-equality check below pin that proxy to the true multipart signal.
-EXPECTED_MULTIPART_UPLOAD_METHODS: frozenset[tuple[str, str]] = frozenset(
-    {("AttachmentsApi", "create_attachment_for_object")}
-)
-
-# The python-asana methods whose response is an array — they return a lazy
-# ``PageIterator`` / ``EventIterator`` (built in the ``*_with_http_info`` source)
-# under the default flags, which the CLI materializes with ``list(...)``. The
-# runtime detects them via a cheap proxy (the ``:return:`` type ends in
-# ``Array``; see ``_Operation.returns_iterator``). This anchor plus the
-# proxy-equality check below pin that proxy to the true iterator-construction
-# signal so an SDK bump that adds, removes, or reshapes an array endpoint fails
-# loudly. (73 methods in python-asana 5.2.4.)
-EXPECTED_ITERATOR_RETURNING_METHODS: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("AccessRequestsApi", "get_access_requests"),
-        ("AllocationsApi", "get_allocations"),
-        ("AttachmentsApi", "get_attachments_for_object"),
-        ("AuditLogAPIApi", "get_audit_log_events"),
-        ("BatchAPIApi", "create_batch_request"),
-        ("BudgetsApi", "get_budgets"),
-        ("CustomFieldSettingsApi", "get_custom_field_settings_for_goal"),
-        ("CustomFieldSettingsApi", "get_custom_field_settings_for_portfolio"),
-        ("CustomFieldSettingsApi", "get_custom_field_settings_for_project"),
-        ("CustomFieldSettingsApi", "get_custom_field_settings_for_team"),
-        ("CustomFieldsApi", "get_custom_fields_for_workspace"),
-        ("CustomTypesApi", "get_custom_types"),
-        ("EventsApi", "get_events"),
-        ("GoalRelationshipsApi", "get_goal_relationships"),
-        ("GoalsApi", "get_goals"),
-        ("GoalsApi", "get_parent_goals_for_goal"),
-        ("MembershipsApi", "get_memberships"),
-        ("PortfolioMembershipsApi", "get_portfolio_memberships"),
-        ("PortfolioMembershipsApi", "get_portfolio_memberships_for_portfolio"),
-        ("PortfoliosApi", "get_items_for_portfolio"),
-        ("PortfoliosApi", "get_portfolios"),
-        ("ProjectMembershipsApi", "get_project_memberships_for_project"),
-        ("ProjectPortfolioSettingsApi", "get_project_portfolio_settings_for_portfolio"),
-        ("ProjectPortfolioSettingsApi", "get_project_portfolio_settings_for_project"),
-        ("ProjectStatusesApi", "get_project_statuses_for_project"),
-        ("ProjectTemplatesApi", "get_project_templates"),
-        ("ProjectTemplatesApi", "get_project_templates_for_team"),
-        ("ProjectsApi", "get_projects"),
-        ("ProjectsApi", "get_projects_for_task"),
-        ("ProjectsApi", "get_projects_for_team"),
-        ("ProjectsApi", "get_projects_for_workspace"),
-        ("ProjectsApi", "search_projects_for_workspace"),
-        ("RatesApi", "get_rates"),
-        ("ReactionsApi", "get_reactions_on_object"),
-        ("RolesApi", "get_roles"),
-        ("SectionsApi", "get_sections_for_project"),
-        ("StatusUpdatesApi", "get_statuses_for_object"),
-        ("StoriesApi", "get_stories_for_goal"),
-        ("StoriesApi", "get_stories_for_task"),
-        ("TagsApi", "get_tags"),
-        ("TagsApi", "get_tags_for_task"),
-        ("TagsApi", "get_tags_for_workspace"),
-        ("TaskTemplatesApi", "get_task_templates"),
-        ("TasksApi", "get_dependencies_for_task"),
-        ("TasksApi", "get_dependents_for_task"),
-        ("TasksApi", "get_subtasks_for_task"),
-        ("TasksApi", "get_tasks"),
-        ("TasksApi", "get_tasks_for_project"),
-        ("TasksApi", "get_tasks_for_section"),
-        ("TasksApi", "get_tasks_for_tag"),
-        ("TasksApi", "get_tasks_for_user_task_list"),
-        ("TasksApi", "search_tasks_for_workspace"),
-        ("TeamMembershipsApi", "get_team_memberships"),
-        ("TeamMembershipsApi", "get_team_memberships_for_team"),
-        ("TeamMembershipsApi", "get_team_memberships_for_user"),
-        ("TeamsApi", "get_teams_for_user"),
-        ("TeamsApi", "get_teams_for_workspace"),
-        ("TimePeriodsApi", "get_time_periods"),
-        ("TimeTrackingCategoriesApi", "get_time_tracking_categories"),
-        ("TimeTrackingCategoriesApi", "get_time_tracking_entries_for_time_tracking_category"),
-        ("TimeTrackingEntriesApi", "get_time_tracking_entries"),
-        ("TimeTrackingEntriesApi", "get_time_tracking_entries_for_task"),
-        ("TimesheetApprovalStatusesApi", "get_timesheet_approval_statuses"),
-        ("TypeaheadApi", "typeahead_for_workspace"),
-        ("UsersApi", "get_favorites_for_user"),
-        ("UsersApi", "get_users"),
-        ("UsersApi", "get_users_for_team"),
-        ("UsersApi", "get_users_for_workspace"),
-        ("WebhooksApi", "get_webhooks"),
-        ("WorkspaceMembershipsApi", "get_workspace_memberships_for_user"),
-        ("WorkspaceMembershipsApi", "get_workspace_memberships_for_workspace"),
-        ("WorkspacesApi", "get_workspace_events"),
-        ("WorkspacesApi", "get_workspaces"),
     }
 )
 
@@ -341,14 +259,6 @@ def test_no_unknown_configuration_settable_attrs() -> None:
 def test_upload_detection_matches_multipart_population() -> None:
     multipart = _methods_populating_local_var_files()
     assert multipart, "no method populates local_var_files — SDK introspection broke"
-    assert multipart == EXPECTED_MULTIPART_UPLOAD_METHODS, (
-        "the set of multipart-upload methods drifted:\n"
-        f"  added:   {sorted(multipart - EXPECTED_MULTIPART_UPLOAD_METHODS)}\n"
-        f"  removed: {sorted(EXPECTED_MULTIPART_UPLOAD_METHODS - multipart)}\n"
-        "A new/renamed upload endpoint must get the per-command "
-        "--multibyte-filenames flag (cli.py:_make_command, gated by "
-        "_Operation.does_upload). See docs/sdk-deviations.md."
-    )
     via_proxy = _upload_ops_via_does_upload()
     assert via_proxy == multipart, (
         "_Operation.does_upload (the 'has a file opt' proxy) no longer matches "
@@ -364,14 +274,6 @@ def test_iterator_detection_matches_source_construction() -> None:
     constructed = _methods_constructing_iterator()
     assert constructed, (
         "no method constructs a PageIterator/EventIterator — SDK introspection broke"
-    )
-    assert constructed == EXPECTED_ITERATOR_RETURNING_METHODS, (
-        "the set of iterator-returning methods drifted:\n"
-        f"  added:   {sorted(constructed - EXPECTED_ITERATOR_RETURNING_METHODS)}\n"
-        f"  removed: {sorted(EXPECTED_ITERATOR_RETURNING_METHODS - constructed)}\n"
-        "These are exactly the calls execute_call_plan materializes with "
-        "list(...); review the change and regenerate the set. See "
-        "_Operation.returns_iterator."
     )
     via_proxy = _iterator_ops_via_returns_iterator()
     assert via_proxy == constructed, (
