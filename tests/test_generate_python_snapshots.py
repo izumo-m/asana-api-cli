@@ -35,7 +35,7 @@ from asana_api_cli.cli import main
 FIXTURES = Path(__file__).parent / "fixtures" / "generate_python"
 _UPDATE = os.environ.get("UPDATE_GENERATE_SNAPSHOTS") == "1"
 
-_SNAPSHOT_ASANA_VERSION = "5.2.5"
+_SNAPSHOT_ASANA_VERSION = "5.3.0"
 pytestmark = pytest.mark.skipif(
     version("asana") != _SNAPSHOT_ASANA_VERSION,
     reason=(

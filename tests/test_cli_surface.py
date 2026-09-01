@@ -34,7 +34,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "cli_surface.json"
 # to diverge. Skip the snapshot tests when the SDK doesn't match rather
 # than failing — the surface drift on older / newer SDKs is informational,
 # not a regression to gate against.
-_SNAPSHOT_ASANA_VERSION = "5.2.5"
+_SNAPSHOT_ASANA_VERSION = "5.3.0"
 _INSTALLED_ASANA_VERSION = version("asana")
 
 pytestmark = pytest.mark.skipif(

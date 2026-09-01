@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Curated `--help` description for the new `ai-studio-usage-api` command
+  group** (`python-asana` 5.3.0's AI Studio usage API): `asana-api --help` now
+  shows "Read AI Studio credit usage and seats" instead of the auto-generated
+  fallback name. The group itself is not added by this release — the command
+  tree mirrors the installed SDK, so it appears on any asana-api-cli version
+  once `python-asana >= 5.3.0` is installed.
+
 ## [3.3.0] - 2026-06-29
 
 ### Added
