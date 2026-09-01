@@ -4,7 +4,9 @@ The CLI is built dynamically from whatever ``asana`` SDK version is installed,
 so a bump of the ``asana`` dependency can silently change every command.
 This test pins the surface to ``tests/fixtures/cli_surface.json``: any
 addition, removal, rename, or signature change shows up as a fixture diff
-that must be reviewed (and recorded in CHANGELOG) before merging.
+that must be reviewed before merging. SDK-driven surface changes are not
+recorded in ``CHANGELOG.md`` — see ``docs/development.md`` §Bumping the
+asana SDK.
 
 To regenerate after an intentional SDK bump::
 
@@ -93,6 +95,7 @@ class TestSurfaceSnapshot:
         assert actual == expected, (
             "CLI surface differs from the recorded fixture. "
             "Review the diff; if the SDK bump is intentional, regenerate "
-            "tests/fixtures/cli_surface.json and note the change in "
-            "CHANGELOG.md."
+            "tests/fixtures/cli_surface.json. SDK-driven surface changes "
+            "are not CHANGELOG.md entries — see docs/development.md "
+            "§Bumping the asana SDK."
         )
