@@ -63,6 +63,10 @@ extend-exclude = ["tests/fixtures/generate_python"]
 [tool.ruff.format]
 docstring-code-format = true
 quote-style = "double"
+# Markdown code blocks are transcripts (the README's python block mirrors
+# --generate-python output verbatim, single quotes included) — keep the
+# formatter (a Markdown formatter since ruff 0.16) away from them.
+exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "N", "B", "ISC", "G", "SIM", "Q"]
