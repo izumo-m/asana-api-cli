@@ -18,15 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.3.0] - 2026-06-29
 
-### Added
+### Changed
 
-- **`agents` and `ooo-entries` command groups**, picked up from the
-  `python-asana` 5.2.5 release. `agents` reads a workspace's AI agents (Asana's
-  AI Teammates): `get-agent`, `get-agents-for-workspace`. `ooo-entries` is full
-  CRUD over a user's out-of-office entries: `create-ooo-entry`,
-  `get-ooo-entries`, `get-ooo-entry`, `update-ooo-entry`, `delete-ooo-entry`.
-  The command tree is built by introspecting the installed SDK, so these appear
-  automatically when `python-asana >= 5.2.5` is installed.
+- **Curated `--help` descriptions for the `agents` and `ooo-entries` command
+  groups** (`python-asana` 5.2.5's new resource groups): `asana-api --help`
+  shows "Read workspace AI agents (AI Teammates)" and "Manage out-of-office
+  (OOO) entries" instead of the auto-generated fallback names. The groups
+  themselves were not added by this release — the command tree mirrors the
+  installed SDK, so they appear on any asana-api-cli version once
+  `python-asana >= 5.2.5` is installed: `agents` reads a workspace's AI agents
+  (`get-agent`, `get-agents-for-workspace`), and `ooo-entries` is full CRUD
+  over a user's out-of-office entries.
 
 ### Fixed
 
