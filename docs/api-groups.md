@@ -34,6 +34,7 @@ CRUD coverage — SDK methods are the ground truth.
 | ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | `access-requests`             | [Access Requests](https://developers.asana.com/reference/access-requests)                             | Manage private-object access requests      |
 | `agents`                      | [Agents](https://developers.asana.com/reference/agents)                                               | Read workspace AI agents (AI Teammates)    |
+| `ai-studio-usage-api`         | [AI Studio Usage API](https://developers.asana.com/reference/ai-studio-usage-api)                     | Read AI Studio credit usage and seats      |
 | `allocations`                 | [Allocations](https://developers.asana.com/reference/allocations)                                     | Manage user allocations across projects    |
 | `attachments`                 | [Attachments](https://developers.asana.com/reference/attachments)                                     | Upload, list, and remove file attachments  |
 | `audit-log-api`               | [Audit Log API](https://developers.asana.com/reference/audit-log-api)                                 | Read domain audit log events               |

@@ -1,6 +1,83 @@
 {
   "groups": [
     {
+      "class_name": "AIStudioUsageAPIApi",
+      "commands": [
+        {
+          "command": "get-ai-studio-runs",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_ai_studio_runs",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "division_gid",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "end_at",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "start_at",
+              "py_type": "datetime",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "command": "get-ai-studio-seats",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_ai_studio_seats",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "division_gid",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "state",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ],
+          "returns_iterator": true
+        }
+      ],
+      "group": "ai-studio-usage-api"
+    },
+    {
       "class_name": "AccessRequestsApi",
       "commands": [
         {
@@ -807,11 +884,19 @@
               "name": "opt_fields",
               "py_type": "list[str]",
               "required": false
+            },
+            {
+              "name": "project",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "workspace",
+              "py_type": "str",
+              "required": false
             }
           ],
-          "positional": [
-            "project"
-          ],
+          "positional": [],
           "returns_iterator": true
         }
       ],
@@ -1758,6 +1843,11 @@
           "paginatable": true,
           "params": [
             {
+              "name": "custom_type",
+              "py_type": "str",
+              "required": false
+            },
+            {
               "name": "limit",
               "py_type": "int",
               "required": false
@@ -2458,6 +2548,11 @@
               "required": false
             },
             {
+              "name": "custom_type",
+              "py_type": "str",
+              "required": false
+            },
+            {
               "name": "limit",
               "py_type": "int",
               "required": false
@@ -2493,6 +2588,11 @@
           "method": "get_projects_for_task",
           "paginatable": true,
           "params": [
+            {
+              "name": "include_inherited_projects",
+              "py_type": "bool",
+              "required": false
+            },
             {
               "name": "limit",
               "py_type": "int",
@@ -3921,6 +4021,11 @@
             {
               "name": "completed_since",
               "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "custom_type",
+              "py_type": "str",
               "required": false
             },
             {

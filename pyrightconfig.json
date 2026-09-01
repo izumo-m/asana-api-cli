@@ -2,12 +2,15 @@
   "pythonVersion": "3.10",
   "typeCheckingMode": "standard",
   "reportAny": "none",
+  "venvPath": ".",
+  "venv": ".venv",
   "include": [
     "src",
     "tools",
     "tests"
   ],
   "extraPaths": [
+    "src",
     "tools"
   ],
   "exclude": [

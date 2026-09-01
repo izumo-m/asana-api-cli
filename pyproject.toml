@@ -1,6 +1,6 @@
 [project]
 name = "asana-api-cli"
-version = "3.3.0"
+version = "3.3.1"
 description = "Command-line wrapper around the official Asana Python SDK"
 authors = [{name = "Masanao Izumo"}]
 readme = "README.md"

@@ -5,19 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.3.1] - 2026-09-01
+
+### Changed
+
+- **Curated `--help` description for the new `ai-studio-usage-api` command
+  group** (`python-asana` 5.3.0's AI Studio usage API): `asana-api --help` now
+  shows "Read AI Studio credit usage and seats" instead of the auto-generated
+  fallback name. The group itself is not added by this release — the command
+  tree mirrors the installed SDK, so it appears on any asana-api-cli version
+  once `python-asana >= 5.3.0` is installed.
 
 ## [3.3.0] - 2026-06-29
 
-### Added
+### Changed
 
-- **`agents` and `ooo-entries` command groups**, picked up from the
-  `python-asana` 5.2.5 release. `agents` reads a workspace's AI agents (Asana's
-  AI Teammates): `get-agent`, `get-agents-for-workspace`. `ooo-entries` is full
-  CRUD over a user's out-of-office entries: `create-ooo-entry`,
-  `get-ooo-entries`, `get-ooo-entry`, `update-ooo-entry`, `delete-ooo-entry`.
-  The command tree is built by introspecting the installed SDK, so these appear
-  automatically when `python-asana >= 5.2.5` is installed.
+- **Curated `--help` descriptions for the `agents` and `ooo-entries` command
+  groups** (`python-asana` 5.2.5's new resource groups): `asana-api --help`
+  shows "Read workspace AI agents (AI Teammates)" and "Manage out-of-office
+  (OOO) entries" instead of the auto-generated fallback names. The groups
+  themselves were not added by this release — the command tree mirrors the
+  installed SDK, so they appear on any asana-api-cli version once
+  `python-asana >= 5.2.5` is installed: `agents` reads a workspace's AI agents
+  (`get-agent`, `get-agents-for-workspace`), and `ooo-entries` is full CRUD
+  over a user's out-of-office entries.
 
 ### Fixed
 
@@ -445,7 +456,8 @@ Combining a deprecated alias with its replacement (e.g.
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.3...v3.2.0
 [3.1.3]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.2...v3.1.3

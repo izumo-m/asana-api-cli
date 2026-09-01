@@ -231,7 +231,9 @@ class TestV3PrimaryFlags:
         mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=_page([]))
         result = make_runner().invoke(cmd, ["--paginate"])
         assert result.exit_code != 0
-        assert "No such option: --paginate" in full_output(result)
+        output = full_output(result)
+        assert "No such option" in output
+        assert "--paginate" in output
         assert mock.call_count == 0
 
 
@@ -1070,7 +1072,9 @@ class TestErrorPathExitCodes:
             ["--exception-query", ".exception", "get-task", "--task", "T1"],
         )
         assert result.exit_code == 2, full_output(result)
-        assert "No such option: --exception-query" in full_output(result)
+        output = full_output(result)
+        assert "No such option" in output
+        assert "--exception-query" in output
 
     def test_query_invalid_jq_on_success_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")

@@ -225,6 +225,7 @@ def _humanize_class_name(name: str) -> str:
 _GROUP_DESCRIPTIONS: dict[str, str] = {
     "AccessRequests": "Manage private-object access requests",
     "Agents": "Read workspace AI agents (AI Teammates)",
+    "AIStudioUsageAPI": "Read AI Studio credit usage and seats",
     "Allocations": "Manage user allocations across projects",
     "Attachments": "Upload, list, and remove file attachments",
     "AuditLogAPI": "Read domain audit log events",

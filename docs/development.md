@@ -51,7 +51,18 @@ Procedure:
    of checking it.
 3. `uv run pytest` — failures in `test_cli_surface.py` /
    `test_generate_python_snapshots.py` print the diff.
-4. Review the diff; describe user-visible changes in `CHANGELOG.md`.
+4. Review the diff — every entry should be explainable by the SDK's release
+   notes. Do **not** record SDK-driven surface changes (new groups or opts,
+   changed signatures) as this project's own `CHANGELOG.md` entries, and do
+   not treat an SDK-side break as grounds for a major version bump: the
+   command tree mirrors the installed SDK and the `asana` bound is wide, so
+   those changes reach users of *any* asana-api-cli version as soon as their
+   installed SDK updates — an asana-api-cli release neither delivers nor
+   gates them. `CHANGELOG.md` records only what the bump changes in this
+   project itself (typically the curated group descriptions of step 7, under
+   `### Changed` — a help-string change). When SDK effects are worth
+   mentioning for context, attribute them to the SDK: "appears on any
+   asana-api-cli version once `python-asana >= X.Y.Z` is installed".
 5. Regenerate the fixtures (exact command in each test's module docstring):
    - `tests/fixtures/cli_surface.json` — the CLI surface. Besides commands and
      options it pins each command's `paginatable` / `returns_iterator` /
@@ -94,8 +105,8 @@ Procedure:
      individual `/reference/<group>.md` pages.
 8. Commit `uv.lock`, the two `_SNAPSHOT_ASANA_VERSION` bumps, the regenerated
    fixtures (`tests/fixtures/cli_surface.json` and any `generate_python/*`
-   snapshots), and `CHANGELOG.md` together (plus any group-description edits
-   from step 7).
+   snapshots), and any `CHANGELOG.md` entry from step 4 together (plus any
+   group-description edits from step 7).
 
 ## Trying shell completion locally
 
