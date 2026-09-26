@@ -52,12 +52,19 @@ bash tools/test_python_versions.sh --lowest 3.10 3.11 3.12
 Run this whenever a floor changes (and as part of bumping the `asana`
 SDK) to confirm the declared minimum still works.
 
-The floors are deliberately old: `pip install asana-api-cli` must work on an
-existing system from the python-asana 5.0.2 era (December 2023) without
-upgrading the packages it already has — e.g. `jq` 1.6.0, the release current
-then. Do not raise a floor only because that release has no wheel for a newer
-Python: pip there simply picks a newer release. This is why `--lowest` fails on
-Python 3.13 and later, where `jq` 1.6.0 has no wheel and does not build.
+The floors are deliberately old: they track the oldest supported date of
+[constitution #7](../docs/principles.md#constitution) — e.g. `jq` 1.6.0 was
+the current release on 2023-12-16. To see what PyPI offered on a given date,
+resolve with uv's `--exclude-newer`:
+
+```bash
+printf '%s\n' "asana==5.0.2" click tabulate jq \
+  | uv pip compile --python-version 3.10 --exclude-newer 2023-12-16T23:59:59Z -
+```
+
+Such an old release may have no wheel for a newer Python. pip there picks a
+newer release, but `--lowest` does not: it fails on Python 3.13 and later,
+where `jq` 1.6.0 has no wheel and does not build.
 
 ## End-to-end tests
 
