@@ -1114,7 +1114,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # reachable + labelled.
     reserved = _static_reserved_flags()
 
-    options: list[click.Option] = []
+    options: list[click.Parameter] = []
 
     # Tier 1 — path / body positionals in function-signature order. Each
     # positional renders by kind: body, the unified workspace, or a plain path

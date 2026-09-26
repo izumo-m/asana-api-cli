@@ -298,6 +298,32 @@ class TestCommandClassChain:
         assert GroupWithGlobalOptions.command_class is CommandWithGlobalOptions
 
 
+class TestGlobalOptionsAppendedLazily:
+    # Every group and every command of the entered group is built on each run,
+    # but only those on the invoked path read their params — building the
+    # globals up front for all of them cost ~10-18 ms of startup.
+    def test_not_built_until_params_is_read(self) -> None:
+        own = click.Option(["--own"])
+        for cmd in (
+            CommandWithGlobalOptions(name="leaf", params=[own]),
+            GroupWithGlobalOptions(name="group", params=[own]),
+        ):
+            assert cmd._globals_appended is False  # pyright: ignore[reportPrivateUsage]
+            names = [p.name for p in cmd.params]
+            # Own params first, then the globals — the order --help renders.
+            assert names[0] == "own"
+            assert set(names[1:]) == GLOBAL_OPTION_NAMES
+
+    def test_appended_once(self) -> None:
+        cmd = CommandWithGlobalOptions(name="leaf")
+        first = list(cmd.params)
+        assert cmd.params == first
+        # click caches the help option by appending it to ``params`` and popping
+        # it straight back off, which must not re-trigger the append.
+        cmd.get_help_option(click.Context(cmd))
+        assert cmd.params == first
+
+
 class TestGlobalOptionsSingleSource:
     """Global options are declared once, in ``click_ext._global_option_sections``,
     and appended to every command from that single source (the root group via

@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are now masked in error output, and such a malformed value is no longer
   echoed. See `SECURITY.md`.
 
+### Changed
+
+- **Startup is faster.** Every run — commands, `--help`, `--version`, and each
+  shell-completion keystroke — starts about 10–18 ms (10–15%) sooner.
+
 ### Fixed
 
 - **`--debug` no longer hangs when stdout's reader goes away.** With
