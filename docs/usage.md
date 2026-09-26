@@ -209,7 +209,10 @@ format Python uses for an uncaught exception (the qualified class name and the
 message, with no traceback frames). For an `ApiException` that output already
 includes the status, reason, headers, and body, so the response payload (e.g.
 the 412 sync-token body when polling events) is readable without requesting an
-envelope.
+envelope. Credentials quoted in that text are masked, in the envelope too — e.g.
+a token with a stray line break (read from a CRLF file) makes the SDK stack
+report `Invalid header value b'Bearer <token>\r'` — see
+[SECURITY.md](../SECURITY.md#error-output-masks-your-credentials).
 
 `--exception-output {none|json|text|csv|table}` (default `none`) controls the
 structured envelope:

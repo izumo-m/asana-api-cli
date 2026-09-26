@@ -7,7 +7,7 @@ Runtime-introspection wrapper around `python-asana`. API group stubs are registe
 | File | Role |
 |---|---|
 | `cli.py` | Runtime introspection + Click command tree; body / workspace input resolution |
-| `session.py` | SDK client (`Configuration` + `ApiClient`); on context-manager entry (`open`) installs the `--debug` side effects (the `http.client` debuglevel + asana/urllib3 logger flips and the `Authorization` redactor), reverses them on exit (`close`) |
+| `session.py` | SDK client (`Configuration` + `ApiClient`); on context-manager entry (`open`) installs the `--debug` side effects (the `http.client` debuglevel + asana/urllib3 logger flips and the `Authorization` redactor), reverses them on exit (`close`); `mask_credentials` masks this invocation's credentials in error text |
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
 | `click_ext.py` | The `_GlobalOptionsMixin` mixin and its concrete subclasses propagating global options to the root group and subgroups (`GroupWithGlobalOptions`) and leaf commands (`CommandWithGlobalOptions`) |
 | `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |

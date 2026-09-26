@@ -276,3 +276,38 @@ class TestDefaultHeaderCallback:
     def test_empty_name_rejected(self) -> None:
         with pytest.raises(click.BadParameter, match="NAME=VALUE"):
             _default_headers("=value")
+
+
+class TestCredentialsNotEchoedInErrors:
+    """Constitution #2: a malformed value is quoted back in the error, so one
+    carrying a credential — typically ``Authorization: Bearer <token>`` typed
+    with ``:`` for ``=`` — must not be."""
+
+    TOKEN = "2/1111111111111111/2222222222222222:secretTOKENabcdef0123456789"
+
+    def _message(self, exc_info: pytest.ExceptionInfo[click.BadParameter]) -> str:
+        return exc_info.value.format_message()
+
+    def test_default_header_mentioning_authorization(self) -> None:
+        with pytest.raises(click.BadParameter) as exc_info:
+            _default_headers(f"Authorization: Bearer {self.TOKEN}")
+        message = self._message(exc_info)
+        assert self.TOKEN not in message
+        assert "not shown" in message
+
+    def test_header_params_pair_mentioning_authorization(self) -> None:
+        with pytest.raises(click.BadParameter) as exc_info:
+            parse_structured_arg(f"Asana-Enable=x,proxy-authorization: Basic {self.TOKEN}")
+        message = self._message(exc_info)
+        assert self.TOKEN not in message
+        assert "not shown" in message
+
+    def test_known_token_masked_in_other_values(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ASANA_ACCESS_TOKEN", self.TOKEN)
+        with pytest.raises(click.BadParameter) as exc_info:
+            _default_headers(f"X-Token {self.TOKEN}")
+        assert self._message(exc_info).endswith("Expected NAME=VALUE, got 'X-Token ...456789'.")
+
+    def test_other_values_still_echoed(self) -> None:
+        with pytest.raises(click.BadParameter, match="'Asana-Enable new_x'"):
+            parse_structured_arg("Asana-Enable new_x")

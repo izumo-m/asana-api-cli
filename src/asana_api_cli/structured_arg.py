@@ -38,6 +38,8 @@ from typing import Any
 
 import click
 
+from asana_api_cli.session import mask_credentials
+
 _BOOL_TRUE = {"true"}
 _BOOL_FALSE = {"false"}
 
@@ -107,6 +109,17 @@ def parse_structured_arg(
     return _parse_shorthand(value, schema)
 
 
+def _shown(text: str) -> str:
+    """*text* quoted for an error message, with credentials kept out of it
+    (constitution #2): a malformed pair that mentions ``Authorization`` — e.g.
+    ``Authorization: Bearer <token>`` typed with ``:`` for ``=`` — is not
+    echoed at all, and a known token elsewhere is masked
+    (:func:`~asana_api_cli.session.mask_credentials`)."""
+    if "authorization" in text.lower():
+        return "<a value mentioning Authorization, not shown>"
+    return mask_credentials(repr(text))
+
+
 def _parse_json_object(text: str) -> dict[str, Any]:
     try:
         obj = json.loads(text)
@@ -133,7 +146,7 @@ def _parse_shorthand(
         pair = raw_pair.strip()
         if "=" not in pair:
             raise click.BadParameter(
-                f"Missing '=' in shorthand pair: {pair!r}. "
+                f"Missing '=' in shorthand pair: {_shown(pair)}. "
                 "Use 'key=value[,key=value...]' or a JSON object."
             )
         key, raw_val = pair.split("=", 1)
@@ -229,6 +242,8 @@ def default_header_callback(
         name, sep, val = token.partition("=")
         name = name.strip()
         if not sep or not name:
-            raise click.BadParameter(f"Expected NAME=VALUE, got {token!r}.", ctx=ctx, param=param)
+            raise click.BadParameter(
+                f"Expected NAME=VALUE, got {_shown(token)}.", ctx=ctx, param=param
+            )
         headers[name] = val
     return headers

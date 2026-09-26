@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Credentials are masked in error output.** Before, three mistakes put a
+  credential into user-visible output:
+  - A token with a stray line break, e.g. read with `$(cat token.txt)` from a
+    file with Windows (CRLF) line endings, made the error quote the whole token
+    (`Invalid header value b'Bearer <token>\r'`). This appeared on stderr and in
+    the `--exception-output` envelope.
+  - An unparsable `--proxy` / `--host` URL was repeated with its password.
+  - A malformed `--set-default-header` / `--header-params` value such as
+    `Authorization: Bearer <token>` was echoed back in the usage error.
+
+  The token, `Authorization` / `Proxy-Authorization` values, and URL passwords
+  are now masked in error output, and such a malformed value is no longer
+  echoed. See `SECURITY.md`.
+
 ### Fixed
 
 - **A `--query` / `--exception-query` jq expression that does not compile is

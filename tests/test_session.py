@@ -3,6 +3,9 @@ the pagination knobs, the ``_CONFIG_KNOBS``
 Configuration table, and the ApiClient-instance settings (``--user-agent`` /
 ``--set-default-header``).
 
+``mask_credentials`` (credential masking for error output) is covered here
+too; its wiring into the error renderings is in ``test_formatter.py``.
+
 The input-resolution helpers (``resolve_body`` / ``resolve_workspace``) now
 live in ``asana_api_cli.cli``; their tests are in ``test_cli.py``.
 """
@@ -18,6 +21,7 @@ import pytest
 
 from asana_api_cli.session import (
     AsanaSession,
+    mask_credentials,
     runtime,
 )
 
@@ -296,3 +300,72 @@ class TestAsanaSessionApiClientHeaders:
         # No runtime overrides → the SDK's own default User-Agent is untouched.
         session = AsanaSession(token="x" * 20)
         assert session.client.user_agent.startswith("Swagger-Codegen")
+
+
+# ---------------------------------------------------------------------------
+# mask_credentials — credential masking for error output (constitution #2)
+# ---------------------------------------------------------------------------
+
+TOKEN = "2/1111111111111111/2222222222222222:secretTOKENabcdef0123456789"
+
+
+class TestMaskCredentials:
+    """Every credential the invocation holds is masked in free text (an
+    exception message), with the ``--debug`` trace's presentation."""
+
+    @pytest.fixture(autouse=True)
+    def _no_env_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+
+    def test_token_with_stray_crlf_is_masked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # The real leak: a token read from a CRLF file makes http.client quote
+        # the whole header, with the CR escaped, in its ValueError.
+        monkeypatch.setattr(runtime, "access_token", TOKEN + "\r\n")
+        text = f"Invalid header value b'Bearer {TOKEN}\\r\\n'"
+        assert mask_credentials(text) == "Invalid header value b'Bearer ...456789\\r\\n'"
+
+    def test_env_token_is_masked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ASANA_ACCESS_TOKEN", TOKEN)
+        assert mask_credentials(f"x {TOKEN} y") == "x ...456789 y"
+
+    def test_short_value_is_left_alone(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Too short to be a real credential; masking it would mangle text.
+        monkeypatch.setattr(runtime, "access_token", "abc")
+        assert mask_credentials("abcdef abc") == "abcdef abc"
+
+    def test_auth_header_values_are_masked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            runtime, "default_headers", {"Proxy-Authorization": "Basic dXNlcjpwYXNzd29yZA==\r"}
+        )
+        header_params = {"authorization": f"Bearer {TOKEN}", "X-Other": "Basic not-a-credential"}
+        text = f"a b'Basic dXNlcjpwYXNzd29yZA==\\r' b Bearer {TOKEN} c Basic not-a-credential"
+        assert mask_credentials(text, header_params=header_params) == (
+            "a b'Basic <REDACTED>\\r' b Bearer ...456789 c Basic not-a-credential"
+        )
+
+    @pytest.mark.parametrize(
+        ("attr", "url", "expected"),
+        [
+            ("proxy", "http://u:pw@127.0.0.1:x", "http://u:***@127.0.0.1:x"),
+            # An unescaped '@' in the password: the configured URL is matched
+            # whole, so no part of the password survives.
+            ("proxy", "http://u:p@ss@h:x", "http://u:***@h:x"),
+            ("host", "http://u:pw@h:x/api/1.0", "http://u:***@h:x/api/1.0"),
+        ],
+    )
+    def test_configured_url_password_is_masked(
+        self, monkeypatch: pytest.MonkeyPatch, attr: str, url: str, expected: str
+    ) -> None:
+        monkeypatch.setattr(runtime, attr, url)
+        assert mask_credentials(f"Failed to parse: {url}") == f"Failed to parse: {expected}"
+
+    def test_any_url_password_is_masked(self) -> None:
+        # Fallback for a URL the configured values do not match verbatim.
+        assert mask_credentials("see 'https://user:secret@proxy:3128/x'") == (
+            "see 'https://user:***@proxy:3128/x'"
+        )
+
+    def test_text_without_credentials_is_unchanged(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "access_token", TOKEN)
+        text = "HTTPSConnectionPool(host='app.asana.com', port=443): Max retries exceeded"
+        assert mask_credentials(text) == text

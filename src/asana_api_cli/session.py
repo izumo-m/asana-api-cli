@@ -10,14 +10,17 @@ from __future__ import annotations
 import http.client
 import logging
 import os
+import re
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 import asana
 import click
 
-from asana_api_cli.redactor import HttpClientAuthRedactor
+from asana_api_cli.redactor import _BASIC_MASK, HttpClientAuthRedactor, _default_mask_token
 
 ACCESS_TOKEN_ENV = "ASANA_ACCESS_TOKEN"
 
@@ -251,7 +254,7 @@ class AsanaSession:
     @classmethod
     def from_env(cls) -> AsanaSession:
         """Build a session from runtime.access_token, falling back to $ASANA_ACCESS_TOKEN."""
-        token = runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
+        token = _resolved_token()
         if not token:
             click.echo(
                 f"Access token is not set. Pass --access-token or set {ACCESS_TOKEN_ENV}.",
@@ -259,3 +262,79 @@ class AsanaSession:
             )
             sys.exit(2)
         return cls(token=token)
+
+
+def _resolved_token() -> str:
+    """The access token a session uses: ``--access-token``, else ``$ASANA_ACCESS_TOKEN``."""
+    return runtime.access_token or os.environ.get(ACCESS_TOKEN_ENV, "")
+
+
+# ---------- credential masking for error output -----------------------------
+#
+# Constitution #2. An SDK / urllib3 / http.client exception can quote a
+# credential verbatim: a token with a stray CR/LF (e.g. read from a CRLF file)
+# makes http.client raise ``Invalid header value b'Bearer <token>\r'``, and an
+# unparsable ``--proxy`` / ``--host`` URL is echoed whole by urllib3's
+# ``LocationParseError``. ``mask_credentials`` masks every credential this
+# invocation holds before such text is shown, with the ``--debug`` trace's
+# presentation (``...<last 6>``; ``Basic`` fully masked; a URL password as
+# ``***``).
+
+_AUTH_HEADER_NAMES = frozenset({"authorization", "proxy-authorization"})
+
+# ``scheme://user:password@`` anywhere in free text — a fallback for a URL the
+# known-value pass below cannot match (e.g. one urllib3 re-renders). Bounded by
+# whitespace and quotes because the URL is embedded in a message.
+_URL_PASSWORD_RE = re.compile(r"""([A-Za-z][A-Za-z0-9+.-]*://[^\s'"/@:]*):[^\s'"/@]*@""")
+
+# A shorter value is not worth masking — it cannot be a real credential of the
+# kind masked here, and replacing it would mangle unrelated text.
+_MIN_MASKED_LEN = 8
+
+
+def _mask_auth_value(value: str) -> str:
+    """Mask an ``Authorization`` / ``Proxy-Authorization`` value like the
+    ``--debug`` trace: the ``Bearer`` / ``Basic`` scheme stays visible and a
+    ``Basic`` credential (base64 of ``user:password``) is fully masked."""
+    scheme, sep, credential = value.partition(" ")
+    if sep and scheme.lower() == "basic":
+        return f"{scheme} {_BASIC_MASK}"
+    if sep and scheme.lower() == "bearer":
+        return f"{scheme} {_default_mask_token(credential.strip())}"
+    return _default_mask_token(value)
+
+
+def _credential_masks(header_params: Mapping[str, Any] | None) -> list[tuple[str, str]]:
+    """``(secret, masked)`` pairs for every credential this invocation holds:
+    the access token, ``(Proxy-)Authorization`` header values (session-wide and
+    per call), and the password in the ``--proxy`` / ``--host`` URL. Values are
+    matched without surrounding whitespace — a stray CR/LF is exactly what makes
+    http.client quote them, and it shows up escaped in the message."""
+    masks: list[tuple[str, str]] = []
+    token = _resolved_token().strip()
+    if len(token) >= _MIN_MASKED_LEN:
+        masks.append((token, _default_mask_token(token)))
+    for headers in (runtime.default_headers, header_params):
+        for name, value in (headers or {}).items():
+            if name.lower() in _AUTH_HEADER_NAMES and isinstance(value, str):
+                value = value.strip()
+                if len(value) >= _MIN_MASKED_LEN:
+                    masks.append((value, _mask_auth_value(value)))
+    for url in (runtime.proxy, runtime.host):
+        try:
+            parts = urlsplit(url or "")
+            user, password = parts.username, parts.password
+        except ValueError:  # e.g. an invalid port; the regex fallback still applies
+            continue
+        if password:
+            masks.append((f"{user}:{password}@", f"{user}:***@"))
+    # Longest first, so a value that contains another is masked whole.
+    return sorted(masks, key=lambda m: len(m[0]), reverse=True)
+
+
+def mask_credentials(text: str, header_params: Mapping[str, Any] | None = None) -> str:
+    """*text* with every credential this invocation holds masked (see above).
+    *header_params* are the per-call ``--header-params``, when known."""
+    for secret, masked in _credential_masks(header_params):
+        text = text.replace(secret, masked)
+    return _URL_PASSWORD_RE.sub(r"\1:***@", text)

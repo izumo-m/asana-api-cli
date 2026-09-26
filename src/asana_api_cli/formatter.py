@@ -13,7 +13,7 @@ import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
 
-from asana_api_cli.session import runtime
+from asana_api_cli.session import mask_credentials, runtime
 
 
 def _validate_jq_syntax(
@@ -183,12 +183,21 @@ def formatted(f: Any) -> Any:
             # For ApiException this includes status / reason / headers /
             # body — the useful payload (e.g. the 412 sync-token body
             # in events polling) stays visible without traceback noise.
-            _echo_exception_only(e)
+            # Both renderings mask this invocation's credentials: the SDK
+            # stack can quote one verbatim (constitution #2; see
+            # ``session.mask_credentials``).
+            header_params = kwargs.get("header_params")
+            _echo_exception_only(e, header_params=header_params)
             if exception_output == "none":
                 sys.exit(1)
             # Otherwise also render a ``{exception, ...}`` envelope on
             # stdout and exit 3.
-            _handle_exception(e, exception_output=exception_output, exception_query=exception_query)
+            _handle_exception(
+                e,
+                exception_output=exception_output,
+                exception_query=exception_query,
+                header_params=header_params,
+            )
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
 
     return wrapper
@@ -223,7 +232,7 @@ def _qualified_exception_name(e: BaseException) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
-def _echo_exception_only(e: BaseException) -> None:
+def _echo_exception_only(e: BaseException, *, header_params: Any = None) -> None:
     """Write ``traceback.format_exception_only`` output to stderr.
 
     Format: qualified class name + the exception's ``__str__``, no
@@ -241,20 +250,33 @@ def _echo_exception_only(e: BaseException) -> None:
     Always written from :func:`formatted` (both
     ``--exception-output=none`` and the envelope formats), so the raw
     exception stays visible even when ``--exception-query`` would
-    otherwise strip it from stdout.
+    otherwise strip it from stdout. Credentials are masked
+    (:func:`~asana_api_cli.session.mask_credentials`; *header_params* are the
+    call's ``--header-params``).
     """
     # ``color=True``: keep the message verbatim even when stderr is redirected
     # (see :func:`_echo_payload`).
     click.echo(
-        "".join(traceback.format_exception_only(type(e), e)),
+        mask_credentials(
+            "".join(traceback.format_exception_only(type(e), e)), header_params=header_params
+        ),
         err=True,
         nl=False,
         color=True,
     )
 
 
+def _mask_strings(obj: Any, header_params: Any) -> Any:
+    """*obj* (an envelope) with :func:`mask_credentials` applied to every string."""
+    if isinstance(obj, str):
+        return mask_credentials(obj, header_params=header_params)
+    if isinstance(obj, dict):
+        return {k: _mask_strings(v, header_params) for k, v in obj.items()}
+    return obj
+
+
 def _handle_exception(
-    e: Exception, *, exception_output: str, exception_query: str | None
+    e: Exception, *, exception_output: str, exception_query: str | None, header_params: Any = None
 ) -> NoReturn:
     """Render an exception as an envelope on stdout, then exit 3.
 
@@ -262,7 +284,8 @@ def _handle_exception(
     ``none`` path and the stderr echo are handled upstream in
     :func:`formatted`. For the envelope schema and exit-code contract see
     ``docs/usage.md`` ("Error handling"); for the rationale,
-    ``docs/sdk-deviations.md``.
+    ``docs/sdk-deviations.md``. Every string in the envelope has credentials
+    masked, as in :func:`_echo_exception_only`.
     """
     envelope: dict[str, Any]
     if isinstance(e, ApiException):
@@ -290,7 +313,7 @@ def _handle_exception(
         }
 
     _format_output(
-        envelope,
+        _mask_strings(envelope, header_params),
         output_format=exception_output,
         jq_query=exception_query,
     )
