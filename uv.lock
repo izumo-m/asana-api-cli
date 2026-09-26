@@ -44,7 +44,7 @@ dev = [
 requires-dist = [
     { name = "asana", specifier = ">=5.0.2,<6" },
     { name = "click", specifier = ">=8.0" },
-    { name = "jq", specifier = ">=1.6" },
+    { name = "jq", specifier = ">=1.9.1" },
     { name = "tabulate", specifier = ">=0.9" },
 ]
 
