@@ -28,24 +28,11 @@ flags switch to live API access; see [Running](#running) below.
 
 ## One-time provisioning (live mode only)
 
-Some tests rely on standing fixtures in the test workspace (e.g. a project
-with 1500 tasks for pagination). `tools/e2e_init.py` is idempotent — safe
-to re-run; it only creates / deletes what is needed to reach the target
-state, with 5xx/429 retry and a 0.5 s minimum interval between writes to
-stay under Asana's per-minute rate limit.
-
-```bash
-export ASANA_ACCESS_TOKEN=...
-export ASANA_PYTEST_WORKSPACE=<test-dedicated workspace gid>
-uv run python tools/e2e_init.py
-```
-
-Provisioned per workspace:
-
-- Project `pagination-test` with 1500 tasks (`ptest-0001` .. `ptest-1500`).
-- Project `pagination-test-small` with 50 tasks (`psmall-0001` .. `psmall-0050`); used to verify `--full-payload` / `--no-return-page-iterator` behavior *below* Asana's per-response cap (~1000 items).
-
-The first full run takes roughly 12 minutes (1500 task creations × 0.5 s).
+Some tests rely on standing fixtures in the test workspace (the
+`pagination-test` / `pagination-test-small` projects). Create them once per
+workspace with `tools/e2e_init.py` — see
+[`tools/README.md` §e2e_init.py](../../tools/README.md#e2e_initpy) for
+what it provisions and how to run it.
 
 ## Running
 

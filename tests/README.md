@@ -12,6 +12,17 @@ Run a single test:
 uv run pytest tests/test_formatter.py::test_name
 ```
 
+## Multiple Python versions
+
+`uv run pytest` uses the project's `.venv` (a single Python). To run the suite
+on 3.10, 3.12, and 3.14 — or other versions you name — use
+`tools/test_python_versions.sh`; see
+[`tools/README.md` §test_python_versions.sh](../tools/README.md#test_python_versionssh).
+
+```bash
+bash tools/test_python_versions.sh
+```
+
 ## Lower-bound versions
 
 The default `uv run pytest` resolves every dependency to its newest

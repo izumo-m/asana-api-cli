@@ -28,11 +28,15 @@ tests/
     ├── cli_surface.json        # Canonical CLI surface for the bundled SDK
     └── generate_python/        # Golden snapshots for --generate-python output
 
-tools/
+tools/                          # Maintenance scripts; usage in tools/README.md
 ├── e2e_init.py                 # One-time fixture provisioner for tests/e2e/
-├── publish_pypi.sh             # Build (python -m build) + twine upload to PyPI
-└── tag_version.sh              # Create the annotated git tag from the pyproject version
+├── publish_pypi.sh             # Manual build + twine upload to PyPI
+├── tag_version.sh              # Create the annotated git tag from the pyproject version
+└── test_python_versions.sh     # Run the tests on several Python versions
 ```
+
+See [`tools/README.md`](../tools/README.md) for what each script does and how
+to run it.
 
 ## Bumping the `asana` SDK
 
