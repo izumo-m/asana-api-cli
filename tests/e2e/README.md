@@ -84,11 +84,11 @@ with `--config /dev/null` so an existing named-tunnel
 ingress and respond `http_status:404` to every edge request.
 
 To re-record a subset of cassettes (e.g. after changing the CLI
-surface), delete the affected files first — `--record` writes new
-interactions but does not prune stale ones:
+surface), select just those tests — `--record` replaces each selected
+test's cassette (a test that skips or records nothing keeps its committed
+one):
 
 ```bash
-rm tests/e2e/cassettes/<dir>/<test>.yaml
 uv run pytest --live --record tests/e2e/<file>::<test>
 ```
 
@@ -300,7 +300,7 @@ correctly decode non-ASCII filenames. The upstream `python-asana` SDK
 default. The CLI ships an opt-in workaround: pass
 `--multibyte-filenames` to the upload command (a per-command option on
 file-upload commands, not a global flag), which installs a
-session-scoped patch on `urllib3.fields.RequestField.make_multipart`
+command-scoped patch (via the option's callback) on `urllib3.fields.RequestField.make_multipart`
 that adds `filename*=` when the filename has non-ASCII bytes.
 
 The `japanese_filename_*` parametrized cases in `test_attachments.py`

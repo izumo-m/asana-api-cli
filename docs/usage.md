@@ -180,10 +180,10 @@ a non-empty `--access-token`, which is embedded in **masked** form (`...` plus
 the last 6 characters; a value too short to be a real token — a dummy — stays
 verbatim, so the masked script fails with 401 instead of silently using a
 different credential). An `Authorization` / `Proxy-Authorization` header given
-via `--set-default-header` / `--header-params` and the password in a `--proxy`
-URL are masked the same way (a `Basic` credential entirely, with no tail
-reveal) — in the configuration lines and in the `# Equivalent to:` comment
-alike. Everything else (including other custom
+via `--set-default-header` / `--header-params` is masked the same way (a `Basic`
+credential entirely, with no tail reveal), and the password in a `--proxy` URL
+is replaced with `***` — in the configuration lines and in the
+`# Equivalent to:` comment alike. Everything else (including other custom
 headers and the `--body` payload) is transcribed verbatim — see
 [SECURITY.md](../SECURITY.md). Input validation still runs
 during generation: a malformed `--body` literal or a missing required
@@ -373,7 +373,7 @@ Mirroring the SDK, `--proxy` is the only way to configure a proxy — the
 
 ### Credentials in the proxy URL are discarded
 
-As of `python-asana` 5.2.5 — the latest version checked —
+As of `python-asana` 5.3.0 — the latest version checked —
 `--proxy http://user:pass@host:port` parses, but the credentials are **never
 sent**: the SDK stack (`python-asana` → urllib3) does not turn URL userinfo
 into a `Proxy-Authorization` header. urllib3's only built-in proxy-credential
@@ -424,7 +424,7 @@ like `--project` that the Asana API accepts in place of a workspace.
 
 ## File uploads
 
-In `python-asana` 5.2.5 — the latest version checked, and most likely later
+In `python-asana` 5.3.0 — the latest version checked, and most likely later
 ones too — uploading a file whose name contains non-ASCII characters (accented
 letters, Japanese, emoji, …) stores a garbled (mojibake) filename on Asana.
 This is a long-standing bug in the SDK — see the
