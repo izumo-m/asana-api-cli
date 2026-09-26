@@ -274,6 +274,10 @@ esac
   `delete-*` command has taken effect, and retrying it repeats the change. The
   unfiltered result is not printed; when an `--exception-query` fails this way,
   the SDK exception has still been echoed to stderr.
+- A reader that stops early (`| head`, or quitting `| less`) ends the run with
+  a quiet `1` once `asana-api` next writes to stdout — no traceback, on Windows
+  too. Every page has already been fetched by then: the output is written after
+  the call completes.
 - `1` is the catch-all for everything else that failed; do not read a specific
   cause into it. To ask "did it fail?", test for non-zero; to branch on the
   kind, match `2` / `3` and treat any other non-zero (including `1`) as an

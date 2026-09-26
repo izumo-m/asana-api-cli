@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import csv
+import errno
 import functools
 import io
 import json
+import os
 import sys
 import traceback
+from collections.abc import Iterator
 from typing import Any, NoReturn
 
 import click
@@ -115,7 +119,10 @@ def formatted(f: Any) -> Any:
     (leaf) options bound to the single method invocation, not global flags.
     """
 
+    # A reader that leaves early (``| head``) ends the run quietly — see
+    # :func:`_exit_quietly_if_stdout_closed`.
     @functools.wraps(f)
+    @_exit_quietly_if_stdout_closed()
     def wrapper(
         *args: Any,
         output_format: str,
@@ -189,6 +196,7 @@ def formatted(f: Any) -> Any:
             header_params = kwargs.get("header_params")
             _echo_exception_only(e, header_params=header_params)
             if exception_output == "none":
+                _flush_stdout()
                 sys.exit(1)
             # Otherwise also render a ``{exception, ...}`` envelope on
             # stdout and exit 3.
@@ -199,8 +207,48 @@ def formatted(f: Any) -> Any:
                 header_params=header_params,
             )
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
+        _flush_stdout()
 
     return wrapper
+
+
+def _flush_stdout() -> None:
+    """Flush stdout before a path that writes nothing more to it
+    (``--output none``, or an error under ``--exception-output none``).
+
+    ``--debug`` may have buffered wire-trace lines there. If the reader is
+    gone (``| head``), flushing now raises inside
+    :func:`_exit_quietly_if_stdout_closed` instead of at interpreter shutdown
+    ("Exception ignored ... BrokenPipeError", exit 120).
+    """
+    sys.stdout.flush()
+
+
+@contextlib.contextmanager
+def _exit_quietly_if_stdout_closed() -> Iterator[None]:
+    """Turn a write to a stdout whose reader is gone (``| head``, quitting
+    ``| less``) into a quiet exit 1 — the convention click applies to EPIPE.
+
+    Handled here rather than left to click because Windows reports the same
+    condition as ``OSError(EINVAL)``, which click does not recognize (a
+    traceback, then exit 120 from the shutdown flush). Either way fd 1 is
+    pointed at the null device first, so the interpreter's final flush of
+    whatever is still buffered cannot fail again.
+    """
+    try:
+        yield
+    except OSError as e:
+        closed = isinstance(e, BrokenPipeError) or (
+            sys.platform == "win32" and e.errno == errno.EINVAL
+        )
+        if not closed:
+            raise
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except (OSError, ValueError):  # no real fd behind stdout (e.g. a test runner)
+            pass
+        sys.exit(1)
 
 
 def formatter_flag_names() -> frozenset[str]:

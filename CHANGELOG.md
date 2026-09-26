@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--debug` no longer hangs when stdout's reader goes away.** With
+  `asana-api --debug ... | head`, or after quitting `| less`, the call could
+  wait forever: a failed write of the wire trace kept the request from being
+  sent. The trace line is now dropped and the call completes.
+- **A reader that stops early now ends the run quietly on Windows too.** On
+  Windows, output to a closed pipe (e.g. `| head` in Git Bash) printed an
+  `OSError: [Errno 22] Invalid argument` traceback. It now exits `1` without
+  one, as on Linux and macOS. `--output none` under `--debug` no longer prints
+  "Exception ignored ... BrokenPipeError" or exits `120`.
 - **A `--query` / `--exception-query` jq expression that does not compile is
   now rejected before the API call.** It used to be checked only against the
   response, so a typo in `--query` still ran the call — a `create-task` created
