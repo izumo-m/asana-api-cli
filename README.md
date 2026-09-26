@@ -92,8 +92,13 @@ installing `asana-api-cli`; `pipx upgrade asana-api-cli` updates only
 CLI:
 
 ```bash
-pipx runpip asana-api-cli install -U asana
+pipx runpip asana-api-cli install -U "asana<6"
 ```
+
+Keep the `<6` bound — it is the SDK range `asana-api-cli` supports. A bare
+`install -U asana` does not honor that requirement: pip would install a future
+major version anyway (reporting only a dependency-conflict error), leaving the
+CLI on an SDK it does not support.
 
 The next `asana-api` run sees the new SDK and any newly added methods
 automatically.
@@ -126,17 +131,21 @@ $env:ASANA_DEFAULT_WORKSPACE = "12345678"   # optional
 ## Shell completion
 
 `asana-api` is built with Click, which supports dynamic shell completion.
-To enable bash completion, add the following line to your `~/.bashrc`:
+To enable it, add the line for your shell to its startup file:
 
 ```bash
+# bash: ~/.bashrc
 eval "$(_ASANA_API_COMPLETE=bash_source asana-api)"
+
+# zsh: ~/.zshrc
+eval "$(_ASANA_API_COMPLETE=zsh_source asana-api)"
+
+# fish: ~/.config/fish/config.fish
+_ASANA_API_COMPLETE=fish_source asana-api | source
 ```
 
-Then reload the shell (`source ~/.bashrc` or open a new terminal). Pressing
-`<TAB>` after `asana-api` will now complete subcommands and options.
-
-For `zsh` or `fish`, replace `bash_source` with `zsh_source` or `fish_source`
-and add the line to `~/.zshrc` or `~/.config/fish/config.fish` respectively.
+Then reload the shell (e.g. `source ~/.bashrc`, or open a new terminal).
+Pressing `<TAB>` after `asana-api` will now complete subcommands and options.
 
 Click does not generate PowerShell completion. Windows users can install
 completion under WSL or Git Bash using the `bash_source` line above.
@@ -174,9 +183,10 @@ asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PRO
 
 # Output formats — non-JSON formats render one row per item. The default
 # auto-paginating output is a flat list, so it is directly rowable; under
-# --full-payload, unwrap the `{"data": [...]}` envelope first with `--query '.data'`.
+# --full-payload, unwrap the `{"data": [...]}` envelope first with `--query '.data'`
+# (and pass --limit: Asana rejects an unpaginated request over ~1000 items).
 asana-api tasks get-tasks --project <PROJECT_GID> --output table
-asana-api tasks get-tasks --project <PROJECT_GID> --full-payload --query '.data' --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload --query '.data' --output csv
 
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
 # Windows, which otherwise displays non-ASCII characters as garbled text.

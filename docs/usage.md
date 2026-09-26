@@ -128,7 +128,7 @@ auto-paginating output is already a flat list, so it is directly rowable; under
 ```bash
 asana-api tasks get-tasks --project <PROJECT_GID> --output table
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv
-asana-api tasks get-tasks --project <PROJECT_GID> --full-payload --query '.data' --output table
+asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload --query '.data' --output table
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # Side-effect-only call: only the exit code matters
