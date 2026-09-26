@@ -47,6 +47,7 @@ from __future__ import annotations
 import ast
 import inspect
 import textwrap
+import threading
 from collections.abc import Iterator
 from typing import Any
 
@@ -299,3 +300,17 @@ def test_pagination_items_are_generators() -> None:
 
     assert inspect.isgeneratorfunction(PageIterator.items)
     assert inspect.isgeneratorfunction(EventIterator.items)
+
+
+def test_api_client_starts_no_pool_threads() -> None:
+    # ``ApiClient.__init__`` starts a thread pool whose GC-time cleanup can hang
+    # the suite; conftest's ``_lazy_sdk_thread_pool`` swaps in a pool that starts
+    # only on use. Pin that the swap still applies: an SDK that built its pool
+    # some other way would silently bring the rare hang back.
+    before = threading.active_count()
+    client = asana.ApiClient(asana.Configuration())
+    assert threading.active_count() == before, (
+        "asana.ApiClient() started threads — update _lazy_sdk_thread_pool in "
+        "tests/conftest.py to the SDK's new way of building its pool"
+    )
+    del client
