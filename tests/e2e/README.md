@@ -28,24 +28,11 @@ flags switch to live API access; see [Running](#running) below.
 
 ## One-time provisioning (live mode only)
 
-Some tests rely on standing fixtures in the test workspace (e.g. a project
-with 1500 tasks for pagination). `tools/e2e_init.py` is idempotent — safe
-to re-run; it only creates / deletes what is needed to reach the target
-state, with 5xx/429 retry and a 0.5 s minimum interval between writes to
-stay under Asana's per-minute rate limit.
-
-```bash
-export ASANA_ACCESS_TOKEN=...
-export ASANA_PYTEST_WORKSPACE=<test-dedicated workspace gid>
-uv run python tools/e2e_init.py
-```
-
-Provisioned per workspace:
-
-- Project `pagination-test` with 1500 tasks (`ptest-0001` .. `ptest-1500`).
-- Project `pagination-test-small` with 50 tasks (`psmall-0001` .. `psmall-0050`); used to verify `--full-payload` / `--no-return-page-iterator` behavior *below* Asana's per-response cap (~1000 items).
-
-The first full run takes roughly 12 minutes (1500 task creations × 0.5 s).
+Some tests rely on standing fixtures in the test workspace (the
+`pagination-test` / `pagination-test-small` projects). Create them once per
+workspace with `tools/e2e_init.py` — see
+[`tools/README.md` §e2e_init.py](../../tools/README.md#e2e_initpy) for
+what it provisions and how to run it.
 
 ## Running
 
@@ -84,11 +71,11 @@ with `--config /dev/null` so an existing named-tunnel
 ingress and respond `http_status:404` to every edge request.
 
 To re-record a subset of cassettes (e.g. after changing the CLI
-surface), delete the affected files first — `--record` writes new
-interactions but does not prune stale ones:
+surface), select just those tests — `--record` replaces each selected
+test's cassette (a test that skips or records nothing keeps its committed
+one):
 
 ```bash
-rm tests/e2e/cassettes/<dir>/<test>.yaml
 uv run pytest --live --record tests/e2e/<file>::<test>
 ```
 
@@ -300,7 +287,7 @@ correctly decode non-ASCII filenames. The upstream `python-asana` SDK
 default. The CLI ships an opt-in workaround: pass
 `--multibyte-filenames` to the upload command (a per-command option on
 file-upload commands, not a global flag), which installs a
-session-scoped patch on `urllib3.fields.RequestField.make_multipart`
+command-scoped patch (via the option's callback) on `urllib3.fields.RequestField.make_multipart`
 that adds `filename*=` when the filename has non-ASCII bytes.
 
 The `japanese_filename_*` parametrized cases in `test_attachments.py`

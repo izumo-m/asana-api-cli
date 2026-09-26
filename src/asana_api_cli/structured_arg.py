@@ -32,11 +32,14 @@ contain commas, which the ``key=value,key=value`` shorthand would mis-split.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import click
+
+from asana_api_cli.session import mask_credentials
 
 _BOOL_TRUE = {"true"}
 _BOOL_FALSE = {"false"}
@@ -91,7 +94,9 @@ def parse_structured_arg(
     if first == "@":
         path = Path(value[1:])
         try:
-            raw = path.read_text(encoding="utf-8")
+            # ``utf-8-sig`` skips a leading BOM (e.g. from Windows PowerShell
+            # 5.1's ``Out-File -Encoding utf8``), which json.loads rejects.
+            raw = path.read_text(encoding="utf-8-sig")
         except FileNotFoundError as exc:
             raise click.BadParameter(f"File not found: {path}") from exc
         except UnicodeDecodeError as exc:
@@ -103,6 +108,32 @@ def parse_structured_arg(
             _validate_keys(parsed, schema)
         return parsed
     return _parse_shorthand(value, schema)
+
+
+def _shown(text: str) -> str:
+    """*text* quoted for an error message, with credentials kept out of it
+    (constitution #2): a malformed pair that mentions ``Authorization`` — e.g.
+    ``Authorization: Bearer <token>`` typed with ``:`` for ``=`` — is not
+    echoed at all, and a known token elsewhere is masked
+    (:func:`~asana_api_cli.session.mask_credentials`)."""
+    if "authorization" in text.lower():
+        return "<a value mentioning Authorization, not shown>"
+    return mask_credentials(repr(text))
+
+
+# An HTTP header name is a token (RFC 9110 §5.6.2). A name with ``:`` or
+# whitespace is a mistyped ``Name: value`` pair whose "name" carries the value —
+# e.g. ``Proxy-Authorization: Basic <base64>==``, split at the padding ``=``.
+# http.client would quote such a name whole in its ``Invalid header name`` error
+# (constitution #2), so it is rejected here.
+_HEADER_NAME_RE = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
+
+
+def _check_header_name(name: str) -> None:
+    if not _HEADER_NAME_RE.fullmatch(name):
+        raise click.BadParameter(
+            f"Invalid header name: {_shown(name)}. A name cannot contain ':' or whitespace."
+        )
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:
@@ -131,7 +162,7 @@ def _parse_shorthand(
         pair = raw_pair.strip()
         if "=" not in pair:
             raise click.BadParameter(
-                f"Missing '=' in shorthand pair: {pair!r}. "
+                f"Missing '=' in shorthand pair: {_shown(pair)}. "
                 "Use 'key=value[,key=value...]' or a JSON object."
             )
         key, raw_val = pair.split("=", 1)
@@ -207,6 +238,19 @@ def click_callback(
     return _cb
 
 
+def header_params_callback(
+    _ctx: click.Context, _param: click.Parameter, value: str | None
+) -> dict[str, Any] | None:
+    """Click ``callback`` for ``--header-params``: :func:`parse_structured_arg`
+    without a schema, with every key checked to be a valid header name."""
+    if value is None:
+        return None
+    headers = parse_structured_arg(value)
+    for name in headers:
+        _check_header_name(name)
+    return headers
+
+
 def default_header_callback(
     ctx: click.Context, param: click.Parameter, value: tuple[str, ...]
 ) -> dict[str, str] | None:
@@ -216,7 +260,8 @@ def default_header_callback(
     (empty when the flag was not given). Returns ``None`` for "not given" so the
     value matches the other globals' unset sentinel, otherwise a ``{name:
     value}`` dict. Raises ``click.BadParameter`` (Click renders it as exit 2)
-    when a token lacks ``=`` or has an empty name. The value may itself contain
+    when a token lacks ``=`` or its name is empty or not a valid header name
+    (e.g. contains ``:``). The value may itself contain
     ``=`` (only the first is the separator) and is kept verbatim; only the name
     is trimmed of surrounding whitespace.
     """
@@ -227,6 +272,9 @@ def default_header_callback(
         name, sep, val = token.partition("=")
         name = name.strip()
         if not sep or not name:
-            raise click.BadParameter(f"Expected NAME=VALUE, got {token!r}.", ctx=ctx, param=param)
+            raise click.BadParameter(
+                f"Expected NAME=VALUE, got {_shown(token)}.", ctx=ctx, param=param
+            )
+        _check_header_name(name)
         headers[name] = val
     return headers

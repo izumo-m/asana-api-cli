@@ -97,8 +97,17 @@ _FIXED_BINDINGS: dict[str, str] = {
 }
 
 # Bindings populated by fixtures during a test (e.g. discovered resource
-# gids). Cleared on teardown by the fixture that set them.
+# gids). Cleared in the ``trylast`` ``pytest_runtest_teardown`` hook, *not* by
+# the fixture that set them: pytest-recording's autouse ``vcr`` fixture is set
+# up first and so torn down last, and its teardown is what serializes the
+# cassette — a fixture-level clear would run before that save and leave the
+# discovered gid untemplated (and outside the ``_live_secret_values`` check).
 _dynamic_bindings: dict[str, str] = {}
+
+# Committed cassette bytes wiped by ``pytest_runtest_setup`` under
+# ``--record``, keyed by path, so ``pytest_runtest_teardown`` can restore a
+# cassette its test never re-wrote (a skip, or a failure before any request).
+_wiped_cassettes: dict[Path, bytes] = {}
 
 
 def _bindings() -> dict[str, str]:
@@ -637,7 +646,7 @@ def _discover_project_gid(workspace_gid: str, name: str) -> str:
 
 
 @pytest.fixture
-def pagination_project_gid(workspace_gid: str) -> Generator[str, None, None]:
+def pagination_project_gid(workspace_gid: str) -> str:
     """Discover the ``pagination-test`` project gid in the test workspace.
 
     Registers the discovered gid as ``${PAGINATION_PROJECT_GID}`` so the
@@ -650,14 +659,11 @@ def pagination_project_gid(workspace_gid: str) -> Generator[str, None, None]:
     """
     gid = _discover_project_gid(workspace_gid, PAGINATION_PROJECT_NAME)
     _dynamic_bindings["PAGINATION_PROJECT_GID"] = gid
-    try:
-        yield gid
-    finally:
-        _dynamic_bindings.pop("PAGINATION_PROJECT_GID", None)
+    return gid
 
 
 @pytest.fixture
-def pagination_small_project_gid(workspace_gid: str) -> Generator[str, None, None]:
+def pagination_small_project_gid(workspace_gid: str) -> str:
     """Discover the ``pagination-test-small`` project gid.
 
     Same template-binding mechanism as ``pagination_project_gid`` but for
@@ -666,10 +672,7 @@ def pagination_small_project_gid(workspace_gid: str) -> Generator[str, None, Non
     """
     gid = _discover_project_gid(workspace_gid, PAGINATION_SMALL_PROJECT_NAME)
     _dynamic_bindings["PAGINATION_SMALL_PROJECT_GID"] = gid
-    try:
-        yield gid
-    finally:
-        _dynamic_bindings.pop("PAGINATION_SMALL_PROJECT_GID", None)
+    return gid
 
 
 @pytest.fixture
@@ -760,7 +763,11 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
       synthetic gids from a prior recording would then be re-collected
       by ``_auto_hash_gids`` as if they were real, double-hashing them
       on the next save. Wiping here gives VCR an empty cassette to
-      start from.
+      start from. The wiped bytes are kept in ``_wiped_cassettes`` so
+      ``pytest_runtest_teardown`` can put the cassette back when the test
+      records nothing (e.g. it skips for a missing
+      ``ASANA_PYTEST_WORKSPACE`` or an unprovisioned project) — vcrpy only
+      saves a cassette that gained interactions.
     * **Masker registration.** See :func:`_register_cassette_maskers`
       for the timing rationale.
     """
@@ -771,19 +778,29 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         return
     module_path = Path(str(item.fspath))
     cassette_path = module_path.parent / "cassettes" / module_path.stem / f"{item.name}.yaml"
-    cassette_path.unlink(missing_ok=True)
+    if cassette_path.exists():
+        _wiped_cassettes[cassette_path] = cassette_path.read_bytes()
+        cassette_path.unlink()
 
 
 @pytest.hookimpl(trylast=True)
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:  # noqa: ARG001
-    """Drain ``_active_maskers`` after pytest has torn down every fixture.
+    """Drain the per-test state after pytest has torn down every fixture.
 
     ``trylast=True`` is essential. Without it our hook implementation
     runs *before* the core ``_pytest.runner`` impl that actually tears
     down fixtures (including pytest-recording's ``vcr``), so the clear
     would race the cassette save and leave ``_templated_yaml_serialize``
-    looking at an empty list. ``trylast=True`` pushes us behind the
-    core impl, so by the time we run the L3 maskers have already been
-    consumed.
+    looking at an empty list / unbound gids. ``trylast=True`` pushes us
+    behind the core impl, so by the time we run the L3 maskers and the
+    dynamic bindings have already been consumed.
+
+    A cassette wiped for ``--record`` that the test did not re-write is
+    restored here, so a skipped test never loses its committed cassette.
     """
     _active_maskers.clear()
+    _dynamic_bindings.clear()
+    for path, content in _wiped_cassettes.items():
+        if not path.exists():
+            path.write_bytes(content)
+    _wiped_cassettes.clear()

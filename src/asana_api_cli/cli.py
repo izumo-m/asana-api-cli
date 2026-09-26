@@ -65,7 +65,7 @@ from asana_api_cli.session import (
     runtime,
 )
 from asana_api_cli.structured_arg import (
-    click_callback,
+    header_params_callback,
 )
 from asana_api_cli.version import version_string
 
@@ -90,10 +90,16 @@ def resolve_body(value: str) -> JsonValue:
     - ``@path`` — read JSON from a file
     - ``-``     — read JSON from stdin
     - otherwise — parse the string itself as JSON
+
+    A leading UTF-8 BOM in a file or on stdin is skipped (RFC 8259 lets a
+    parser ignore it): Windows PowerShell 5.1 adds one with
+    ``Out-File -Encoding utf8`` and when piping under
+    ``$OutputEncoding = [Text.Encoding]::UTF8``, and ``json.loads`` would
+    otherwise reject the input.
     """
     if value == "-":
         try:
-            raw = sys.stdin.read()
+            raw = sys.stdin.read().removeprefix("\ufeff")
         except UnicodeDecodeError as exc:
             # stdin is reconfigured to UTF-8 at startup (see ``main``), so
             # non-UTF-8 input from a pipe surfaces here instead of being
@@ -104,7 +110,7 @@ def resolve_body(value: str) -> JsonValue:
     elif value.startswith("@"):
         path = Path(value[1:])
         try:
-            raw = path.read_text(encoding="utf-8")
+            raw = path.read_text(encoding="utf-8-sig")
         except FileNotFoundError as exc:
             raise click.BadParameter(f"file not found: {path}", param_hint="--body") from exc
         except UnicodeDecodeError as exc:
@@ -689,7 +695,7 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
         click.Option(
             ["--header-params", "header_params"],
             default=None,
-            callback=click_callback(),
+            callback=header_params_callback,
             help=(
                 "Custom HTTP request headers merged into the request. VALUE: "
                 "'k1=v1,k2=v2,...', JSON object, or @path. Use cases include "
@@ -1108,7 +1114,7 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # reachable + labelled.
     reserved = _static_reserved_flags()
 
-    options: list[click.Option] = []
+    options: list[click.Parameter] = []
 
     # Tier 1 — path / body positionals in function-signature order. Each
     # positional renders by kind: body, the unified workspace, or a plain path
@@ -1273,7 +1279,7 @@ _ROOT_EPILOG = (
     "  asana-api tasks get-tasks --workspace WS --assignee me\n"
     "  asana-api tasks get-task --task 1234567890 --opt-fields name,assignee.name\n"
     "  asana-api tasks create-task --body @new-task.json   # workspace goes inside body\n"
-    "  asana-api --debug tasks get-tasks --workspace WS   # show HTTP requests\n"
+    "  asana-api --debug tasks get-task --task 1234567890   # show HTTP requests\n"
     "  asana-api <group> --help   # e.g. asana-api tasks --help\n"
     "\n"
     "  Set $ASANA_ACCESS_TOKEN once, or pass --access-token TOKEN."

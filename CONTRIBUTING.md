@@ -48,11 +48,12 @@ The CLI command tree is built **at runtime** by introspecting the installed
 To change CLI behavior (option naming, pagination wiring, error handling,
 etc.) edit `cli.py` directly.
 
-When the bundled `asana` SDK version changes (`pyproject.toml`), the CLI
-surface may shift. The snapshot test at `tests/test_cli_surface.py` pins
-the expected shape; an SDK bump that adds, removes, or renames endpoints
-will fail the test until the fixture at `tests/fixtures/cli_surface.json`
-is regenerated and the changes are reflected in `CHANGELOG.md`.
+When the locked `asana` SDK version changes (`uv.lock`; the `pyproject.toml`
+bound stays wide), the CLI surface may shift. The snapshot test at
+`tests/test_cli_surface.py` pins the expected shape against the SDK version
+named in its `_SNAPSHOT_ASANA_VERSION` (it skips on any other version). Follow
+[`docs/development.md` §Bumping the asana SDK](docs/development.md#bumping-the-asana-sdk)
+for the procedure, including what does and does not go into `CHANGELOG.md`.
 
 See [`docs/development.md`](docs/development.md) for the project layout.
 

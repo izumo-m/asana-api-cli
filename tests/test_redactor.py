@@ -379,6 +379,59 @@ class TestHttpClientAuthRedactor:
             ("send:", plain_body),
         ]
 
+    def test_broken_pipe_from_print_is_swallowed(self, _clean_http_client_print: None) -> None:
+        """A trace line that cannot be written (stdout's reader is gone) is
+        dropped instead of raising: the exception would abort the request
+        in the middle of ``send()`` — see the next test."""
+        seen: list[tuple[Any, ...]] = []
+
+        def _closed_stdout(*args: Any, **kwargs: Any) -> None:
+            seen.append(args)
+            raise BrokenPipeError(32, "Broken pipe")
+
+        http.client.print = _closed_stdout  # pyright: ignore[reportAttributeAccessIssue]
+        with HttpClientAuthRedactor():
+            wrapper = http.client.__dict__["print"]
+            wrapper("send:", "b'GET / HTTP/1.1\\r\\nAuthorization: Bearer abc\\r\\n'")
+            wrapper("reply:", "'HTTP/1.1 200 OK\\r\\n'")
+        assert len(seen) == 2
+
+    def test_request_completes_when_stdout_is_closed(self, _clean_http_client_print: None) -> None:
+        """End-to-end: ``send()`` prints *before* it writes to the socket, so a
+        BrokenPipeError from the print used to skip the write. urllib3 swallows
+        a BrokenPipeError while sending (taking it for the server's early
+        close) and then waited forever for a response to a request never sent
+        — ``asana-api --debug ... | head`` hung. The request must go out."""
+
+        class _H(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+            def log_message(self, *args: Any, **kwargs: Any) -> None:
+                return
+
+        def _closed_stdout(*args: Any, **kwargs: Any) -> None:
+            raise BrokenPipeError(32, "Broken pipe")
+
+        srv = HTTPServer(("127.0.0.1", 0), _H)
+        server_thread = threading.Thread(target=srv.handle_request, daemon=True)
+        server_thread.start()
+        http.client.print = _closed_stdout  # pyright: ignore[reportAttributeAccessIssue]
+        try:
+            with HttpClientAuthRedactor():
+                http.client.HTTPConnection.debuglevel = 1
+                conn = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=5)
+                conn.request("GET", "/x")
+                response = conn.getresponse()
+                assert (response.status, response.read()) == (200, b"ok")
+                conn.close()
+        finally:
+            server_thread.join(timeout=2)
+            srv.server_close()
+
     def test_redacts_real_http_client_send(
         self, _clean_http_client_print: None, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -401,24 +454,31 @@ class TestHttpClientAuthRedactor:
 
         srv = HTTPServer(("127.0.0.1", 0), _H)
         port = srv.server_address[1]
-        threading.Thread(target=srv.handle_request, daemon=True).start()
+        server_thread = threading.Thread(target=srv.handle_request, daemon=True)
+        server_thread.start()
 
         token = "SECRET-TOKEN-2/123456/789:abcdef0123"
-        with HttpClientAuthRedactor():
-            http.client.HTTPConnection.debuglevel = 1
-            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
-            # Add a trailing header so we can assert the regex did not
-            # swallow the next header name at the boundary.
-            conn.request(
-                "GET",
-                "/x",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "X-Test-Trailer": "preserved",
-                },
-            )
-            conn.getresponse().read()
-            conn.close()
+        try:
+            with HttpClientAuthRedactor():
+                http.client.HTTPConnection.debuglevel = 1
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+                # Add a trailing header so we can assert the regex did not
+                # swallow the next header name at the boundary.
+                conn.request(
+                    "GET",
+                    "/x",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "X-Test-Trailer": "preserved",
+                    },
+                )
+                conn.getresponse().read()
+                conn.close()
+        finally:
+            # Close the listening socket too; otherwise it is only reclaimed by
+            # GC, which emits a ResourceWarning ("unclosed <socket.socket ...>").
+            server_thread.join(timeout=2)
+            srv.server_close()
 
         captured = capsys.readouterr()
         assert token not in captured.out

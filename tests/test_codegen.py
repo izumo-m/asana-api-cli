@@ -220,6 +220,9 @@ class TestCallEquivalence:
                 ["--request-timeout", "30", "--header-params", '{"X-Req":"1"}'],
                 lambda: iter([]),
             ),
+            # Non-finite floats must render as ``float('inf')``, not a bare ``inf``.
+            ("get-tasks", ["--request-timeout", "inf"], lambda: iter([])),
+            ("get-tasks", ["--header-params", '{"X-Req": -Infinity}'], lambda: iter([])),
         ],
     )
     def test_same_call(
@@ -247,7 +250,7 @@ class TestBodyForms:
 
     def test_file_reads_at_runtime(self) -> None:
         code = _generate(["create-task", "--body", "@payload.json"])
-        assert "with open('payload.json', encoding=\"utf-8\") as f:" in code
+        assert "with open('payload.json', encoding=\"utf-8-sig\") as f:" in code
         assert "    body = json.load(f)" in code
 
     def test_stdin_reads_at_runtime(self) -> None:
@@ -261,7 +264,7 @@ class TestBodyForms:
         # regardless of --output (it lives in the body branch, not the output
         # reconfigure block, which --output none would otherwise omit).
         code = _generate(["create-task", "--body", "-", "--output", "none"])
-        assert 'sys.stdin.reconfigure(encoding="utf-8")' in code
+        assert 'sys.stdin.reconfigure(encoding="utf-8-sig")' in code
         assert code.index("sys.stdin.reconfigure") < code.index("json.load(sys.stdin)")
 
     def test_file_not_read_at_generation(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -279,6 +282,16 @@ class TestBodyForms:
         code = _generate(["create-task", "--body", f"@{payload}"])
         seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
         assert seen["args"][0] == {"data": {"name": "FromFile"}}
+
+    def test_generated_file_body_skips_utf8_bom(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+    ) -> None:
+        # Same BOM tolerance as ``resolve_body`` (Windows PowerShell 5.1 emits one).
+        payload = tmp_path / "bom.json"
+        payload.write_bytes(b'\xef\xbb\xbf{"data": {"name": "FromBomFile"}}')
+        code = _generate(["create-task", "--body", f"@{payload}"])
+        seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
+        assert seen["args"][0] == {"data": {"name": "FromBomFile"}}
 
     def test_generated_stdin_body_reads_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         code = _generate(["create-task", "--body", "-"])
@@ -439,6 +452,23 @@ class TestConfigEquivalence:
         ref = AsanaSession.from_env()._config.retry_strategy
         assert (gen.total, gen.backoff_factor) == (ref.total, ref.backoff_factor)
 
+    @pytest.mark.skipif(
+        not _SDK_HAS_RETRY_STRATEGY,
+        reason="installed python-asana has no Configuration.retry_strategy",
+    )
+    @pytest.mark.parametrize(
+        "value",
+        ["backoff_max=inf,total=2", '{"backoff_max": Infinity, "total": 2}'],
+        ids=["shorthand", "json"],
+    )
+    def test_non_finite_retry_field_runs(self, monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+        # ``repr(float("inf"))`` is the bare token ``inf`` — a NameError in the
+        # emitted script; it must be spelled ``float('inf')`` instead.
+        code = _generate(["get-tasks", "--retry-strategy", value, "--output", "none"])
+        _, _, namespace = _exec_generated(monkeypatch, code, "get-tasks", lambda: iter([]))
+        gen = namespace["configuration"].retry_strategy
+        assert (gen.backoff_max, gen.total) == (float("inf"), 2)
+
     def test_falsy_toggle_is_still_emitted(self) -> None:
         # C-8: an explicit ``False`` (here --no-return-page-iterator) must be
         # written, not skipped like an unset (None) knob.
@@ -587,6 +617,24 @@ class TestCredentialMasking:
         # shlex quotes the masked URL (it contains ``*``).
         assert "--proxy 'http://user:***@proxy.test:8080'" in code
 
+    def test_proxy_password_with_unescaped_slash_and_at_is_masked(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            [
+                "tasks",
+                "get-tasks",
+                "--proxy",
+                "http://user:pa/ss@wd@proxy.test",
+                "--workspace",
+                "1",
+            ],
+        )
+        assert "pa/ss" not in code
+        assert "wd@" not in code
+        assert "configuration.proxy = 'http://user:***@proxy.test'" in code
+
     def test_proxy_without_credentials_stays_verbatim(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -671,8 +719,10 @@ class TestHeader:
         # A line-break-bearing argument (here a multiline --query jq program) must
         # not end the "# Equivalent to:" comment and leak its tail into the script
         # as source — every continuation line is re-prefixed with "#", and the
-        # script still compiles.
-        argv = ["tasks", "get-tasks", "--workspace", "1", "--query", f".data{sep}  | map(.name)"]
+        # script still compiles. The break sits inside a jq string literal: jq < 1.9.1
+        # rejects a CR between tokens, but every supported jq accepts one there.
+        query = f'.data | map(.name + "{sep}  suffix")'
+        argv = ["tasks", "get-tasks", "--workspace", "1", "--query", query]
         monkeypatch.setattr(sys, "argv", ["asana-api", "--generate-python", *argv])
         result = make_runner().invoke(main, ["--generate-python", *argv])
         assert result.exit_code == 0, full_output(result)
@@ -741,24 +791,39 @@ class TestQueryEquivalence:
         code = _generate(["get-tasks", "--workspace", "1"])
         assert "import jq" not in code
 
-    def test_bad_query_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize("flag", ["--query", "--exception-query"])
+    def test_bad_query_syntax_rejected_at_generation(self, flag: str) -> None:
+        # A jq syntax error is caught while parsing the command line, as in
+        # execute mode — generation exits 2 and emits no script.
+        result = make_runner().invoke(
+            _command("TasksApi", "get_tasks"),
+            ["--generate-python", "--workspace", "1", "--exception-output", "json", flag, "{"],
+        )
+        runtime.generate_python = False
+        assert result.exit_code == 2
+        assert "Invalid jq expression" in full_output(result)
+        assert "import asana" not in result.stdout
+
+    def test_query_runtime_error_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A runtime error depends on the response, so the generated script
+        # reproduces the CLI's post-call handling: exit 2.
         factory: Factory = lambda: iter([{"gid": "1"}])  # noqa: E731
-        code = _generate(["get-tasks", "--workspace", "1", "--query", "{"])
+        code = _generate(["get-tasks", "--workspace", "1", "--query", ".foo"])
         _, exit_code = _exec_expecting_exit(monkeypatch, code, "get-tasks", factory)
         assert exit_code == 2
 
     def test_output_none_with_query_validates_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # --output none + --query: jq still runs (validation), nothing is printed,
-        # and a bad expression exits 2 — matching _format_output's jq-before-none
-        # contract. The reconfigure block must still be present (the jq error
-        # writes to stderr).
+        # and an expression failing at run time exits 2 — matching
+        # _format_output's jq-before-none contract. The reconfigure block must
+        # still be present (the jq error writes to stderr).
         factory: Factory = lambda: iter([{"gid": "1"}])  # noqa: E731
         ok = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", ".[].name"])
         assert "import jq" in ok
         assert 'reconfigure(encoding="utf-8")' in ok
         _, gen_bytes, _ = _exec_generated(monkeypatch, ok, "get-tasks", factory)
         assert gen_bytes == b""  # validated, printed nothing
-        bad = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", "{"])
+        bad = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", ".foo"])
         _, exit_code = _exec_expecting_exit(monkeypatch, bad, "get-tasks", factory)
         assert exit_code == 2
 
@@ -854,10 +919,19 @@ class TestErrorEnvelopeEquivalence:
         assert gen_exit == 3
         assert gen_bytes == ref
 
-    def test_exception_query_bad_expr_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_exception_query_runtime_error_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # ``.reason`` is "boom", which ``tonumber`` cannot parse: a runtime error.
         factory = self._raise(ValueError("boom"))
         code = _generate(
-            ["get-task", "--task", "1", "--exception-output", "json", "--exception-query", "{"]
+            [
+                "get-task",
+                "--task",
+                "1",
+                "--exception-output",
+                "json",
+                "--exception-query",
+                ".reason | tonumber",
+            ]
         )
         _, gen_exit = _exec_expecting_exit(monkeypatch, code, "get-task", factory)
         assert gen_exit == 2

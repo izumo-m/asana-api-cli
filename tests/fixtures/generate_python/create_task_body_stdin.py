@@ -19,7 +19,7 @@ api_client = asana.ApiClient(configuration)
 
 api_instance = asana.TasksApi(api_client)
 if hasattr(sys.stdin, "reconfigure"):
-    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdin.reconfigure(encoding="utf-8-sig")
 body = json.load(sys.stdin)
 opts = {}
 

@@ -6,8 +6,9 @@ Creates two projects under ``ASANA_PYTEST_WORKSPACE``:
 - ``pagination-test-small`` with 50 tasks named ``psmall-0001`` .. ``psmall-0050``
 
 Idempotent: existing projects are reused, tasks already present (by name)
-are skipped, and tasks NOT matching the expected name pattern within each
-project are deleted so the project ends up with exactly the expected set.
+are skipped, and every other task within each project (an unexpected name or
+a duplicate of an expected one) is deleted so the project ends up with
+exactly the expected set.
 
 Each project is treated as test-dedicated; do not run this against a
 workspace that has other meaningful data in projects of these names.
@@ -22,7 +23,6 @@ Usage::
 from __future__ import annotations
 
 import os
-import re
 import sys
 import time
 from collections.abc import Iterable
@@ -84,7 +84,6 @@ class ProjectSpec:
     name: str
     task_count: int
     task_name_fmt: str
-    task_name_re: re.Pattern[str]
 
 
 PROJECT_SPECS: list[ProjectSpec] = [
@@ -92,13 +91,11 @@ PROJECT_SPECS: list[ProjectSpec] = [
         name="pagination-test",
         task_count=1500,
         task_name_fmt="ptest-{:04d}",
-        task_name_re=re.compile(r"^ptest-\d{4}$"),
     ),
     ProjectSpec(
         name="pagination-test-small",
         task_count=50,
         task_name_fmt="psmall-{:04d}",
-        task_name_re=re.compile(r"^psmall-\d{4}$"),
     ),
 ]
 
@@ -180,9 +177,22 @@ def _provision(
     tasks = _all_tasks(tasks_api, project_gid)
     print(f"found {len(tasks)} task(s) in project")
 
-    strays = [t for t in tasks if not spec.task_name_re.match(t.get("name", "") or "")]
+    # A stray is any task beyond one per expected name: a name outside the
+    # expected set (including out-of-range numbers the regex alone would
+    # accept, e.g. ``ptest-1501``) or a duplicate of a name already kept — a
+    # retried ``create_task`` whose first attempt did land on the server
+    # leaves such a duplicate.
+    expected_names = {spec.task_name_fmt.format(i) for i in range(1, spec.task_count + 1)}
+    kept_names: set[str] = set()
+    strays: list[dict[str, Any]] = []
+    for t in tasks:
+        name = t.get("name", "") or ""
+        if name in expected_names and name not in kept_names:
+            kept_names.add(name)
+        else:
+            strays.append(t)
     if strays:
-        print(f"deleting {len(strays)} stray task(s) not matching {spec.task_name_fmt} ...")
+        print(f"deleting {len(strays)} stray or duplicate task(s) ...")
         for i, t in enumerate(strays, 1):
             _throttle_write()
             _delete_task(tasks_api, cast("str", t["gid"]))

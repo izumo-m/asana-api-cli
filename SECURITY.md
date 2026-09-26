@@ -75,6 +75,32 @@ clear text: keep such a script out of source control and out of issues, logs,
 and screenshots, and rotate any credential it may have exposed (Asana tokens
 at <https://app.asana.com/0/my-apps>).
 
+## Error output masks your credentials
+
+The exception text the SDK stack produces can quote a credential verbatim. A
+token with a stray line break (e.g. `ASANA_ACCESS_TOKEN=$(cat token.txt)` on a
+file with Windows line endings) is rejected by `http.client` as
+`Invalid header value b'Bearer <token>\r'`, and an unparsable `--proxy` /
+`--host` URL is repeated whole, password included. `asana-api` masks, in both
+the stderr echo and the `--exception-output` envelope:
+
+- the access token in use (`--access-token` or `ASANA_ACCESS_TOKEN`), as `...`
+  plus its last 6 characters — the `--debug` trace's presentation;
+- `Authorization` / `Proxy-Authorization` values given via
+  `--set-default-header` or `--header-params`, with the scheme prefix kept
+  visible and a `Basic` credential fully masked (`Basic <REDACTED>`);
+- the password in a URL (`http://user:***@host`).
+
+A malformed `--set-default-header` / `--header-params` value that mentions
+`Authorization` (for example `Authorization: Bearer <token>`, typed with `:`
+instead of `=`) is not echoed back in the usage error. A header name containing
+`:` or whitespace is rejected before any request, so such a typo cannot reach
+the SDK either.
+
+A value under any other header name is not masked unless it contains the
+access token, just as in `--debug` output. A `--generate-python` script reports
+errors with the SDK's text, unmasked.
+
 ## Secrets on the command line
 
 A value passed as a command-line argument is visible to other users through

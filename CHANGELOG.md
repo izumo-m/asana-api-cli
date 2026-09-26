@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.2] - 2026-09-26
+
+### Security
+
+- **Credentials are masked in error output.** Before, three mistakes put a
+  credential into user-visible output:
+  - A token with a stray line break, e.g. read with `$(cat token.txt)` from a
+    file with Windows (CRLF) line endings, made the error quote the whole token
+    (`Invalid header value b'Bearer <token>\r'`). This appeared on stderr and in
+    the `--exception-output` envelope.
+  - An unparsable `--proxy` / `--host` URL was repeated with its password.
+  - A malformed `--set-default-header` / `--header-params` value such as
+    `Authorization: Bearer <token>` was echoed back in the usage error.
+
+  The token, `Authorization` / `Proxy-Authorization` values, and URL passwords
+  are now masked in error output, and such a malformed value is no longer
+  echoed. A header name containing `:` or whitespace — e.g.
+  `Proxy-Authorization: Basic <base64>==`, whose padding `=` was taken as the
+  separator — is now rejected with exit `2` before any request, instead of
+  being quoted whole by the SDK's error. See `SECURITY.md`.
+
+### Changed
+
+- **Startup is faster.** Every run — commands, `--help`, `--version`, and each
+  shell-completion keystroke — starts about 10–18 ms (10–15%) sooner.
+
+### Fixed
+
+- **`--debug` no longer hangs when stdout's reader goes away.** With
+  `asana-api --debug ... | head`, or after quitting `| less`, the call could
+  wait forever: a failed write of the wire trace kept the request from being
+  sent. The trace line is now dropped and the call completes.
+- **A reader that stops early now ends the run quietly on Windows too.** On
+  Windows, output to a closed pipe (e.g. `| head` in Git Bash) printed an
+  `OSError: [Errno 22] Invalid argument` traceback. It now exits `1` without
+  one, as on Linux and macOS. `--output none` under `--debug` no longer prints
+  "Exception ignored ... BrokenPipeError" or exits `120`.
+- **A `--query` / `--exception-query` jq expression that does not compile is
+  now rejected before the API call.** It used to be checked only against the
+  response, so a typo in `--query` still ran the call — a `create-task` created
+  the task, then exited `2` with the result lost — and a typo in
+  `--exception-query` went unnoticed until a call first failed (exiting `2`
+  instead of `3`). Such an expression now exits `2` while the command line is
+  parsed: nothing is sent and no access token is needed, also under
+  `--generate-python`. A jq error that depends on the response (a runtime
+  error) still surfaces after the call, as before; `docs/usage.md` now spells
+  out that the call has already taken effect in that case.
+- **JSON input with a UTF-8 BOM is accepted.** `--body @file`, `--body -`
+  (stdin), and the `@path` form of `--header-params` / `--retry-strategy`
+  rejected a leading BOM ("Unexpected UTF-8 BOM"), which Windows PowerShell 5.1
+  adds with `Out-File -Encoding utf8` and when piping under
+  `$OutputEncoding = [Text.Encoding]::UTF8`. The BOM is now skipped, including
+  in `--generate-python` scripts that read the body from a file or stdin.
+  `docs/usage.md` gains a "Windows and PowerShell" section covering PowerShell's
+  encoding and quoting pitfalls.
+- **`--generate-python` scripts no longer crash on an infinite or NaN value.**
+  A float option given as `inf` / `nan` (e.g. `--request-timeout inf`,
+  `--retry-strategy backoff_max=inf`, or `Infinity` in a JSON-form
+  `--retry-strategy` / `--header-params`) was written into the script as a
+  bare `inf` / `nan`, so the script failed with `NameError` although the
+  command itself ran. Such values are now emitted as `float('inf')` etc.
+- **`--output text` / `table` no longer strip ANSI escape sequences from the
+  data when stdout is a pipe or file.** A value containing one (e.g. a task
+  name with `\x1b[31m`) was silently altered whenever the output was not a
+  terminal; it is now written verbatim, matching what a terminal receives and
+  what a `--generate-python` script prints. The exception echoed to stderr is
+  likewise written verbatim.
+- **The `--debug` example in `asana-api --help` now works as written.** It
+  used `tasks get-tasks --workspace WS` alone, which the Asana API rejects
+  (`get-tasks` needs a project / tag, or an assignee together with the
+  workspace); it now shows `tasks get-task --task 1234567890`.
+- **The test suite in the source distribution now runs.** The sdist used to
+  ship only the `tests/test*.py` modules — without their `conftest.py`,
+  helpers, fixtures, and cassettes — so `pytest` from an unpacked archive
+  failed at collection. It now includes the whole `tests/` tree plus `docs/`
+  (one test checks the group descriptions against `docs/api-groups.md`).
+  Building from source now requires `setuptools>=77`, the first release that
+  accepts the SPDX `license` field; older setuptools could not build it
+  anyway.
+
 ## [3.3.1] - 2026-09-01
 
 ### Changed
@@ -456,7 +536,8 @@ Combining a deprecated alias with its replacement (e.g.
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.1...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.2...HEAD
+[3.3.2]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.1.3...v3.2.0

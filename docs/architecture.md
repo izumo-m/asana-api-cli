@@ -7,7 +7,7 @@ Runtime-introspection wrapper around `python-asana`. API group stubs are registe
 | File | Role |
 |---|---|
 | `cli.py` | Runtime introspection + Click command tree; body / workspace input resolution |
-| `session.py` | SDK client (`Configuration` + `ApiClient`); on context-manager entry (`open`) installs the `--debug` side effects (the `http.client` debuglevel + asana/urllib3 logger flips and the `Authorization` redactor), reverses them on exit (`close`) |
+| `session.py` | SDK client (`Configuration` + `ApiClient`); on context-manager entry (`open`) installs the `--debug` side effects (the `http.client` debuglevel + asana/urllib3 logger flips and the `Authorization` redactor), reverses them on exit (`close`); `mask_credentials` masks this invocation's credentials in error text |
 | `formatter.py` | Output formatting (`json` / `table` / `csv` / `text` / `none`) + the `@formatted` decorator |
 | `click_ext.py` | The `_GlobalOptionsMixin` mixin and its concrete subclasses propagating global options to the root group and subgroups (`GroupWithGlobalOptions`) and leaf commands (`CommandWithGlobalOptions`) |
 | `redactor.py` | `HttpClientAuthRedactor` — masks `Authorization` headers in `http.client` debug output |
@@ -50,6 +50,6 @@ All changes to how an SDK method becomes a CLI command go through `_make_command
 
 ## Surface snapshot guardrail
 
-`tests/test_cli_surface.py` deep-compares `introspect_to_manifest()` against `tests/fixtures/cli_surface.json`. An SDK bump that adds, removes, or renames a docstring-derived option fails this test. Synthetic options (global flags, deprecation aliases) are intentionally outside the manifest.
+`tests/test_cli_surface.py` deep-compares `introspect_to_manifest()` against `tests/fixtures/cli_surface.json`. An SDK bump that adds, removes, or renames a docstring-derived option fails this test once `_SNAPSHOT_ASANA_VERSION` is bumped to the new SDK (on any other installed version the test skips — see [`development.md`](development.md#bumping-the-asana-sdk)). Synthetic options (global flags, deprecation aliases) are intentionally outside the manifest.
 
 `tests/test_sdk_boilerplate.py` is the companion guard for the two SDK-uniform input families that the manifest deliberately omits: every method's `all_params` (the boilerplate `**kwargs`) and the settable `asana.Configuration` attributes. An SDK bump that adds a new boilerplate kwarg or Configuration property fails it, forcing a conscious classification — a `Configuration` global flag, or a common per-command `(kwargs: ...)` option — rather than a silent miss. It also pins which methods perform a multipart upload (a whole-SDK source scan for `local_var_files` population), proving the cheap `file`-opt proxy (`_Operation.does_upload`) that gates the per-command `--multibyte-filenames` flag stays exact as the SDK evolves.

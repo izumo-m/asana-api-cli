@@ -21,6 +21,7 @@ from asana_api_cli.formatter import (
     scalar_text,
     to_rows,
 )
+from asana_api_cli.session import runtime
 
 
 def _formatted_command(fn: Any, name: str = "cmd") -> click.Command:
@@ -217,6 +218,36 @@ class TestFormatOutputText:
     def test_with_jq_query(self, capsys: pytest.CaptureFixture[str]) -> None:
         _format_output({"data": {"gid": "123"}}, output_format="text", jq_query=".data.gid")
         assert capsys.readouterr().out.strip() == "123"
+
+
+class TestAnsiEscapesPreserved:
+    """Data containing ANSI escape sequences is written verbatim.
+
+    ``click.echo`` strips ANSI codes by default when the stream is not a
+    terminal (as with ``capsys``, a pipe, or a redirect), which would silently
+    alter a value such as a task name — and diverge from the ``print`` calls
+    of a ``--generate-python`` script.
+    """
+
+    NAME = "A\x1b[31mB\x1b[0mC"
+
+    @pytest.mark.parametrize(
+        ("output_format", "data"),
+        [
+            ("text", {"name": NAME}),
+            ("table", [{"name": NAME}]),
+            ("table", NAME),  # scalar fall-through
+        ],
+    )
+    def test_payload(
+        self, capsys: pytest.CaptureFixture[str], output_format: str, data: Any
+    ) -> None:
+        _format_output(data, output_format=output_format, jq_query=None)
+        assert self.NAME in capsys.readouterr().out
+
+    def test_stderr_exception_echo(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _echo_exception_only(RuntimeError(self.NAME))
+        assert self.NAME in capsys.readouterr().err
 
 
 class TestFormatOutputJq:
@@ -453,6 +484,53 @@ class TestHandleApiException:
         # naming differences.
         assert env["exception"].endswith(".CustomApiException")
         assert "." in env["exception"]  # FQDN, not bare name
+
+
+class TestCredentialsMaskedInExceptionOutput:
+    """Constitution #2: the SDK stack can quote a credential in an exception
+    (``Invalid header value b'Bearer <token>\\r'`` for a token with a stray CR).
+    Both renderings — the stderr echo and the envelope — mask it. The masking
+    itself is covered in ``test_session.py`` (``TestMaskCredentials``)."""
+
+    TOKEN = "2/1111111111111111/2222222222222222:secretTOKENabcdef0123456789"
+
+    @pytest.fixture(autouse=True)
+    def _token(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(runtime, "access_token", self.TOKEN + "\r")
+
+    def _leaky(self) -> ValueError:
+        return ValueError(f"Invalid header value {('Bearer ' + self.TOKEN + chr(13)).encode()!r}")
+
+    def test_stderr_echo(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _echo_exception_only(self._leaky())
+        err = capsys.readouterr().err
+        assert self.TOKEN not in err
+        assert "Bearer ...456789" in err
+
+    def test_envelope(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit):
+            _handle_exception(self._leaky(), exception_output="json", exception_query=None)
+        out = capsys.readouterr().out
+        assert self.TOKEN not in out
+        assert json.loads(out)["reason"] == "Invalid header value b'Bearer ...456789\\r'"
+
+    def test_api_exception_fields(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # Response fields are masked too, should a server or proxy echo it back.
+        exc = ApiException(status=400, reason=f"Bad {self.TOKEN}")
+        exc.body = f'{{"echo": "{self.TOKEN}"}}'.encode()  # type: ignore[assignment]
+        exc.headers = {"X-Echo": self.TOKEN}  # type: ignore[assignment]
+        with pytest.raises(SystemExit):
+            _handle_exception(exc, exception_output="json", exception_query=None)
+        out = capsys.readouterr().out
+        assert self.TOKEN not in out
+        assert out.count("...456789") == 3
+
+    def test_header_params_credential(self, capsys: pytest.CaptureFixture[str]) -> None:
+        exc = ValueError("Invalid header value b'Basic dXNlcjpwYXNzd29yZA==\\r'")
+        header_params = {"Proxy-Authorization": "Basic dXNlcjpwYXNzd29yZA==\r"}
+        _echo_exception_only(exc, header_params=header_params)
+        expected = "ValueError: Invalid header value b'Basic <REDACTED>\\r'\n"
+        assert capsys.readouterr().err == expected
 
 
 class TestHandleApiExceptionFormats:

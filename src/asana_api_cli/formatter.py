@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import csv
+import errno
 import functools
 import io
 import json
+import os
 import sys
 import traceback
+from collections.abc import Iterator
 from typing import Any, NoReturn
 
 import click
@@ -13,7 +17,29 @@ import jq as jqlib
 from asana.rest import ApiException
 from tabulate import tabulate
 
-from asana_api_cli.session import runtime
+from asana_api_cli.session import mask_credentials, runtime
+
+
+def _validate_jq_syntax(
+    _ctx: click.Context, _param: click.Parameter, value: str | None
+) -> str | None:
+    """Option callback: reject a jq program that does not compile.
+
+    Runs while the command line is parsed — before the token is read or any
+    request is sent — so a typo in ``--query`` / ``--exception-query`` exits 2
+    without side effects. Checked after the call instead, a mutating command
+    (``create-task`` ...) would already have run, and the result would be lost
+    behind the error; an ``--exception-query`` typo would go unnoticed until
+    the call first failed. Only syntax is checked here: a runtime error depends
+    on the response and still surfaces in :func:`_format_output`. An empty
+    value means "no filter", as in :func:`_format_output`.
+    """
+    if value:
+        try:
+            jqlib.compile(value)
+        except ValueError as e:
+            raise click.BadParameter(f"Invalid jq expression: {e}") from e
+    return value
 
 
 def make_formatter_options() -> list[click.Option]:
@@ -40,6 +66,7 @@ def make_formatter_options() -> list[click.Option]:
         click.Option(
             ["--query", "jq_query"],
             default=None,
+            callback=_validate_jq_syntax,
             help="jq expression to filter output (asana-api: extension)",
         ),
         click.Option(
@@ -70,6 +97,7 @@ def make_formatter_options() -> list[click.Option]:
         click.Option(
             ["--exception-query", "exception_query"],
             default=None,
+            callback=_validate_jq_syntax,
             help=(
                 "Apply a jq filter to the error envelope; result is rendered via "
                 "--exception-output. Pairing with the default 'none' emits a stderr "
@@ -91,7 +119,10 @@ def formatted(f: Any) -> Any:
     (leaf) options bound to the single method invocation, not global flags.
     """
 
+    # A reader that leaves early (``| head``) ends the run quietly — see
+    # :func:`_exit_quietly_if_stdout_closed`.
     @functools.wraps(f)
+    @_exit_quietly_if_stdout_closed()
     def wrapper(
         *args: Any,
         output_format: str,
@@ -159,15 +190,65 @@ def formatted(f: Any) -> Any:
             # For ApiException this includes status / reason / headers /
             # body — the useful payload (e.g. the 412 sync-token body
             # in events polling) stays visible without traceback noise.
-            _echo_exception_only(e)
+            # Both renderings mask this invocation's credentials: the SDK
+            # stack can quote one verbatim (constitution #2; see
+            # ``session.mask_credentials``).
+            header_params = kwargs.get("header_params")
+            _echo_exception_only(e, header_params=header_params)
             if exception_output == "none":
+                _flush_stdout()
                 sys.exit(1)
             # Otherwise also render a ``{exception, ...}`` envelope on
             # stdout and exit 3.
-            _handle_exception(e, exception_output=exception_output, exception_query=exception_query)
+            _handle_exception(
+                e,
+                exception_output=exception_output,
+                exception_query=exception_query,
+                header_params=header_params,
+            )
         _format_output(data, output_format=output_format, jq_query=jq_query, csv_bom=csv_bom)
+        _flush_stdout()
 
     return wrapper
+
+
+def _flush_stdout() -> None:
+    """Flush stdout before a path that writes nothing more to it
+    (``--output none``, or an error under ``--exception-output none``).
+
+    ``--debug`` may have buffered wire-trace lines there. If the reader is
+    gone (``| head``), flushing now raises inside
+    :func:`_exit_quietly_if_stdout_closed` instead of at interpreter shutdown
+    ("Exception ignored ... BrokenPipeError", exit 120).
+    """
+    sys.stdout.flush()
+
+
+@contextlib.contextmanager
+def _exit_quietly_if_stdout_closed() -> Iterator[None]:
+    """Turn a write to a stdout whose reader is gone (``| head``, quitting
+    ``| less``) into a quiet exit 1 — the convention click applies to EPIPE.
+
+    Handled here rather than left to click because Windows reports the same
+    condition as ``OSError(EINVAL)``, which click does not recognize (a
+    traceback, then exit 120 from the shutdown flush). Either way fd 1 is
+    pointed at the null device first, so the interpreter's final flush of
+    whatever is still buffered cannot fail again.
+    """
+    try:
+        yield
+    except OSError as e:
+        closed = isinstance(e, BrokenPipeError) or (
+            sys.platform == "win32" and e.errno == errno.EINVAL
+        )
+        if not closed:
+            raise
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except (OSError, ValueError):  # no real fd behind stdout (e.g. a test runner)
+            pass
+        sys.exit(1)
 
 
 def formatter_flag_names() -> frozenset[str]:
@@ -199,7 +280,7 @@ def _qualified_exception_name(e: BaseException) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
-def _echo_exception_only(e: BaseException) -> None:
+def _echo_exception_only(e: BaseException, *, header_params: Any = None) -> None:
     """Write ``traceback.format_exception_only`` output to stderr.
 
     Format: qualified class name + the exception's ``__str__``, no
@@ -217,17 +298,33 @@ def _echo_exception_only(e: BaseException) -> None:
     Always written from :func:`formatted` (both
     ``--exception-output=none`` and the envelope formats), so the raw
     exception stays visible even when ``--exception-query`` would
-    otherwise strip it from stdout.
+    otherwise strip it from stdout. Credentials are masked
+    (:func:`~asana_api_cli.session.mask_credentials`; *header_params* are the
+    call's ``--header-params``).
     """
+    # ``color=True``: keep the message verbatim even when stderr is redirected
+    # (see :func:`_echo_payload`).
     click.echo(
-        "".join(traceback.format_exception_only(type(e), e)),
+        mask_credentials(
+            "".join(traceback.format_exception_only(type(e), e)), header_params=header_params
+        ),
         err=True,
         nl=False,
+        color=True,
     )
 
 
+def _mask_strings(obj: Any, header_params: Any) -> Any:
+    """*obj* (an envelope) with :func:`mask_credentials` applied to every string."""
+    if isinstance(obj, str):
+        return mask_credentials(obj, header_params=header_params)
+    if isinstance(obj, dict):
+        return {k: _mask_strings(v, header_params) for k, v in obj.items()}
+    return obj
+
+
 def _handle_exception(
-    e: Exception, *, exception_output: str, exception_query: str | None
+    e: Exception, *, exception_output: str, exception_query: str | None, header_params: Any = None
 ) -> NoReturn:
     """Render an exception as an envelope on stdout, then exit 3.
 
@@ -235,7 +332,8 @@ def _handle_exception(
     ``none`` path and the stderr echo are handled upstream in
     :func:`formatted`. For the envelope schema and exit-code contract see
     ``docs/usage.md`` ("Error handling"); for the rationale,
-    ``docs/sdk-deviations.md``.
+    ``docs/sdk-deviations.md``. Every string in the envelope has credentials
+    masked, as in :func:`_echo_exception_only`.
     """
     envelope: dict[str, Any]
     if isinstance(e, ApiException):
@@ -263,12 +361,26 @@ def _handle_exception(
         }
 
     _format_output(
-        envelope,
+        _mask_strings(envelope, header_params),
         output_format=exception_output,
         jq_query=exception_query,
     )
     # Envelope written to stdout; exit 3 is the API / connection-error code.
     sys.exit(3)
+
+
+def _echo_payload(text: str) -> None:
+    """Write one payload line to stdout exactly as given.
+
+    ``color=True`` stops ``click.echo`` from stripping ANSI escape sequences
+    when stdout is not a terminal: by default a value that happens to contain
+    one (e.g. a task name with ``\x1b[31m``) would be silently altered in a
+    pipe or redirect, while the same bytes reach an interactive terminal
+    unchanged — so stripping protects nothing and only corrupts data. It also
+    keeps ``--output text`` / ``table`` byte-identical to the ``print`` calls
+    of a ``--generate-python`` script.
+    """
+    click.echo(text, color=True)
 
 
 def _format_output(
@@ -312,7 +424,7 @@ def _format_output(
 
     if output_format == "json":
         for v in results:
-            click.echo(format_json(v))
+            _echo_payload(format_json(v))
         return
 
     if output_format == "text":
@@ -336,7 +448,7 @@ def _format_output(
 
     if not rows and non_rowable:
         for v in non_rowable:
-            click.echo(scalar_text(v))
+            _echo_payload(scalar_text(v))
         return
 
     # Stringify nested values (dict / list) as JSON so cells use JSON
@@ -348,7 +460,7 @@ def _format_output(
         # ``tabulate([], ...)`` returns ``""`` and ``click.echo("")`` would
         # still write a newline. Matches the empty-rows skip on the CSV path.
         if rows:
-            click.echo(format_table(rows))
+            _echo_payload(format_table(rows))
     elif output_format == "csv":
         _print_csv(rows, with_bom=csv_bom)
 
@@ -417,9 +529,9 @@ def _print_text(data: Any) -> None:
     """
     if isinstance(data, list):
         for item in data:
-            click.echo(format_text(item))
+            _echo_payload(format_text(item))
         return
-    click.echo(format_text(data))
+    _echo_payload(format_text(data))
 
 
 def format_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> str:

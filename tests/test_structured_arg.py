@@ -12,10 +12,13 @@ from pathlib import Path
 
 import click
 import pytest
+from _cli_runner import full_output, make_runner
 
+from asana_api_cli.cli import main
 from asana_api_cli.structured_arg import (
     RETRY_FIELD_SCHEMA,
     default_header_callback,
+    header_params_callback,
     parse_structured_arg,
 )
 
@@ -54,6 +57,12 @@ class TestFileForm:
         f.write_text("not json", encoding="utf-8")
         with pytest.raises(click.BadParameter, match="Invalid JSON"):
             parse_structured_arg(f"@{f}")
+
+    def test_leading_utf8_bom_is_skipped(self, tmp_path: Path) -> None:
+        # Windows PowerShell 5.1's ``Out-File -Encoding utf8`` writes a BOM.
+        f = tmp_path / "bom.json"
+        f.write_bytes(b'\xef\xbb\xbf{"k": "v"}')
+        assert parse_structured_arg(f"@{f}") == {"k": "v"}
 
     def test_non_utf8_file(self, tmp_path: Path) -> None:
         f = tmp_path / "binary.bin"
@@ -270,3 +279,103 @@ class TestDefaultHeaderCallback:
     def test_empty_name_rejected(self) -> None:
         with pytest.raises(click.BadParameter, match="NAME=VALUE"):
             _default_headers("=value")
+
+    @pytest.mark.parametrize("name", ["X-Foo: bar", "X Foo", "X\tFoo"])
+    def test_invalid_name_rejected(self, name: str) -> None:
+        # http.client would reject a name with ':' and send one with a space.
+        with pytest.raises(click.BadParameter, match="Invalid header name"):
+            _default_headers(f"{name}=value")
+
+
+def _header_params(value: str) -> dict[str, object] | None:
+    param = click.Option(["--header-params"])
+    ctx = click.Context(click.Command("test"))
+    return header_params_callback(ctx, param, value)
+
+
+class TestHeaderParamsCallback:
+    def test_valid_names_accepted(self) -> None:
+        assert _header_params("Asana-Enable=new_x,X-Trace=abc") == {
+            "Asana-Enable": "new_x",
+            "X-Trace": "abc",
+        }
+
+    @pytest.mark.parametrize("value", ["X-Foo: bar=baz", '{"X Foo": "bar"}'])
+    def test_invalid_name_rejected(self, value: str) -> None:
+        with pytest.raises(click.BadParameter, match="Invalid header name"):
+            _header_params(value)
+
+
+class TestCredentialsNotEchoedInErrors:
+    """Constitution #2: a malformed value is quoted back in the error, so one
+    carrying a credential — typically ``Authorization: Bearer <token>`` typed
+    with ``:`` for ``=`` — must not be."""
+
+    TOKEN = "2/1111111111111111/2222222222222222:secretTOKENabcdef0123456789"
+
+    def _message(self, exc_info: pytest.ExceptionInfo[click.BadParameter]) -> str:
+        return exc_info.value.format_message()
+
+    def test_default_header_mentioning_authorization(self) -> None:
+        with pytest.raises(click.BadParameter) as exc_info:
+            _default_headers(f"Authorization: Bearer {self.TOKEN}")
+        message = self._message(exc_info)
+        assert self.TOKEN not in message
+        assert "not shown" in message
+
+    def test_header_params_pair_mentioning_authorization(self) -> None:
+        with pytest.raises(click.BadParameter) as exc_info:
+            parse_structured_arg(f"Asana-Enable=x,proxy-authorization: Basic {self.TOKEN}")
+        message = self._message(exc_info)
+        assert self.TOKEN not in message
+        assert "not shown" in message
+
+    # A Basic credential ends in '=' padding, so the pair *has* a separator:
+    # what precedes the padding is taken as the header name.
+    BASIC = "Basic YWxpY2U6c2VjcmV0cGFzcw=="
+
+    def test_default_header_basic_credential_typed_with_colon(self) -> None:
+        with pytest.raises(click.BadParameter) as exc_info:
+            _default_headers(f"Proxy-Authorization: {self.BASIC}")
+        message = self._message(exc_info)
+        assert "YWxpY2U6c2VjcmV0cGFzcw" not in message
+        assert "not shown" in message
+
+    def test_header_params_basic_credential_typed_with_colon(self) -> None:
+        with pytest.raises(click.BadParameter) as exc_info:
+            _header_params(f"Proxy-Authorization: {self.BASIC}")
+        message = self._message(exc_info)
+        assert "YWxpY2U6c2VjcmV0cGFzcw" not in message
+        assert "not shown" in message
+
+    def test_known_token_masked_in_other_values(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ASANA_ACCESS_TOKEN", self.TOKEN)
+        with pytest.raises(click.BadParameter) as exc_info:
+            _default_headers(f"X-Token {self.TOKEN}")
+        assert self._message(exc_info).endswith("Expected NAME=VALUE, got 'X-Token ...456789'.")
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            # --access-token parsed before the malformed value...
+            ["--access-token", TOKEN, "users", "get-user", "--set-default-header", "X {t}"],
+            # ...and after it, at a deeper level, in the '=' spelling.
+            ["--set-default-header", "X {t}", "users", "get-user", f"--access-token={TOKEN}"],
+            ["users", "get-user", "--header-params", "X {t}", "--access-token", TOKEN],
+        ],
+    )
+    def test_command_line_token_masked_in_other_values(
+        self, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    ) -> None:
+        # The usage error is raised while the command line is parsed, before
+        # --access-token reaches ``runtime``.
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        argv = [a.replace("{t}", self.TOKEN) for a in argv]
+        result = make_runner().invoke(main, [*argv, "--user", "me"])
+        assert result.exit_code == 2, full_output(result)
+        assert self.TOKEN not in full_output(result)
+        assert "'X ...456789'" in full_output(result)
+
+    def test_other_values_still_echoed(self) -> None:
+        with pytest.raises(click.BadParameter, match="'Asana-Enable new_x'"):
+            parse_structured_arg("Asana-Enable new_x")

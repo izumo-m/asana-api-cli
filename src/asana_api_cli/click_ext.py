@@ -372,6 +372,18 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
     setattr(runtime, name, value)
 
 
+def _access_tokens_in(args: list[str]) -> tuple[str, ...]:
+    """Every ``--access-token`` value in *args*, in both the ``--access-token
+    VALUE`` and ``--access-token=VALUE`` spellings."""
+    tokens: list[str] = []
+    for i, arg in enumerate(args):
+        if arg == "--access-token" and i + 1 < len(args):
+            tokens.append(args[i + 1])
+        elif arg.startswith("--access-token="):
+            tokens.append(arg.partition("=")[2])
+    return tuple(tokens)
+
+
 def _consume_global_options(ctx: click.Context) -> None:
     """Pop injected global options from ``ctx.params`` and apply user values.
 
@@ -434,7 +446,28 @@ class _GlobalOptionsMixin:
     descriptions. Subcommands inherit the global flags' behavior but no
     longer drown their own ``Options:`` block in ~70 lines of repeated
     global-option help text.
+
+    The global options are appended to ``params`` on its first read, not at
+    construction: an invocation builds every group and every command of the
+    group it enters, but reads the params of only the few on its path, so
+    building ~20 options for each of the rest would only slow startup.
     """
+
+    _own_params: list[click.Parameter]
+    _globals_appended: bool
+
+    @property
+    def params(self) -> list[click.Parameter]:
+        if not self._globals_appended:
+            self._globals_appended = True
+            self._own_params.extend(_make_global_option_params())
+        return self._own_params
+
+    @params.setter
+    def params(self, value: list[click.Parameter]) -> None:
+        # Assigned the command's own params by ``click.Command.__init__``.
+        self._own_params = value
+        self._globals_appended = False
 
     def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         is_root = ctx.parent is None
@@ -506,20 +539,17 @@ class _GlobalOptionsMixin:
             self.format_commands(ctx, formatter)
 
 
-class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):
+# ``params`` is a property on the mixin, an attribute on click's classes.
+class CommandWithGlobalOptions(_GlobalOptionsMixin, click.Command):  # pyright: ignore[reportIncompatibleVariableOverride]
     """A ``click.Command`` that also accepts the shared global options."""
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        for opt in _make_global_option_params():
-            self.params.append(opt)
 
     def invoke(self, ctx: click.Context) -> Any:
         _consume_global_options(ctx)
         return super().invoke(ctx)
 
 
-class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):
+# ``params`` is a property on the mixin, an attribute on click's classes.
+class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):  # pyright: ignore[reportIncompatibleVariableOverride]
     """A ``click.Group`` that also accepts the shared global options.
 
     Used for the root group and every subgroup: the global flags come from
@@ -530,10 +560,10 @@ class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):
 
     command_class = CommandWithGlobalOptions
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        for opt in _make_global_option_params():
-            self.params.append(opt)
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if ctx.parent is None:
+            runtime.argv_access_tokens = _access_tokens_in(args)
+        return super().parse_args(ctx, args)
 
     def invoke(self, ctx: click.Context) -> Any:
         _consume_global_options(ctx)

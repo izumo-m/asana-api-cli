@@ -62,7 +62,7 @@ from typing import TYPE_CHECKING
 import click
 
 from asana_api_cli import formatter, multibyte_filename, redactor, version
-from asana_api_cli.session import _CONFIG_KNOBS, ACCESS_TOKEN_ENV, runtime
+from asana_api_cli.session import _CONFIG_KNOBS, ACCESS_TOKEN_ENV, runtime, url_userinfo
 
 if TYPE_CHECKING:
     # Type-only: importing ``cli`` at runtime would cycle (cli -> formatter ->
@@ -259,12 +259,13 @@ def _mask_authorization(value: str) -> str:
     return f"{m.group(1)} {_mask_secret(m.group(2))}"
 
 
-_PROXY_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://[^/@:]*):([^/@]*)@")
-
-
 def _mask_proxy(value: str) -> str:
     """Mask the password component of a proxy URL's userinfo."""
-    return _PROXY_USERINFO_RE.sub(r"\1:***@", value)
+    found = url_userinfo(value)
+    if found is None:
+        return value
+    user, userinfo = found
+    return value.replace(f"{userinfo}@", f"{user}:***@", 1)
 
 
 def _mask_header_params(value: dict[str, object]) -> dict[str, object]:
@@ -351,14 +352,16 @@ def _render_config(needs: _Imports) -> list[str]:
         if applies:
             if attr == "proxy":
                 value = _mask_proxy(value)
-            lines.append(f"configuration.{attr} = {value!r}")
+            lines.append(f"configuration.{attr} = {_py_literal(value)}")
     if runtime.debug:
         # Not a ``_CONFIG_KNOBS`` entry: ``AsanaSession`` sets this in ``open()``
         # alongside the redactor. The property setter flips the ``http.client``
         # debuglevel; the inlined ``with HttpClientAuthRedactor()`` masks the token.
         lines.append("configuration.debug = True")
     if runtime.retry_strategy_overrides is not None:
-        kwargs = ", ".join(f"{k}={v!r}" for k, v in runtime.retry_strategy_overrides.items())
+        kwargs = ", ".join(
+            f"{k}={_py_literal(v)}" for k, v in runtime.retry_strategy_overrides.items()
+        )
         lines.append(f"configuration.retry_strategy = configuration.retry_strategy.new({kwargs})")
     lines.append("api_client = asana.ApiClient(configuration)")
     if runtime.default_headers:
@@ -394,6 +397,28 @@ def _has_non_finite_float(value: object) -> bool:
     return False
 
 
+def _py_literal(value: object) -> str:
+    """``repr`` that is always valid Python source.
+
+    ``repr`` renders a NaN / Infinity float as the bare token ``nan`` / ``inf``,
+    which is not a Python name — the emitted line would ``NameError`` at run
+    time. Yet the CLI accepts such values wherever a float is parsed:
+    ``--request-timeout inf`` (click's float type), ``--retry-strategy
+    backoff_max=inf`` (shorthand ``float()``), and ``Infinity`` / ``NaN`` in
+    any JSON-form structured value. Non-finite floats are therefore spelled
+    ``float('inf')`` / ``float('-inf')`` / ``float('nan')``, recursing into
+    containers; everything else is plain ``repr``.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return f"float({str(value)!r})"
+    if isinstance(value, dict):
+        items = ", ".join(f"{_py_literal(k)}: {_py_literal(v)}" for k, v in value.items())
+        return "{" + items + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(_py_literal(v) for v in value) + "]"
+    return repr(value)
+
+
 def _render_body(raw_body: str, needs: _Imports) -> list[str]:
     """Emit code that binds ``body`` from the unresolved ``--body`` string (C-9).
 
@@ -402,22 +427,23 @@ def _render_body(raw_body: str, needs: _Imports) -> list[str]:
     re-runnable against a different payload; a JSON literal is validated now
     (exit 2 on bad JSON, matching ``resolve_body``) and inlined as a Python
     literal. Mirrors ``cli.resolve_body``'s three branches — including UTF-8
-    decoding: ``@file`` opens with ``encoding="utf-8"``, and the stdin branch
-    reconfigures ``sys.stdin`` to UTF-8 first, matching the CLI's startup
+    decoding: ``@file`` opens with ``encoding="utf-8-sig"``, and the stdin branch
+    reconfigures ``sys.stdin`` to ``utf-8-sig`` first, matching the CLI's startup
     reconfigure (``cli.py:main``) so a piped UTF-8 body is not misdecoded with the
-    locale code page on cp932 Windows (constitution #5).
+    locale code page on cp932 Windows (constitution #5). ``utf-8-sig`` also skips
+    a leading BOM, as ``resolve_body`` does (Windows PowerShell 5.1 emits one).
     """
     if raw_body == "-":
         needs.stdlib |= {"sys", "json"}
         return [
             'if hasattr(sys.stdin, "reconfigure"):',
-            '    sys.stdin.reconfigure(encoding="utf-8")',
+            '    sys.stdin.reconfigure(encoding="utf-8-sig")',
             "body = json.load(sys.stdin)",
         ]
     if raw_body.startswith("@"):
         needs.stdlib.add("json")
         path = raw_body[1:]
-        return [f'with open({path!r}, encoding="utf-8") as f:', "    body = json.load(f)"]
+        return [f'with open({path!r}, encoding="utf-8-sig") as f:', "    body = json.load(f)"]
     try:
         value = json.loads(raw_body)
     except json.JSONDecodeError as exc:
@@ -439,7 +465,12 @@ def _render_call_setup(plan: CallPlan, needs: _Imports) -> list[str]:
         assert plan.raw_body is not None  # has_body ⟺ a required --body was given
         lines += _render_body(plan.raw_body, needs)
     if plan.has_opts:
-        lines.append(f"opts = {pprint.pformat(plan.opts, sort_dicts=False)}")
+        opts = (
+            _py_literal(plan.opts)
+            if _has_non_finite_float(plan.opts)
+            else pprint.pformat(plan.opts, sort_dicts=False)
+        )
+        lines.append(f"opts = {opts}")
     return lines
 
 
@@ -449,14 +480,14 @@ def _call_expression(plan: CallPlan) -> str:
     positional: list[str] = []
     if plan.has_body:
         positional.append("body")
-    positional += [repr(arg) for arg in plan.path_call_args]
+    positional += [_py_literal(arg) for arg in plan.path_call_args]
     if plan.has_opts:
         positional.append("opts")
     keyword: list[str] = []
     for name, value in plan.method_kwargs.items():
         if name == "header_params" and isinstance(value, dict):
             value = _mask_header_params(value)
-        keyword.append(f"{name}={value!r}")
+        keyword.append(f"{name}={_py_literal(value)}")
     call = f"api_instance.{plan.method_name}({', '.join(positional + keyword)})"
     return f"list({call})" if _returns_iterator(plan) else call
 

@@ -92,8 +92,13 @@ installing `asana-api-cli`; `pipx upgrade asana-api-cli` updates only
 CLI:
 
 ```bash
-pipx runpip asana-api-cli install -U asana
+pipx runpip asana-api-cli install -U "asana<6"
 ```
+
+Keep the `<6` bound — it is the SDK range `asana-api-cli` supports. A bare
+`install -U asana` does not honor that requirement: pip would install a future
+major version anyway (reporting only a dependency-conflict error), leaving the
+CLI on an SDK it does not support.
 
 The next `asana-api` run sees the new SDK and any newly added methods
 automatically.
@@ -107,9 +112,9 @@ automatically.
 
 The token can be issued from the
 [Asana Developer Console](https://app.asana.com/0/developer-console).
-No token is needed for `--help` or command-line parsing errors. (A `--query`
-jq filter is validated against the response, so it surfaces errors only after
-the API call — which does need a token.)
+No token is needed for `--help` or command-line parsing errors, including a
+`--query` jq expression that does not compile. (A jq expression that compiles
+but fails on the actual response surfaces only after the API call.)
 
 ```bash
 export ASANA_ACCESS_TOKEN="2/12345..."
@@ -123,20 +128,30 @@ $env:ASANA_ACCESS_TOKEN = "2/12345..."
 $env:ASANA_DEFAULT_WORKSPACE = "12345678"   # optional
 ```
 
+PowerShell handles native-command input and output encodings its own way —
+especially Windows PowerShell 5.1, which also strips the double quotes from
+inline JSON arguments. See
+[Windows and PowerShell](https://github.com/izumo-m/asana-api-cli/blob/main/docs/usage.md#windows-and-powershell)
+before scripting with it.
+
 ## Shell completion
 
 `asana-api` is built with Click, which supports dynamic shell completion.
-To enable bash completion, add the following line to your `~/.bashrc`:
+To enable it, add the line for your shell to its startup file:
 
 ```bash
+# bash: ~/.bashrc
 eval "$(_ASANA_API_COMPLETE=bash_source asana-api)"
+
+# zsh: ~/.zshrc
+eval "$(_ASANA_API_COMPLETE=zsh_source asana-api)"
+
+# fish: ~/.config/fish/config.fish
+_ASANA_API_COMPLETE=fish_source asana-api | source
 ```
 
-Then reload the shell (`source ~/.bashrc` or open a new terminal). Pressing
-`<TAB>` after `asana-api` will now complete subcommands and options.
-
-For `zsh` or `fish`, replace `bash_source` with `zsh_source` or `fish_source`
-and add the line to `~/.zshrc` or `~/.config/fish/config.fish` respectively.
+Then reload the shell (e.g. `source ~/.bashrc`, or open a new terminal).
+Pressing `<TAB>` after `asana-api` will now complete subcommands and options.
 
 Click does not generate PowerShell completion. Windows users can install
 completion under WSL or Git Bash using the `bash_source` line above.
@@ -174,17 +189,19 @@ asana-api tasks create-task --body '{"data":{"name":"new task","projects":["<PRO
 
 # Output formats — non-JSON formats render one row per item. The default
 # auto-paginating output is a flat list, so it is directly rowable; under
-# --full-payload, unwrap the `{"data": [...]}` envelope first with `--query '.data'`.
+# --full-payload, unwrap the `{"data": [...]}` envelope first with `--query '.data'`
+# (and pass --limit: Asana rejects an unpaginated request over ~1000 items).
 asana-api tasks get-tasks --project <PROJECT_GID> --output table
-asana-api tasks get-tasks --project <PROJECT_GID> --full-payload --query '.data' --output csv
+asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload --query '.data' --output csv
 
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
 # Windows, which otherwise displays non-ASCII characters as garbled text.
+# (In Windows PowerShell 5.1, redirect via cmd.exe — see docs/usage.md.)
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # --output none suppresses the success payload — handy for side-effect-only
-# calls (delete/update) where only the exit code matters. The `--query` pass
-# still runs, so jq syntax errors are caught even when output is silenced.
+# calls (delete/update) where only the exit code matters. A --query still runs,
+# so it can still fail (exit 2) even when output is silenced.
 asana-api tasks delete-task --task <TASK_GID> --output none
 ```
 

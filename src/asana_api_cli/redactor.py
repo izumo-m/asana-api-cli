@@ -22,6 +22,7 @@ copied, as-is, into any project that needs the same redaction.
 from __future__ import annotations
 
 import builtins
+import contextlib
 import http.client
 import re
 from collections.abc import Callable
@@ -190,7 +191,16 @@ class HttpClientAuthRedactor:
                 args = (args[0],) + tuple(
                     _AUTH_HEADER_RE.sub(_redact_match, str(a)) for a in args[1:]
                 )
-            inner(*args, **kwargs)
+            # A trace line that cannot be written — typically stdout's reader
+            # is gone (``| head``, or quitting ``| less``): BrokenPipeError, or
+            # ``OSError(EINVAL)`` on Windows — is dropped so the HTTP exchange
+            # stays intact. ``send()`` prints *before* writing to the socket,
+            # and urllib3 takes an error there for a connection problem: it
+            # swallows a BrokenPipeError (the server may have closed early) and
+            # waits — forever, without a read timeout — for the response to a
+            # request never sent, and it retries other errors, with backoff.
+            with contextlib.suppress(OSError):
+                inner(*args, **kwargs)
 
         setattr(_redact_print, _MARKER_ATTR, True)
         setattr(_redact_print, _INNER_ATTR, inner)

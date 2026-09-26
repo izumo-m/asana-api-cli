@@ -565,6 +565,57 @@ class TestHttpHeaderGlobalsReachClient:
         assert "NAME=VALUE" in full_output(result)
 
 
+class TestCredentialsMaskedEndToEnd:
+    """Constitution #2, through the real CLI and SDK: exception text that
+    quotes a credential is masked on both streams. No network is needed —
+    http.client rejects the header, and urllib3 the URL, before connecting."""
+
+    TOKEN = "2/1111111111111111/2222222222222222:secretTOKENabcdef0123456789"
+    HOST = "http://127.0.0.1:9/api/1.0"  # never reached
+
+    def _run(self, argv: list[str]) -> tuple[int, str]:
+        from asana_api_cli.cli import main
+
+        result = make_runner().invoke(main, argv)
+        return result.exit_code, result.stdout + result.stderr
+
+    def test_token_with_stray_cr(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # e.g. ASANA_ACCESS_TOKEN=$(cat token.txt) on a CRLF file
+        monkeypatch.setenv("ASANA_ACCESS_TOKEN", self.TOKEN + "\r")
+        code, out = self._run(
+            ["--host", self.HOST, "users", "get-user", "--user", "me", "--exception-output", "json"]
+        )
+        assert code == 3, out
+        assert self.TOKEN not in out
+        assert out.count("Bearer ...456789") == 2  # stderr echo + envelope
+
+    def test_header_params_credential_with_stray_cr(self) -> None:
+        header = json.dumps({"Proxy-Authorization": "Basic dXNlcjpwYXNzd29yZA==\r"})
+        code, out = self._run(
+            ["--host", self.HOST, "users", "get-user", "--user", "me", "--header-params", header]
+        )
+        assert code == 1, out
+        assert "dXNlcjpwYXNzd29yZA" not in out
+        assert "Basic <REDACTED>" in out
+
+    def test_unparsable_proxy_url(self) -> None:
+        # Recent urllib3 quotes the whole URL in the LocationParseError (older
+        # releases only the host part); either way the password must not show.
+        proxy = "http://user:hunter2hunter2@127.0.0.1:x"
+        code, out = self._run(["--proxy", proxy, "users", "get-user", "--user", "me"])
+        assert code == 1, out
+        assert "LocationParseError" in out
+        assert "hunter2" not in out
+
+    @pytest.mark.parametrize("flag", ["--set-default-header", "--header-params"])
+    def test_malformed_authorization_argument(self, flag: str) -> None:
+        code, out = self._run(
+            [flag, f"Authorization: Bearer {self.TOKEN}", "users", "get-user", "--user", "me"]
+        )
+        assert code == 2, out
+        assert self.TOKEN not in out
+
+
 class TestAccessTokenLastWins:
     """``access_token`` follows the same last-wins rule as every other global
     option: the command-line value overwrites whatever ``runtime`` held,
@@ -1024,6 +1075,25 @@ class TestErrorPathExitCodes:
         # exit 2 = user-input error (bad jq syntax). docs/usage.md
         assert result.exit_code == 2
         assert "Invalid jq expression" in full_output(result)
+
+    @pytest.mark.parametrize("flag", ["--query", "--exception-query"])
+    def test_jq_syntax_error_stops_before_the_call(
+        self, monkeypatch: pytest.MonkeyPatch, flag: str
+    ) -> None:
+        # A jq typo is an input error caught while parsing: a mutating call
+        # must not run (its result would be lost behind the error), and no
+        # token is needed to report it. For --exception-query this also covers
+        # a call that would have succeeded, where the typo used to go unnoticed.
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        cmd = _build_command("TasksApi", "create_task")
+        mock = _patch(monkeypatch, "TasksApi", "create_task", return_value={"gid": "new"})
+        result = make_runner().invoke(
+            cmd,
+            ["--body", '{"data": {"name": "x"}}', "--exception-output", "json", flag, ".gid |"],
+        )
+        assert result.exit_code == 2
+        assert "Invalid jq expression" in full_output(result)
+        assert mock.call_count == 0
 
     def test_exception_query_alone_warns(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")

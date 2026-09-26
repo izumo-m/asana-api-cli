@@ -17,10 +17,14 @@ RES=<task or project gid>
 # stderr, which is fine for humans but not capturable by ``$(...)``).
 # The envelope's ``body`` is the raw response string, so ``fromjson``
 # parses it; ``text`` format makes the scalar print without JSON quotes.
+# ``// empty`` matters: any other API error (401, 404, ...) also exits 3,
+# but its body has no ``sync``, and ``text`` would print the resulting null
+# as ``None`` — slipping past the ``-z`` guards below. ``empty`` prints
+# nothing instead, so the guard stops the script.
 SYNC=$(asana-api events get-events --resource "$RES" \
   --full-payload \
   --exception-output text \
-  --exception-query '.body | fromjson | .sync')
+  --exception-query '.body | fromjson | .sync // empty')
 [ -z "$SYNC" ] && exit 1
 
 # Poll: send the token, print events, rotate, sleep, repeat.
@@ -29,13 +33,14 @@ while true; do
   RESP=$(asana-api events get-events --resource "$RES" --sync "$SYNC" \
     --full-payload \
     --exception-output text \
-    --exception-query '.body | fromjson | .sync')
+    --exception-query '.body | fromjson | .sync // empty')
   case $? in
     0) echo "$RESP"
-       SYNC=$(echo "$RESP" | jq -r '.sync')
+       SYNC=$(echo "$RESP" | jq -r '.sync // empty')
        [ -z "$SYNC" ] && exit 1
        ;;
     3) # 412: sync token expired — envelope yields a fresh token
+       # (any other API error yields nothing, stopping at the guard)
        SYNC=$RESP
        [ -z "$SYNC" ] && exit 1
        ;;

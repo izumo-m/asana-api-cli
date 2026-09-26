@@ -24,10 +24,10 @@ asana-api --access-token "2/12345..." workspaces get-workspaces
 ```
 
 No token is needed for `--help` or command-line parsing errors (unknown
-options, a missing required argument, a malformed `NAME=VALUE`). One exception:
-a `--query` / `--exception-query` jq filter is validated against the response
-payload, so a syntactically invalid filter surfaces only *after* the API
-call — which does need a token.
+options, a missing required argument, a malformed `NAME=VALUE` or header name, a `--query` /
+`--exception-query` jq expression that does not compile). A jq expression that
+compiles but fails on the actual payload is the exception: it surfaces only
+*after* the API call — which does need a token.
 
 ## Options
 
@@ -128,15 +128,24 @@ auto-paginating output is already a flat list, so it is directly rowable; under
 ```bash
 asana-api tasks get-tasks --project <PROJECT_GID> --output table
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv
-asana-api tasks get-tasks --project <PROJECT_GID> --full-payload --query '.data' --output table
+asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload --query '.data' --output table
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # Side-effect-only call: only the exit code matters
 asana-api tasks delete-task --task <TASK_GID> --output none
 ```
 
-`--query` runs and validates even under `--output none`, so a broken jq
-expression still surfaces (exit `2`) regardless of the chosen format.
+A `--query` expression that does not compile is rejected before the API call
+(exit `2`, nothing sent). One that compiles still runs under `--output none`, so
+a jq runtime error against the payload surfaces (exit `2`) regardless of the
+chosen format.
+
+The expressions are evaluated by the installed `jq` Python package, so the
+language follows its bundled jq version. With `jq` older than 1.9.1, a carriage
+return between tokens is a syntax error: a `--query` / `--exception-query` read
+from a file with Windows (CRLF) line endings — e.g. `--query "$(cat filter.jq)"`
+— exits `2`. Strip the CRs (`--query "$(tr -d '\r' < filter.jq)"`) or upgrade
+`jq`.
 
 ## Generating Python code
 
@@ -146,7 +155,7 @@ path), makes no network call, and needs no token — so it is a quick way to tur
 a working CLI invocation into copy-pasteable SDK code.
 
 ```bash
-asana-api --generate-python tasks get-tasks --workspace <WS> --opt-fields name
+asana-api --generate-python tasks get-tasks --workspace <WS> --assignee me --opt-fields name
 asana-api tasks get-task --task <TASK_GID> --generate-python > fetch_task.py
 ```
 
@@ -180,14 +189,15 @@ a non-empty `--access-token`, which is embedded in **masked** form (`...` plus
 the last 6 characters; a value too short to be a real token — a dummy — stays
 verbatim, so the masked script fails with 401 instead of silently using a
 different credential). An `Authorization` / `Proxy-Authorization` header given
-via `--set-default-header` / `--header-params` and the password in a `--proxy`
-URL are masked the same way (a `Basic` credential entirely, with no tail
-reveal) — in the configuration lines and in the `# Equivalent to:` comment
-alike. Everything else (including other custom
+via `--set-default-header` / `--header-params` is masked the same way (a `Basic`
+credential entirely, with no tail reveal), and the password in a `--proxy` URL
+is replaced with `***` — in the configuration lines and in the
+`# Equivalent to:` comment alike. Everything else (including other custom
 headers and the `--body` payload) is transcribed verbatim — see
 [SECURITY.md](../SECURITY.md). Input validation still runs
-during generation: a malformed `--body` literal or a missing required
-`--workspace` exits `2`, just as when executing.
+during generation: a malformed `--body` literal, a missing required
+`--workspace`, or a `--query` / `--exception-query` that does not compile exits
+`2`, just as when executing.
 
 `asana-api --generate-python --version` emits a script that prints the version
 string (rather than printing it directly).
@@ -199,7 +209,10 @@ format Python uses for an uncaught exception (the qualified class name and the
 message, with no traceback frames). For an `ApiException` that output already
 includes the status, reason, headers, and body, so the response payload (e.g.
 the 412 sync-token body when polling events) is readable without requesting an
-envelope.
+envelope. Credentials quoted in that text are masked, in the envelope too — e.g.
+a token with a stray line break (read from a CRLF file) makes the SDK stack
+report `Invalid header value b'Bearer <token>\r'` — see
+[SECURITY.md](../SECURITY.md#error-output-masks-your-credentials).
 
 `--exception-output {none|json|text|csv|table}` (default `none`) controls the
 structured envelope:
@@ -230,10 +243,12 @@ asana-api tasks get-task --task 0 || echo "exit=$?"
 
 # Opt into a stdout envelope: exit 3, structured error on stdout
 out=$(asana-api tasks get-task --task 0 --exception-output json)
-case $? in
+rc=$?
+case $rc in
   0) echo "$out" | jq '.' ;;          # success: $out is the payload
   3) echo "$out" | jq '.status' ;;    # API error: $out is the envelope
-  *) echo "input error" >&2 ;;        # exit 2: bad input
+  2) echo "input error" >&2 ;;        # bad input
+  *) echo "unexpected error (exit $rc)" >&2 ;;  # e.g. 1: unclassified
 esac
 ```
 
@@ -243,13 +258,26 @@ esac
 |---|---|
 | `0` | Success |
 | `1` | Unhandled error — the catch-all. Usually an SDK call exception under the default `--exception-output=none` (echoed to stderr, no traceback); but also Python's default for any other uncaught failure the CLI does not classify, e.g. an incompatible `asana` SDK that fails to import (which prints a full traceback) |
-| `2` | User-input invalid (missing access token, bad option value, missing required workspace, jq syntax / runtime error, malformed `--body` / structured-arg value) |
+| `2` | User-input invalid (missing access token, bad option value, missing required workspace, jq syntax / runtime error, malformed `--body` / structured-arg value). A jq *runtime* error happens after the API call — see below |
 | `3` | SDK call exception rendered as an envelope on stdout (requires `--exception-output {json\|text\|csv\|table}`) |
 
 - Only `2` and `3` are narrowly defined: `2` for invalid user input (Click's
   convention, reused for jq and `--body` parse failures), `3` for an SDK error
   you explicitly captured as an envelope. When a command has both bad input and
-  a failing API call, the input error (`2`) wins — it is detected first.
+  a failing API call, the input error (`2`) wins — it is detected first, before
+  anything is sent.
+- The one input error detected *after* the API call is a jq **runtime** error: a
+  `--query` / `--exception-query` that compiles (syntax is checked up front) but
+  fails on the actual response or envelope — e.g. `tonumber` on a string, or
+  indexing an array with a key. The call has already been made, so exit `2`
+  here does **not** mean nothing happened: a `create-*` / `update-*` /
+  `delete-*` command has taken effect, and retrying it repeats the change. The
+  unfiltered result is not printed; when an `--exception-query` fails this way,
+  the SDK exception has still been echoed to stderr.
+- A reader that stops early (`| head`, or quitting `| less`) ends the run with
+  a quiet `1` once `asana-api` next writes to stdout — no traceback, on Windows
+  too. Every page has already been fetched by then: the output is written after
+  the call completes.
 - `1` is the catch-all for everything else that failed; do not read a specific
   cause into it. To ask "did it fail?", test for non-zero; to branch on the
   kind, match `2` / `3` and treat any other non-zero (including `1`) as an
@@ -347,6 +375,10 @@ asana-api --user-agent "my-integration/1.0" \
           tasks get-task --task <TASK_GID>
 ```
 
+A header name (in `--set-default-header` or `--header-params`) containing `:`
+or whitespace is rejected with exit `2` before any request: it is almost always
+`Name: value` typed for `Name=value`.
+
 `--user-agent VALUE` is shorthand for `--set-default-header "User-Agent=VALUE"` —
 both write the same header. If you set the `User-Agent` through both, the
 dedicated `--user-agent` wins.
@@ -373,7 +405,7 @@ Mirroring the SDK, `--proxy` is the only way to configure a proxy — the
 
 ### Credentials in the proxy URL are discarded
 
-As of `python-asana` 5.2.5 — the latest version checked —
+As of `python-asana` 5.3.0 — the latest version checked —
 `--proxy http://user:pass@host:port` parses, but the credentials are **never
 sent**: the SDK stack (`python-asana` → urllib3) does not turn URL userinfo
 into a `Proxy-Authorization` header. urllib3's only built-in proxy-credential
@@ -424,7 +456,7 @@ like `--project` that the Asana API accepts in place of a workspace.
 
 ## File uploads
 
-In `python-asana` 5.2.5 — the latest version checked, and most likely later
+In `python-asana` 5.3.0 — the latest version checked, and most likely later
 ones too — uploading a file whose name contains non-ASCII characters (accented
 letters, Japanese, emoji, …) stores a garbled (mojibake) filename on Asana.
 This is a long-standing bug in the SDK — see the
@@ -436,3 +468,48 @@ This is a long-standing bug in the SDK — see the
 patch so the original filename round-trips intact. It is off by default to match
 stock SDK behavior; turn it on whenever an attachment's name has any character
 outside ASCII (plain-ASCII names, including symbols, are unaffected).
+
+## Windows and PowerShell
+
+`asana-api` reads and writes UTF-8 everywhere — command output, `--body` /
+`@file` input, and stdin — regardless of the console code page (e.g. cp932 on
+Japanese Windows). A leading UTF-8 BOM on a JSON file or on stdin is accepted,
+so files written by Windows PowerShell 5.1's `Out-File -Encoding utf8` work
+as-is. `cmd.exe` redirection passes these bytes through unchanged; PowerShell
+converts them, so a few settings matter there.
+
+**Both Windows PowerShell 5.1 and PowerShell 7** (checked with 7.6) decode a
+native command's output with `[Console]::OutputEncoding`, which follows the
+console code page. Capturing non-ASCII output — `$r = asana-api ...` or piping
+into another cmdlet — garbles it unless you switch to UTF-8 first:
+
+```powershell
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$tasks = asana-api tasks get-tasks --project <PROJECT_GID> | ConvertFrom-Json
+```
+
+**Windows PowerShell 5.1** additionally:
+
+- **Strips double quotes from native-command arguments.** An inline JSON body
+  (`--body '{"data":{"name":"x"}}'`) or a `--query` with quoted keys reaches
+  `asana-api` without its `"` and fails. Put the JSON in a file
+  (`--body @task.json`) or pipe it (`--body -`). PowerShell 7 passes such
+  arguments intact.
+- **Pipes to native commands as ASCII by default**, so non-ASCII text piped into
+  `--body -` silently becomes `?`. Set a UTF-8 `$OutputEncoding` first (the BOM
+  this adds is accepted):
+
+  ```powershell
+  $OutputEncoding = [Text.Encoding]::UTF8
+  Get-Content task.json -Encoding UTF8 | asana-api tasks create-task --body -
+  ```
+
+- **Writes `>` redirections as UTF-16LE**, so `--output csv --csv-bom > tasks.csv`
+  does not produce the UTF-8-with-BOM file Excel expects. Redirect through
+  `cmd.exe` instead, which keeps the bytes as written:
+
+  ```powershell
+  cmd /c "asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv"
+  ```
+
+  PowerShell 7's `>` keeps the bytes as well.
