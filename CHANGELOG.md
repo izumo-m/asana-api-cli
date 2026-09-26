@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The test suite in the source distribution now runs.** The sdist used to
+  ship only the `tests/test*.py` modules — without their `conftest.py`,
+  helpers, fixtures, and cassettes — so `pytest` from an unpacked archive
+  failed at collection. It now includes the whole `tests/` tree plus `docs/`
+  (one test checks the group descriptions against `docs/api-groups.md`).
+  Building from source now requires `setuptools>=77`, the first release that
+  accepts the SPDX `license` field; older setuptools could not build it
+  anyway.
+
 ## [3.3.1] - 2026-09-01
 
 ### Changed

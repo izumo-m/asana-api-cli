@@ -1,0 +1,9 @@
+# Ship the complete test suite in the sdist so it runs from an unpacked
+# archive. setuptools' default picks up only ``tests/test*.py``, leaving out
+# ``conftest.py`` / ``_cli_runner.py`` / fixtures / e2e cassettes, which makes
+# the shipped tests fail at collection. ``docs/`` rides along because
+# ``tests/test_cli.py`` checks the group descriptions against
+# ``docs/api-groups.md``.
+graft tests
+graft docs
+global-exclude __pycache__ *.py[cod]
