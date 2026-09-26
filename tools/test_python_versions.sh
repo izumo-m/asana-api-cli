@@ -51,7 +51,9 @@ for v in "${versions[@]}"; do
   echo "=== Python ${v} ==="
   env_dir="$(mktemp -d)"
   envs+=("$env_dir")
-  if (cd "$ROOT" && UV_PROJECT_ENVIRONMENT="$env_dir" \
+  # UV_LINK_MODE=copy: the throwaway env usually sits on another filesystem
+  # than uv's cache, where uv would warn and fall back to copying anyway.
+  if (cd "$ROOT" && UV_PROJECT_ENVIRONMENT="$env_dir" UV_LINK_MODE="${UV_LINK_MODE:-copy}" \
       uv run --python "$v" --locked --managed-python \
       pytest -q ${pytest_args[@]+"${pytest_args[@]}"}); then
     results+=("  ${v}: passed")
