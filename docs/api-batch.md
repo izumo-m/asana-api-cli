@@ -204,10 +204,18 @@ Sub-action failures are visible **only** inside per-action
 parent call's status, so scripts must walk the result array themselves:
 
 ```bash
-asana-api batch-api create-batch-request --body @/tmp/req.json --full-payload \
-  | jq -e 'all(.data[]; .status_code >= 200 and .status_code < 300)' >/dev/null \
-  || echo "at least one sub-action failed" >&2
+if out=$(asana-api batch-api create-batch-request --body @/tmp/req.json --full-payload); then
+  echo "$out" \
+    | jq -e 'all(.data[]; .status_code >= 200 and .status_code < 300)' >/dev/null \
+    || echo "at least one sub-action failed" >&2
+else
+  echo "batch request failed" >&2
+fi
 ```
+
+Capture the output first: piped straight into `jq`, a failure of the batch
+call itself (bad token, network error, a parent `400`) would leave `jq` with
+no input and be reported as a sub-action failure.
 
 ## Limits and restrictions
 

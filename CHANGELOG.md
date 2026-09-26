@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   terminal; it is now written verbatim, matching what a terminal receives and
   what a `--generate-python` script prints. The exception echoed to stderr is
   likewise written verbatim.
+- **The `--debug` example in `asana-api --help` now works as written.** It
+  used `tasks get-tasks --workspace WS` alone, which the Asana API rejects
+  (`get-tasks` needs a project / tag, or an assignee together with the
+  workspace); it now shows `tasks get-task --task 1234567890`.
 - **The test suite in the source distribution now runs.** The sdist used to
   ship only the `tests/test*.py` modules — without their `conftest.py`,
   helpers, fixtures, and cassettes — so `pytest` from an unpacked archive

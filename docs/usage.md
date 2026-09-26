@@ -146,7 +146,7 @@ path), makes no network call, and needs no token — so it is a quick way to tur
 a working CLI invocation into copy-pasteable SDK code.
 
 ```bash
-asana-api --generate-python tasks get-tasks --workspace <WS> --opt-fields name
+asana-api --generate-python tasks get-tasks --workspace <WS> --assignee me --opt-fields name
 asana-api tasks get-task --task <TASK_GID> --generate-python > fetch_task.py
 ```
 
@@ -230,10 +230,12 @@ asana-api tasks get-task --task 0 || echo "exit=$?"
 
 # Opt into a stdout envelope: exit 3, structured error on stdout
 out=$(asana-api tasks get-task --task 0 --exception-output json)
-case $? in
+rc=$?
+case $rc in
   0) echo "$out" | jq '.' ;;          # success: $out is the payload
   3) echo "$out" | jq '.status' ;;    # API error: $out is the envelope
-  *) echo "input error" >&2 ;;        # exit 2: bad input
+  2) echo "input error" >&2 ;;        # bad input
+  *) echo "unexpected error (exit $rc)" >&2 ;;  # e.g. 1: unclassified
 esac
 ```
 

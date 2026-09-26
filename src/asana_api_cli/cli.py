@@ -1273,7 +1273,7 @@ _ROOT_EPILOG = (
     "  asana-api tasks get-tasks --workspace WS --assignee me\n"
     "  asana-api tasks get-task --task 1234567890 --opt-fields name,assignee.name\n"
     "  asana-api tasks create-task --body @new-task.json   # workspace goes inside body\n"
-    "  asana-api --debug tasks get-tasks --workspace WS   # show HTTP requests\n"
+    "  asana-api --debug tasks get-task --task 1234567890   # show HTTP requests\n"
     "  asana-api <group> --help   # e.g. asana-api tasks --help\n"
     "\n"
     "  Set $ASANA_ACCESS_TOKEN once, or pass --access-token TOKEN."
