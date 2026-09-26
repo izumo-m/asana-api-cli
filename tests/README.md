@@ -42,15 +42,22 @@ UV_PROJECT_ENVIRONMENT=$(mktemp -d) uv run --resolution lowest-direct --isolated
 - `UV_PROJECT_ENVIRONMENT=$(mktemp -d)` builds the floor environment in a
   throwaway directory, leaving the project's `.venv` untouched.
 
-A floor that works on one Python can fail on another (e.g. no wheel for a
-newer Python), so check the floors on every tested Python version at once with:
+A floor that works on one Python can fail on another, so check the floors on
+several Python versions at once with:
 
 ```bash
-bash tools/test_python_versions.sh --lowest
+bash tools/test_python_versions.sh --lowest 3.10 3.11 3.12
 ```
 
 Run this whenever a floor changes (and as part of bumping the `asana`
 SDK) to confirm the declared minimum still works.
+
+The floors are deliberately old: `pip install asana-api-cli` must work on an
+existing system from the python-asana 5.0.2 era (December 2023) without
+upgrading the packages it already has — e.g. `jq` 1.6.0, the release current
+then. Do not raise a floor only because that release has no wheel for a newer
+Python: pip there simply picks a newer release. This is why `--lowest` fails on
+Python 3.13 and later, where `jq` 1.6.0 has no wheel and does not build.
 
 ## End-to-end tests
 

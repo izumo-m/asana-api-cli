@@ -7,14 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **Requires `jq>=1.9.1`** (was `>=1.6`). Earlier `jq` releases cannot be
-  installed on Python 3.14, and the jq engine they bundle rejects a carriage
-  return in a program — so a `--query` read from a file with Windows (CRLF) line
-  endings failed to compile. The declared minimum dependency versions are now
-  tested on Python 3.10, 3.12, and 3.14.
-
 ### Fixed
 
 - **A `--query` / `--exception-query` jq expression that does not compile is

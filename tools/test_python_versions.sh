@@ -16,7 +16,8 @@
 # Usage:
 #   bash tools/test_python_versions.sh                     # 3.10, 3.12, 3.14
 #   bash tools/test_python_versions.sh 3.11 3.13           # chosen versions
-#   bash tools/test_python_versions.sh --lowest            # declared minimums
+#   bash tools/test_python_versions.sh --lowest 3.10 3.11 3.12
+#                                                          # declared minimums
 #   bash tools/test_python_versions.sh -- -x tests/test_codegen.py
 #                                                          # extra pytest args
 set -euo pipefail

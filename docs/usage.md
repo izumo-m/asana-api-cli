@@ -140,6 +140,13 @@ A `--query` expression that does not compile is rejected before the API call
 a jq runtime error against the payload surfaces (exit `2`) regardless of the
 chosen format.
 
+The expressions are evaluated by the installed `jq` Python package, so the
+language follows its bundled jq version. With `jq` older than 1.9.1, a carriage
+return between tokens is a syntax error: a `--query` / `--exception-query` read
+from a file with Windows (CRLF) line endings — e.g. `--query "$(cat filter.jq)"`
+— exits `2`. Strip the CRs (`--query "$(tr -d '\r' < filter.jq)"`) or upgrade
+`jq`.
+
 ## Generating Python code
 
 `--generate-python` prints a standalone `python-asana` script equivalent to the

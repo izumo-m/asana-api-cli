@@ -16,11 +16,11 @@ Runs `pytest` once per Python version — by default 3.10 (the supported
 minimum), 3.12, and 3.14.
 
 ```bash
-bash tools/test_python_versions.sh                    # 3.10, 3.12, 3.14
-bash tools/test_python_versions.sh 3.11 3.13          # chosen versions
-bash tools/test_python_versions.sh --lowest           # declared minimum dependency versions
-bash tools/test_python_versions.sh -- -x tests/test_codegen.py   # extra pytest args
-bash tools/test_python_versions.sh --lowest 3.14 -- -k codegen   # combined
+bash tools/test_python_versions.sh                              # 3.10, 3.12, 3.14
+bash tools/test_python_versions.sh 3.11 3.13                    # chosen versions
+bash tools/test_python_versions.sh --lowest 3.10 3.11 3.12      # declared minimum dependency versions
+bash tools/test_python_versions.sh -- -x tests/test_codegen.py  # extra pytest args
+bash tools/test_python_versions.sh --lowest 3.12 -- -k codegen  # combined
 ```
 
 - Each version runs in a throwaway virtualenv that is deleted on exit, so the
@@ -29,7 +29,9 @@ bash tools/test_python_versions.sh --lowest 3.14 -- -k codegen   # combined
   With `--lowest`, the direct dependencies are installed at the minimum versions
   `pyproject.toml` declares instead (`--resolution lowest-direct --isolated`;
   see [`tests/README.md` §Lower-bound versions](../tests/README.md#lower-bound-versions)),
-  still without rewriting `uv.lock`.
+  still without rewriting `uv.lock`. Some floors predate the newest Pythons
+  (`jq` 1.6 has no wheel for 3.13+), so pass the versions explicitly:
+  `--lowest 3.10 3.11 3.12`.
 - The installed versions of the runtime dependencies (`asana`, `click`, ...)
   are printed before each run, so the log shows what was actually tested.
 - The interpreter is always a uv-managed CPython (`--managed-python`),

@@ -701,8 +701,10 @@ class TestHeader:
         # A line-break-bearing argument (here a multiline --query jq program) must
         # not end the "# Equivalent to:" comment and leak its tail into the script
         # as source — every continuation line is re-prefixed with "#", and the
-        # script still compiles.
-        argv = ["tasks", "get-tasks", "--workspace", "1", "--query", f".data{sep}  | map(.name)"]
+        # script still compiles. The break sits inside a jq string literal: jq < 1.9.1
+        # rejects a CR between tokens, but every supported jq accepts one there.
+        query = f'.data | map(.name + "{sep}  suffix")'
+        argv = ["tasks", "get-tasks", "--workspace", "1", "--query", query]
         monkeypatch.setattr(sys, "argv", ["asana-api", "--generate-python", *argv])
         result = make_runner().invoke(main, ["--generate-python", *argv])
         assert result.exit_code == 0, full_output(result)
