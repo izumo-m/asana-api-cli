@@ -401,24 +401,31 @@ class TestHttpClientAuthRedactor:
 
         srv = HTTPServer(("127.0.0.1", 0), _H)
         port = srv.server_address[1]
-        threading.Thread(target=srv.handle_request, daemon=True).start()
+        server_thread = threading.Thread(target=srv.handle_request, daemon=True)
+        server_thread.start()
 
         token = "SECRET-TOKEN-2/123456/789:abcdef0123"
-        with HttpClientAuthRedactor():
-            http.client.HTTPConnection.debuglevel = 1
-            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
-            # Add a trailing header so we can assert the regex did not
-            # swallow the next header name at the boundary.
-            conn.request(
-                "GET",
-                "/x",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "X-Test-Trailer": "preserved",
-                },
-            )
-            conn.getresponse().read()
-            conn.close()
+        try:
+            with HttpClientAuthRedactor():
+                http.client.HTTPConnection.debuglevel = 1
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+                # Add a trailing header so we can assert the regex did not
+                # swallow the next header name at the boundary.
+                conn.request(
+                    "GET",
+                    "/x",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "X-Test-Trailer": "preserved",
+                    },
+                )
+                conn.getresponse().read()
+                conn.close()
+        finally:
+            # Close the listening socket too; otherwise it is only reclaimed by
+            # GC, which emits a ResourceWarning ("unclosed <socket.socket ...>").
+            server_thread.join(timeout=2)
+            srv.server_close()
 
         captured = capsys.readouterr()
         assert token not in captured.out
