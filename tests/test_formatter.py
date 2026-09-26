@@ -219,6 +219,36 @@ class TestFormatOutputText:
         assert capsys.readouterr().out.strip() == "123"
 
 
+class TestAnsiEscapesPreserved:
+    """Data containing ANSI escape sequences is written verbatim.
+
+    ``click.echo`` strips ANSI codes by default when the stream is not a
+    terminal (as with ``capsys``, a pipe, or a redirect), which would silently
+    alter a value such as a task name — and diverge from the ``print`` calls
+    of a ``--generate-python`` script.
+    """
+
+    NAME = "A\x1b[31mB\x1b[0mC"
+
+    @pytest.mark.parametrize(
+        ("output_format", "data"),
+        [
+            ("text", {"name": NAME}),
+            ("table", [{"name": NAME}]),
+            ("table", NAME),  # scalar fall-through
+        ],
+    )
+    def test_payload(
+        self, capsys: pytest.CaptureFixture[str], output_format: str, data: Any
+    ) -> None:
+        _format_output(data, output_format=output_format, jq_query=None)
+        assert self.NAME in capsys.readouterr().out
+
+    def test_stderr_exception_echo(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _echo_exception_only(RuntimeError(self.NAME))
+        assert self.NAME in capsys.readouterr().err
+
+
 class TestFormatOutputJq:
     def test_jq_filter(self, capsys: pytest.CaptureFixture[str]) -> None:
         _format_output(

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--generate-python` scripts no longer crash on an infinite or NaN value.**
+  A float option given as `inf` / `nan` (e.g. `--request-timeout inf`,
+  `--retry-strategy backoff_max=inf`, or `Infinity` in a JSON-form
+  `--retry-strategy` / `--header-params`) was written into the script as a
+  bare `inf` / `nan`, so the script failed with `NameError` although the
+  command itself ran. Such values are now emitted as `float('inf')` etc.
+- **`--output text` / `table` no longer strip ANSI escape sequences from the
+  data when stdout is a pipe or file.** A value containing one (e.g. a task
+  name with `\x1b[31m`) was silently altered whenever the output was not a
+  terminal; it is now written verbatim, matching what a terminal receives and
+  what a `--generate-python` script prints. The exception echoed to stderr is
+  likewise written verbatim.
 - **The test suite in the source distribution now runs.** The sdist used to
   ship only the `tests/test*.py` modules — without their `conftest.py`,
   helpers, fixtures, and cassettes — so `pytest` from an unpacked archive

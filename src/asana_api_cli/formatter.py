@@ -219,10 +219,13 @@ def _echo_exception_only(e: BaseException) -> None:
     exception stays visible even when ``--exception-query`` would
     otherwise strip it from stdout.
     """
+    # ``color=True``: keep the message verbatim even when stderr is redirected
+    # (see :func:`_echo_payload`).
     click.echo(
         "".join(traceback.format_exception_only(type(e), e)),
         err=True,
         nl=False,
+        color=True,
     )
 
 
@@ -271,6 +274,20 @@ def _handle_exception(
     sys.exit(3)
 
 
+def _echo_payload(text: str) -> None:
+    """Write one payload line to stdout exactly as given.
+
+    ``color=True`` stops ``click.echo`` from stripping ANSI escape sequences
+    when stdout is not a terminal: by default a value that happens to contain
+    one (e.g. a task name with ``\x1b[31m``) would be silently altered in a
+    pipe or redirect, while the same bytes reach an interactive terminal
+    unchanged — so stripping protects nothing and only corrupts data. It also
+    keeps ``--output text`` / ``table`` byte-identical to the ``print`` calls
+    of a ``--generate-python`` script.
+    """
+    click.echo(text, color=True)
+
+
 def _format_output(
     data: Any,
     *,
@@ -312,7 +329,7 @@ def _format_output(
 
     if output_format == "json":
         for v in results:
-            click.echo(format_json(v))
+            _echo_payload(format_json(v))
         return
 
     if output_format == "text":
@@ -336,7 +353,7 @@ def _format_output(
 
     if not rows and non_rowable:
         for v in non_rowable:
-            click.echo(scalar_text(v))
+            _echo_payload(scalar_text(v))
         return
 
     # Stringify nested values (dict / list) as JSON so cells use JSON
@@ -348,7 +365,7 @@ def _format_output(
         # ``tabulate([], ...)`` returns ``""`` and ``click.echo("")`` would
         # still write a newline. Matches the empty-rows skip on the CSV path.
         if rows:
-            click.echo(format_table(rows))
+            _echo_payload(format_table(rows))
     elif output_format == "csv":
         _print_csv(rows, with_bom=csv_bom)
 
@@ -417,9 +434,9 @@ def _print_text(data: Any) -> None:
     """
     if isinstance(data, list):
         for item in data:
-            click.echo(format_text(item))
+            _echo_payload(format_text(item))
         return
-    click.echo(format_text(data))
+    _echo_payload(format_text(data))
 
 
 def format_csv(rows: list[dict[str, Any]], *, with_bom: bool = False) -> str:
