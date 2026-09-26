@@ -20,6 +20,6 @@
 
 | Term | Refers to |
 |---|---|
-| **`python-asana` SDK** (short: **the SDK**) | The official Asana Python client. Distributed on PyPI as `python-asana`, imported as `asana`. |
+| **`python-asana` SDK** (short: **the SDK**) | The official Asana Python client, developed in the `Asana/python-asana` GitHub repository. Distributed on PyPI as `asana`, imported as `asana`. |
 | **`asana-api-cli`** | This project / pip-installable package name. |
 | **`asana-api`** | The CLI executable produced by this project (what users actually run). |
