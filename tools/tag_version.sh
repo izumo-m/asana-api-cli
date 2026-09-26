@@ -11,7 +11,7 @@ set -euo pipefail
 PYPROJECT="$(cd "$(dirname "$0")/.." && pwd)/pyproject.toml"
 
 # Read current version from pyproject.toml
-version=$(grep -oP '^version\s*=\s*"\K[^"]+' "$PYPROJECT")
+version=$(grep -oP '^version\s*=\s*"\K[^"]+' "$PYPROJECT" || true)
 if [[ -z "$version" ]]; then
   echo "error: could not find version in pyproject.toml" >&2
   exit 1

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Build and publish the package to PyPI.
 #
-# Runs `python -m build` to create sdist + wheel, then uploads with twine.
+# Runs `python -m build` to create sdist + wheel, then uploads with twine —
+# both via `uv run`, so the dev-group build/twine are used, not whatever the
+# ambient `python` has installed.
 # Username and password are entered interactively (use __token__ + API token).
 #
 # Usage:
@@ -16,7 +18,7 @@ BUILD="${ROOT}/build"
 EGG_INFO_GLOB="${ROOT}/src/*.egg-info"
 
 # Read current version from pyproject.toml
-version=$(grep -oP '^version\s*=\s*"\K[^"]+' "$PYPROJECT")
+version=$(grep -oP '^version\s*=\s*"\K[^"]+' "$PYPROJECT" || true)
 if [[ -z "$version" ]]; then
   echo "error: could not find version in pyproject.toml" >&2
   exit 1
@@ -53,7 +55,7 @@ rm -rf $EGG_INFO_GLOB
 
 # Build
 echo "--- Building ---"
-(cd "$ROOT" && python -m build) || {
+(cd "$ROOT" && uv run python -m build) || {
   echo "error: build failed" >&2
   exit 1
 }
@@ -74,7 +76,7 @@ fi
 # Upload
 echo ""
 if [[ -n "$repo_url" ]]; then
-  python -m twine upload --repository-url "$repo_url" "$DIST"/*
+  (cd "$ROOT" && uv run python -m twine upload --repository-url "$repo_url" "$DIST"/*)
 else
-  python -m twine upload "$DIST"/*
+  (cd "$ROOT" && uv run python -m twine upload "$DIST"/*)
 fi
