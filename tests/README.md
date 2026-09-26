@@ -25,10 +25,10 @@ bash tools/test_python_versions.sh
 
 ## Lower-bound versions
 
-The default `uv run pytest` resolves every dependency to its newest
-compatible version. To instead verify that the suite passes at the
-*lowest* versions the project declares — the `>=` floors in
-`pyproject.toml` (`dependencies` and the `dev` group) — run:
+The default `uv run pytest` uses the dependency versions pinned in
+`uv.lock`. To instead verify that the suite passes at the *lowest* versions
+the project declares — the `>=` floors in `pyproject.toml` (`dependencies` and
+the `dev` group) — run:
 
 ```bash
 UV_PROJECT_ENVIRONMENT=$(mktemp -d) uv run --resolution lowest-direct --isolated pytest
@@ -41,6 +41,13 @@ UV_PROJECT_ENVIRONMENT=$(mktemp -d) uv run --resolution lowest-direct --isolated
   rewritten.
 - `UV_PROJECT_ENVIRONMENT=$(mktemp -d)` builds the floor environment in a
   throwaway directory, leaving the project's `.venv` untouched.
+
+A floor that works on one Python can fail on another (e.g. no wheel for a
+newer Python), so check the floors on every tested Python version at once with:
+
+```bash
+bash tools/test_python_versions.sh --lowest
+```
 
 Run this whenever a floor changes (and as part of bumping the `asana`
 SDK) to confirm the declared minimum still works.

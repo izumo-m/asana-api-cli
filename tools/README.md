@@ -18,15 +18,20 @@ minimum), 3.12, and 3.14.
 ```bash
 bash tools/test_python_versions.sh                    # 3.10, 3.12, 3.14
 bash tools/test_python_versions.sh 3.11 3.13          # chosen versions
+bash tools/test_python_versions.sh --lowest           # declared minimum dependency versions
 bash tools/test_python_versions.sh -- -x tests/test_codegen.py   # extra pytest args
-bash tools/test_python_versions.sh 3.14 -- -k codegen # both
+bash tools/test_python_versions.sh --lowest 3.14 -- -k codegen   # combined
 ```
 
 - Each version runs in a throwaway virtualenv that is deleted on exit, so the
   project's `.venv` and `uv.lock` are untouched.
 - Dependencies are installed at the versions pinned in `uv.lock` (`--locked`).
-  To test the declared minimum versions instead, see
-  [`tests/README.md` §Lower-bound versions](../tests/README.md#lower-bound-versions).
+  With `--lowest`, the direct dependencies are installed at the minimum versions
+  `pyproject.toml` declares instead (`--resolution lowest-direct --isolated`;
+  see [`tests/README.md` §Lower-bound versions](../tests/README.md#lower-bound-versions)),
+  still without rewriting `uv.lock`.
+- The installed versions of the runtime dependencies (`asana`, `click`, ...)
+  are printed before each run, so the log shows what was actually tested.
 - The interpreter is always a uv-managed CPython (`--managed-python`),
   downloaded on first use, so the result does not depend on which `python` is
   on `PATH`.
