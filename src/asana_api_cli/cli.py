@@ -65,7 +65,7 @@ from asana_api_cli.session import (
     runtime,
 )
 from asana_api_cli.structured_arg import (
-    click_callback,
+    header_params_callback,
 )
 from asana_api_cli.version import version_string
 
@@ -695,7 +695,7 @@ def _make_per_call_kwarg_options() -> list[click.Option]:
         click.Option(
             ["--header-params", "header_params"],
             default=None,
-            callback=click_callback(),
+            callback=header_params_callback,
             help=(
                 "Custom HTTP request headers merged into the request. VALUE: "
                 "'k1=v1,k2=v2,...', JSON object, or @path. Use cases include "

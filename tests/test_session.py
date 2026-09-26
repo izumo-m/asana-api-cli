@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import http.client
 import logging
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -351,6 +352,9 @@ class TestMaskCredentials:
             # whole, so no part of the password survives.
             ("proxy", "http://u:p@ss@h:x", "http://u:***@h:x"),
             ("host", "http://u:pw@h:x/api/1.0", "http://u:***@h:x/api/1.0"),
+            # An unescaped '/' ends a parsed netloc early; the password is still
+            # taken up to the last '@'.
+            ("proxy", "http://u:pa/ss?w#rd@h:x", "http://u:***@h:x"),
         ],
     )
     def test_configured_url_password_is_masked(
@@ -364,6 +368,19 @@ class TestMaskCredentials:
         assert mask_credentials("see 'https://user:secret@proxy:3128/x'") == (
             "see 'https://user:***@proxy:3128/x'"
         )
+
+    def test_command_line_tokens_are_masked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Collected from argv before parsing, for a usage error raised then.
+        monkeypatch.setattr(runtime, "argv_access_tokens", (TOKEN, "short"))
+        assert mask_credentials(f"x {TOKEN} short") == "x ...456789 short"
+
+    def test_long_scheme_like_run_is_scanned_quickly(self) -> None:
+        # The URL fallback regex used to retry the scheme from every position
+        # of such a run: quadratic, ~4 s for 100 KB (e.g. an error body).
+        text = "a" * 300_000
+        start = time.perf_counter()
+        assert mask_credentials(text) == text
+        assert time.perf_counter() - start < 1
 
     def test_text_without_credentials_is_unchanged(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(runtime, "access_token", TOKEN)

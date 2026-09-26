@@ -372,6 +372,18 @@ def _apply_global_to_runtime(name: str, value: Any) -> None:
     setattr(runtime, name, value)
 
 
+def _access_tokens_in(args: list[str]) -> tuple[str, ...]:
+    """Every ``--access-token`` value in *args*, in both the ``--access-token
+    VALUE`` and ``--access-token=VALUE`` spellings."""
+    tokens: list[str] = []
+    for i, arg in enumerate(args):
+        if arg == "--access-token" and i + 1 < len(args):
+            tokens.append(args[i + 1])
+        elif arg.startswith("--access-token="):
+            tokens.append(arg.partition("=")[2])
+    return tuple(tokens)
+
+
 def _consume_global_options(ctx: click.Context) -> None:
     """Pop injected global options from ``ctx.params`` and apply user values.
 
@@ -547,6 +559,11 @@ class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):  # pyright: igno
     """
 
     command_class = CommandWithGlobalOptions
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if ctx.parent is None:
+            runtime.argv_access_tokens = _access_tokens_in(args)
+        return super().parse_args(ctx, args)
 
     def invoke(self, ctx: click.Context) -> Any:
         _consume_global_options(ctx)

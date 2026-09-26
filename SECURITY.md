@@ -93,7 +93,9 @@ the stderr echo and the `--exception-output` envelope:
 
 A malformed `--set-default-header` / `--header-params` value that mentions
 `Authorization` (for example `Authorization: Bearer <token>`, typed with `:`
-instead of `=`) is not echoed back in the usage error.
+instead of `=`) is not echoed back in the usage error. A header name containing
+`:` or whitespace is rejected before any request, so such a typo cannot reach
+the SDK either.
 
 A value under any other header name is not masked unless it contains the
 access token, just as in `--debug` output. A `--generate-python` script reports

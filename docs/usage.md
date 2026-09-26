@@ -24,7 +24,7 @@ asana-api --access-token "2/12345..." workspaces get-workspaces
 ```
 
 No token is needed for `--help` or command-line parsing errors (unknown
-options, a missing required argument, a malformed `NAME=VALUE`, a `--query` /
+options, a missing required argument, a malformed `NAME=VALUE` or header name, a `--query` /
 `--exception-query` jq expression that does not compile). A jq expression that
 compiles but fails on the actual payload is the exception: it surfaces only
 *after* the API call — which does need a token.
@@ -374,6 +374,10 @@ asana-api --user-agent "my-integration/1.0" \
           --set-default-header "Accept-Language=ja" \
           tasks get-task --task <TASK_GID>
 ```
+
+A header name (in `--set-default-header` or `--header-params`) containing `:`
+or whitespace is rejected with exit `2` before any request: it is almost always
+`Name: value` typed for `Name=value`.
 
 `--user-agent VALUE` is shorthand for `--set-default-header "User-Agent=VALUE"` —
 both write the same header. If you set the `User-Agent` through both, the

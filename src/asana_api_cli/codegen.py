@@ -62,7 +62,7 @@ from typing import TYPE_CHECKING
 import click
 
 from asana_api_cli import formatter, multibyte_filename, redactor, version
-from asana_api_cli.session import _CONFIG_KNOBS, ACCESS_TOKEN_ENV, runtime
+from asana_api_cli.session import _CONFIG_KNOBS, ACCESS_TOKEN_ENV, runtime, url_userinfo
 
 if TYPE_CHECKING:
     # Type-only: importing ``cli`` at runtime would cycle (cli -> formatter ->
@@ -259,12 +259,13 @@ def _mask_authorization(value: str) -> str:
     return f"{m.group(1)} {_mask_secret(m.group(2))}"
 
 
-_PROXY_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://[^/@:]*):([^/@]*)@")
-
-
 def _mask_proxy(value: str) -> str:
     """Mask the password component of a proxy URL's userinfo."""
-    return _PROXY_USERINFO_RE.sub(r"\1:***@", value)
+    found = url_userinfo(value)
+    if found is None:
+        return value
+    user, userinfo = found
+    return value.replace(f"{userinfo}@", f"{user}:***@", 1)
 
 
 def _mask_header_params(value: dict[str, object]) -> dict[str, object]:

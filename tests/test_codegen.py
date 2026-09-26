@@ -617,6 +617,24 @@ class TestCredentialMasking:
         # shlex quotes the masked URL (it contains ``*``).
         assert "--proxy 'http://user:***@proxy.test:8080'" in code
 
+    def test_proxy_password_with_unescaped_slash_and_at_is_masked(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        code = self._generate_main(
+            monkeypatch,
+            [
+                "tasks",
+                "get-tasks",
+                "--proxy",
+                "http://user:pa/ss@wd@proxy.test",
+                "--workspace",
+                "1",
+            ],
+        )
+        assert "pa/ss" not in code
+        assert "wd@" not in code
+        assert "configuration.proxy = 'http://user:***@proxy.test'" in code
+
     def test_proxy_without_credentials_stays_verbatim(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

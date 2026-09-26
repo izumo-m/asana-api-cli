@@ -21,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The token, `Authorization` / `Proxy-Authorization` values, and URL passwords
   are now masked in error output, and such a malformed value is no longer
-  echoed. See `SECURITY.md`.
+  echoed. A header name containing `:` or whitespace — e.g.
+  `Proxy-Authorization: Basic <base64>==`, whose padding `=` was taken as the
+  separator — is now rejected with exit `2` before any request, instead of
+  being quoted whole by the SDK's error. See `SECURITY.md`.
 
 ### Changed
 

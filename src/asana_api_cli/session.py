@@ -15,7 +15,6 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlsplit
 
 import asana
 import click
@@ -46,6 +45,10 @@ class _Runtime:
     verify_ssl: bool | None = None
     ssl_ca_cert: str | None = None
     access_token: str | None = None
+    # Every ``--access-token`` value on the command line, collected by the root
+    # group before any option is parsed: a usage error raised while parsing,
+    # before ``access_token`` is set, still masks them (``mask_credentials``).
+    argv_access_tokens: tuple[str, ...] = ()
     temp_folder_path: str | None = None
     logger_format: str | None = None
     logger_file: str | None = None
@@ -284,12 +287,29 @@ _AUTH_HEADER_NAMES = frozenset({"authorization", "proxy-authorization"})
 
 # ``scheme://user:password@`` anywhere in free text — a fallback for a URL the
 # known-value pass below cannot match (e.g. one urllib3 re-renders). Bounded by
-# whitespace and quotes because the URL is embedded in a message.
-_URL_PASSWORD_RE = re.compile(r"""([A-Za-z][A-Za-z0-9+.-]*://[^\s'"/@:]*):[^\s'"/@]*@""")
+# whitespace and quotes because the URL is embedded in a message. The lookbehind
+# starts the scheme only at a word boundary, keeping the scan linear on a long
+# run of scheme characters (e.g. a hex blob in a response body).
+_URL_PASSWORD_RE = re.compile(
+    r"""((?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*://[^\s'"/@:]*):[^\s'"/@]*@"""
+)
 
 # A shorter value is not worth masking — it cannot be a real credential of the
 # kind masked here, and replacing it would mangle unrelated text.
 _MIN_MASKED_LEN = 8
+
+
+def url_userinfo(url: str) -> tuple[str, str] | None:
+    """``(user, userinfo)`` of a ``scheme://user:password@host`` URL, or
+    ``None`` when it carries no password. The userinfo runs from ``://`` to the
+    *last* ``@``, so a password with an unescaped ``/``, ``?``, ``#`` or ``@`` —
+    exactly what makes the URL unparsable — is still taken whole."""
+    _, sep, rest = url.partition("://")
+    userinfo, at, _ = rest.rpartition("@")
+    user, colon, password = userinfo.partition(":")
+    if not (sep and at and colon and password):
+        return None
+    return user, userinfo
 
 
 def _mask_auth_value(value: str) -> str:
@@ -311,9 +331,10 @@ def _credential_masks(header_params: Mapping[str, Any] | None) -> list[tuple[str
     matched without surrounding whitespace — a stray CR/LF is exactly what makes
     http.client quote them, and it shows up escaped in the message."""
     masks: list[tuple[str, str]] = []
-    token = _resolved_token().strip()
-    if len(token) >= _MIN_MASKED_LEN:
-        masks.append((token, _default_mask_token(token)))
+    for token in (_resolved_token(), *runtime.argv_access_tokens):
+        token = token.strip()
+        if len(token) >= _MIN_MASKED_LEN:
+            masks.append((token, _default_mask_token(token)))
     for headers in (runtime.default_headers, header_params):
         for name, value in (headers or {}).items():
             if name.lower() in _AUTH_HEADER_NAMES and isinstance(value, str):
@@ -321,13 +342,10 @@ def _credential_masks(header_params: Mapping[str, Any] | None) -> list[tuple[str
                 if len(value) >= _MIN_MASKED_LEN:
                     masks.append((value, _mask_auth_value(value)))
     for url in (runtime.proxy, runtime.host):
-        try:
-            parts = urlsplit(url or "")
-            user, password = parts.username, parts.password
-        except ValueError:  # e.g. an invalid port; the regex fallback still applies
-            continue
-        if password:
-            masks.append((f"{user}:{password}@", f"{user}:***@"))
+        found = url_userinfo(url or "")
+        if found:
+            user, userinfo = found
+            masks.append((f"{userinfo}@", f"{user}:***@"))
     # Longest first, so a value that contains another is masked whole.
     return sorted(masks, key=lambda m: len(m[0]), reverse=True)
 
