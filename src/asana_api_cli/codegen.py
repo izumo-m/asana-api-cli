@@ -351,14 +351,16 @@ def _render_config(needs: _Imports) -> list[str]:
         if applies:
             if attr == "proxy":
                 value = _mask_proxy(value)
-            lines.append(f"configuration.{attr} = {value!r}")
+            lines.append(f"configuration.{attr} = {_py_literal(value)}")
     if runtime.debug:
         # Not a ``_CONFIG_KNOBS`` entry: ``AsanaSession`` sets this in ``open()``
         # alongside the redactor. The property setter flips the ``http.client``
         # debuglevel; the inlined ``with HttpClientAuthRedactor()`` masks the token.
         lines.append("configuration.debug = True")
     if runtime.retry_strategy_overrides is not None:
-        kwargs = ", ".join(f"{k}={v!r}" for k, v in runtime.retry_strategy_overrides.items())
+        kwargs = ", ".join(
+            f"{k}={_py_literal(v)}" for k, v in runtime.retry_strategy_overrides.items()
+        )
         lines.append(f"configuration.retry_strategy = configuration.retry_strategy.new({kwargs})")
     lines.append("api_client = asana.ApiClient(configuration)")
     if runtime.default_headers:
@@ -392,6 +394,28 @@ def _has_non_finite_float(value: object) -> bool:
     if isinstance(value, list):
         return any(_has_non_finite_float(v) for v in value)
     return False
+
+
+def _py_literal(value: object) -> str:
+    """``repr`` that is always valid Python source.
+
+    ``repr`` renders a NaN / Infinity float as the bare token ``nan`` / ``inf``,
+    which is not a Python name — the emitted line would ``NameError`` at run
+    time. Yet the CLI accepts such values wherever a float is parsed:
+    ``--request-timeout inf`` (click's float type), ``--retry-strategy
+    backoff_max=inf`` (shorthand ``float()``), and ``Infinity`` / ``NaN`` in
+    any JSON-form structured value. Non-finite floats are therefore spelled
+    ``float('inf')`` / ``float('-inf')`` / ``float('nan')``, recursing into
+    containers; everything else is plain ``repr``.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return f"float({str(value)!r})"
+    if isinstance(value, dict):
+        items = ", ".join(f"{_py_literal(k)}: {_py_literal(v)}" for k, v in value.items())
+        return "{" + items + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(_py_literal(v) for v in value) + "]"
+    return repr(value)
 
 
 def _render_body(raw_body: str, needs: _Imports) -> list[str]:
@@ -439,7 +463,12 @@ def _render_call_setup(plan: CallPlan, needs: _Imports) -> list[str]:
         assert plan.raw_body is not None  # has_body ⟺ a required --body was given
         lines += _render_body(plan.raw_body, needs)
     if plan.has_opts:
-        lines.append(f"opts = {pprint.pformat(plan.opts, sort_dicts=False)}")
+        opts = (
+            _py_literal(plan.opts)
+            if _has_non_finite_float(plan.opts)
+            else pprint.pformat(plan.opts, sort_dicts=False)
+        )
+        lines.append(f"opts = {opts}")
     return lines
 
 
@@ -449,14 +478,14 @@ def _call_expression(plan: CallPlan) -> str:
     positional: list[str] = []
     if plan.has_body:
         positional.append("body")
-    positional += [repr(arg) for arg in plan.path_call_args]
+    positional += [_py_literal(arg) for arg in plan.path_call_args]
     if plan.has_opts:
         positional.append("opts")
     keyword: list[str] = []
     for name, value in plan.method_kwargs.items():
         if name == "header_params" and isinstance(value, dict):
             value = _mask_header_params(value)
-        keyword.append(f"{name}={value!r}")
+        keyword.append(f"{name}={_py_literal(value)}")
     call = f"api_instance.{plan.method_name}({', '.join(positional + keyword)})"
     return f"list({call})" if _returns_iterator(plan) else call
 

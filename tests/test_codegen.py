@@ -220,6 +220,9 @@ class TestCallEquivalence:
                 ["--request-timeout", "30", "--header-params", '{"X-Req":"1"}'],
                 lambda: iter([]),
             ),
+            # Non-finite floats must render as ``float('inf')``, not a bare ``inf``.
+            ("get-tasks", ["--request-timeout", "inf"], lambda: iter([])),
+            ("get-tasks", ["--header-params", '{"X-Req": -Infinity}'], lambda: iter([])),
         ],
     )
     def test_same_call(
@@ -438,6 +441,23 @@ class TestConfigEquivalence:
         gen = namespace["configuration"].retry_strategy
         ref = AsanaSession.from_env()._config.retry_strategy
         assert (gen.total, gen.backoff_factor) == (ref.total, ref.backoff_factor)
+
+    @pytest.mark.skipif(
+        not _SDK_HAS_RETRY_STRATEGY,
+        reason="installed python-asana has no Configuration.retry_strategy",
+    )
+    @pytest.mark.parametrize(
+        "value",
+        ["backoff_max=inf,total=2", '{"backoff_max": Infinity, "total": 2}'],
+        ids=["shorthand", "json"],
+    )
+    def test_non_finite_retry_field_runs(self, monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+        # ``repr(float("inf"))`` is the bare token ``inf`` — a NameError in the
+        # emitted script; it must be spelled ``float('inf')`` instead.
+        code = _generate(["get-tasks", "--retry-strategy", value, "--output", "none"])
+        _, _, namespace = _exec_generated(monkeypatch, code, "get-tasks", lambda: iter([]))
+        gen = namespace["configuration"].retry_strategy
+        assert (gen.backoff_max, gen.total) == (float("inf"), 2)
 
     def test_falsy_toggle_is_still_emitted(self) -> None:
         # C-8: an explicit ``False`` (here --no-return-page-iterator) must be
