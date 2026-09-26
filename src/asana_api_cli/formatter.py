@@ -16,6 +16,28 @@ from tabulate import tabulate
 from asana_api_cli.session import runtime
 
 
+def _validate_jq_syntax(
+    _ctx: click.Context, _param: click.Parameter, value: str | None
+) -> str | None:
+    """Option callback: reject a jq program that does not compile.
+
+    Runs while the command line is parsed — before the token is read or any
+    request is sent — so a typo in ``--query`` / ``--exception-query`` exits 2
+    without side effects. Checked after the call instead, a mutating command
+    (``create-task`` ...) would already have run, and the result would be lost
+    behind the error; an ``--exception-query`` typo would go unnoticed until
+    the call first failed. Only syntax is checked here: a runtime error depends
+    on the response and still surfaces in :func:`_format_output`. An empty
+    value means "no filter", as in :func:`_format_output`.
+    """
+    if value:
+        try:
+            jqlib.compile(value)
+        except ValueError as e:
+            raise click.BadParameter(f"Invalid jq expression: {e}") from e
+    return value
+
+
 def make_formatter_options() -> list[click.Option]:
     """Fresh ``click.Option`` instances for the output-formatting flags consumed
     by :func:`formatted`: the success path ``--output`` / ``--query`` /
@@ -40,6 +62,7 @@ def make_formatter_options() -> list[click.Option]:
         click.Option(
             ["--query", "jq_query"],
             default=None,
+            callback=_validate_jq_syntax,
             help="jq expression to filter output (asana-api: extension)",
         ),
         click.Option(
@@ -70,6 +93,7 @@ def make_formatter_options() -> list[click.Option]:
         click.Option(
             ["--exception-query", "exception_query"],
             default=None,
+            callback=_validate_jq_syntax,
             help=(
                 "Apply a jq filter to the error envelope; result is rendered via "
                 "--exception-output. Pairing with the default 'none' emits a stderr "

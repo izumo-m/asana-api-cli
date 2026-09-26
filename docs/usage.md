@@ -24,10 +24,10 @@ asana-api --access-token "2/12345..." workspaces get-workspaces
 ```
 
 No token is needed for `--help` or command-line parsing errors (unknown
-options, a missing required argument, a malformed `NAME=VALUE`). One exception:
-a `--query` / `--exception-query` jq filter is validated against the response
-payload, so a syntactically invalid filter surfaces only *after* the API
-call — which does need a token.
+options, a missing required argument, a malformed `NAME=VALUE`, a `--query` /
+`--exception-query` jq expression that does not compile). A jq expression that
+compiles but fails on the actual payload is the exception: it surfaces only
+*after* the API call — which does need a token.
 
 ## Options
 
@@ -135,8 +135,10 @@ asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks
 asana-api tasks delete-task --task <TASK_GID> --output none
 ```
 
-`--query` runs and validates even under `--output none`, so a broken jq
-expression still surfaces (exit `2`) regardless of the chosen format.
+A `--query` expression that does not compile is rejected before the API call
+(exit `2`, nothing sent). One that compiles still runs under `--output none`, so
+a jq runtime error against the payload surfaces (exit `2`) regardless of the
+chosen format.
 
 ## Generating Python code
 
@@ -186,8 +188,9 @@ is replaced with `***` — in the configuration lines and in the
 `# Equivalent to:` comment alike. Everything else (including other custom
 headers and the `--body` payload) is transcribed verbatim — see
 [SECURITY.md](../SECURITY.md). Input validation still runs
-during generation: a malformed `--body` literal or a missing required
-`--workspace` exits `2`, just as when executing.
+during generation: a malformed `--body` literal, a missing required
+`--workspace`, or a `--query` / `--exception-query` that does not compile exits
+`2`, just as when executing.
 
 `asana-api --generate-python --version` emits a script that prints the version
 string (rather than printing it directly).
@@ -245,13 +248,22 @@ esac
 |---|---|
 | `0` | Success |
 | `1` | Unhandled error — the catch-all. Usually an SDK call exception under the default `--exception-output=none` (echoed to stderr, no traceback); but also Python's default for any other uncaught failure the CLI does not classify, e.g. an incompatible `asana` SDK that fails to import (which prints a full traceback) |
-| `2` | User-input invalid (missing access token, bad option value, missing required workspace, jq syntax / runtime error, malformed `--body` / structured-arg value) |
+| `2` | User-input invalid (missing access token, bad option value, missing required workspace, jq syntax / runtime error, malformed `--body` / structured-arg value). A jq *runtime* error happens after the API call — see below |
 | `3` | SDK call exception rendered as an envelope on stdout (requires `--exception-output {json\|text\|csv\|table}`) |
 
 - Only `2` and `3` are narrowly defined: `2` for invalid user input (Click's
   convention, reused for jq and `--body` parse failures), `3` for an SDK error
   you explicitly captured as an envelope. When a command has both bad input and
-  a failing API call, the input error (`2`) wins — it is detected first.
+  a failing API call, the input error (`2`) wins — it is detected first, before
+  anything is sent.
+- The one input error detected *after* the API call is a jq **runtime** error: a
+  `--query` / `--exception-query` that compiles (syntax is checked up front) but
+  fails on the actual response or envelope — e.g. `tonumber` on a string, or
+  indexing an array with a key. The call has already been made, so exit `2`
+  here does **not** mean nothing happened: a `create-*` / `update-*` /
+  `delete-*` command has taken effect, and retrying it repeats the change. The
+  unfiltered result is not printed; when an `--exception-query` fails this way,
+  the SDK exception has still been echoed to stderr.
 - `1` is the catch-all for everything else that failed; do not read a specific
   cause into it. To ask "did it fail?", test for non-zero; to branch on the
   kind, match `2` / `3` and treat any other non-zero (including `1`) as an

@@ -112,9 +112,9 @@ automatically.
 
 The token can be issued from the
 [Asana Developer Console](https://app.asana.com/0/developer-console).
-No token is needed for `--help` or command-line parsing errors. (A `--query`
-jq filter is validated against the response, so it surfaces errors only after
-the API call — which does need a token.)
+No token is needed for `--help` or command-line parsing errors, including a
+`--query` jq expression that does not compile. (A jq expression that compiles
+but fails on the actual response surfaces only after the API call.)
 
 ```bash
 export ASANA_ACCESS_TOKEN="2/12345..."
@@ -200,8 +200,8 @@ asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload --q
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # --output none suppresses the success payload — handy for side-effect-only
-# calls (delete/update) where only the exit code matters. The `--query` pass
-# still runs, so jq syntax errors are caught even when output is silenced.
+# calls (delete/update) where only the exit code matters. A --query still runs,
+# so it can still fail (exit 2) even when output is silenced.
 asana-api tasks delete-task --task <TASK_GID> --output none
 ```
 

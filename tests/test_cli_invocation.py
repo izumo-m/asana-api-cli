@@ -1025,6 +1025,25 @@ class TestErrorPathExitCodes:
         assert result.exit_code == 2
         assert "Invalid jq expression" in full_output(result)
 
+    @pytest.mark.parametrize("flag", ["--query", "--exception-query"])
+    def test_jq_syntax_error_stops_before_the_call(
+        self, monkeypatch: pytest.MonkeyPatch, flag: str
+    ) -> None:
+        # A jq typo is an input error caught while parsing: a mutating call
+        # must not run (its result would be lost behind the error), and no
+        # token is needed to report it. For --exception-query this also covers
+        # a call that would have succeeded, where the typo used to go unnoticed.
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        cmd = _build_command("TasksApi", "create_task")
+        mock = _patch(monkeypatch, "TasksApi", "create_task", return_value={"gid": "new"})
+        result = make_runner().invoke(
+            cmd,
+            ["--body", '{"data": {"name": "x"}}', "--exception-output", "json", flag, ".gid |"],
+        )
+        assert result.exit_code == 2
+        assert "Invalid jq expression" in full_output(result)
+        assert mock.call_count == 0
+
     def test_exception_query_alone_warns(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cmd = _build_command("TasksApi", "get_task")
         _patch(

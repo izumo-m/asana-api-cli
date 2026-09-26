@@ -771,24 +771,39 @@ class TestQueryEquivalence:
         code = _generate(["get-tasks", "--workspace", "1"])
         assert "import jq" not in code
 
-    def test_bad_query_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize("flag", ["--query", "--exception-query"])
+    def test_bad_query_syntax_rejected_at_generation(self, flag: str) -> None:
+        # A jq syntax error is caught while parsing the command line, as in
+        # execute mode — generation exits 2 and emits no script.
+        result = make_runner().invoke(
+            _command("TasksApi", "get_tasks"),
+            ["--generate-python", "--workspace", "1", "--exception-output", "json", flag, "{"],
+        )
+        runtime.generate_python = False
+        assert result.exit_code == 2
+        assert "Invalid jq expression" in full_output(result)
+        assert "import asana" not in result.stdout
+
+    def test_query_runtime_error_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A runtime error depends on the response, so the generated script
+        # reproduces the CLI's post-call handling: exit 2.
         factory: Factory = lambda: iter([{"gid": "1"}])  # noqa: E731
-        code = _generate(["get-tasks", "--workspace", "1", "--query", "{"])
+        code = _generate(["get-tasks", "--workspace", "1", "--query", ".foo"])
         _, exit_code = _exec_expecting_exit(monkeypatch, code, "get-tasks", factory)
         assert exit_code == 2
 
     def test_output_none_with_query_validates_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # --output none + --query: jq still runs (validation), nothing is printed,
-        # and a bad expression exits 2 — matching _format_output's jq-before-none
-        # contract. The reconfigure block must still be present (the jq error
-        # writes to stderr).
+        # and an expression failing at run time exits 2 — matching
+        # _format_output's jq-before-none contract. The reconfigure block must
+        # still be present (the jq error writes to stderr).
         factory: Factory = lambda: iter([{"gid": "1"}])  # noqa: E731
         ok = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", ".[].name"])
         assert "import jq" in ok
         assert 'reconfigure(encoding="utf-8")' in ok
         _, gen_bytes, _ = _exec_generated(monkeypatch, ok, "get-tasks", factory)
         assert gen_bytes == b""  # validated, printed nothing
-        bad = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", "{"])
+        bad = _generate(["get-tasks", "--workspace", "1", "--output", "none", "--query", ".foo"])
         _, exit_code = _exec_expecting_exit(monkeypatch, bad, "get-tasks", factory)
         assert exit_code == 2
 
@@ -884,10 +899,19 @@ class TestErrorEnvelopeEquivalence:
         assert gen_exit == 3
         assert gen_bytes == ref
 
-    def test_exception_query_bad_expr_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_exception_query_runtime_error_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # ``.reason`` is "boom", which ``tonumber`` cannot parse: a runtime error.
         factory = self._raise(ValueError("boom"))
         code = _generate(
-            ["get-task", "--task", "1", "--exception-output", "json", "--exception-query", "{"]
+            [
+                "get-task",
+                "--task",
+                "1",
+                "--exception-output",
+                "json",
+                "--exception-query",
+                ".reason | tonumber",
+            ]
         )
         _, gen_exit = _exec_expecting_exit(monkeypatch, code, "get-task", factory)
         assert gen_exit == 2

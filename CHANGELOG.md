@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `--query` / `--exception-query` jq expression that does not compile is
+  now rejected before the API call.** It used to be checked only against the
+  response, so a typo in `--query` still ran the call — a `create-task` created
+  the task, then exited `2` with the result lost — and a typo in
+  `--exception-query` went unnoticed until a call first failed (exiting `2`
+  instead of `3`). Such an expression now exits `2` while the command line is
+  parsed: nothing is sent and no access token is needed, also under
+  `--generate-python`. A jq error that depends on the response (a runtime
+  error) still surfaces after the call, as before; `docs/usage.md` now spells
+  out that the call has already taken effect in that case.
 - **JSON input with a UTF-8 BOM is accepted.** `--body @file`, `--body -`
   (stdin), and the `@path` form of `--header-params` / `--retry-strategy`
   rejected a leading BOM ("Unexpected UTF-8 BOM"), which Windows PowerShell 5.1
