@@ -426,22 +426,23 @@ def _render_body(raw_body: str, needs: _Imports) -> list[str]:
     re-runnable against a different payload; a JSON literal is validated now
     (exit 2 on bad JSON, matching ``resolve_body``) and inlined as a Python
     literal. Mirrors ``cli.resolve_body``'s three branches — including UTF-8
-    decoding: ``@file`` opens with ``encoding="utf-8"``, and the stdin branch
-    reconfigures ``sys.stdin`` to UTF-8 first, matching the CLI's startup
+    decoding: ``@file`` opens with ``encoding="utf-8-sig"``, and the stdin branch
+    reconfigures ``sys.stdin`` to ``utf-8-sig`` first, matching the CLI's startup
     reconfigure (``cli.py:main``) so a piped UTF-8 body is not misdecoded with the
-    locale code page on cp932 Windows (constitution #5).
+    locale code page on cp932 Windows (constitution #5). ``utf-8-sig`` also skips
+    a leading BOM, as ``resolve_body`` does (Windows PowerShell 5.1 emits one).
     """
     if raw_body == "-":
         needs.stdlib |= {"sys", "json"}
         return [
             'if hasattr(sys.stdin, "reconfigure"):',
-            '    sys.stdin.reconfigure(encoding="utf-8")',
+            '    sys.stdin.reconfigure(encoding="utf-8-sig")',
             "body = json.load(sys.stdin)",
         ]
     if raw_body.startswith("@"):
         needs.stdlib.add("json")
         path = raw_body[1:]
-        return [f'with open({path!r}, encoding="utf-8") as f:', "    body = json.load(f)"]
+        return [f'with open({path!r}, encoding="utf-8-sig") as f:', "    body = json.load(f)"]
     try:
         value = json.loads(raw_body)
     except json.JSONDecodeError as exc:

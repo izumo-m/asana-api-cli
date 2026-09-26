@@ -55,6 +55,12 @@ class TestFileForm:
         with pytest.raises(click.BadParameter, match="Invalid JSON"):
             parse_structured_arg(f"@{f}")
 
+    def test_leading_utf8_bom_is_skipped(self, tmp_path: Path) -> None:
+        # Windows PowerShell 5.1's ``Out-File -Encoding utf8`` writes a BOM.
+        f = tmp_path / "bom.json"
+        f.write_bytes(b'\xef\xbb\xbf{"k": "v"}')
+        assert parse_structured_arg(f"@{f}") == {"k": "v"}
+
     def test_non_utf8_file(self, tmp_path: Path) -> None:
         f = tmp_path / "binary.bin"
         f.write_bytes(b"\x80\x81\x82")

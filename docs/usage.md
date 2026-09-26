@@ -438,3 +438,48 @@ This is a long-standing bug in the SDK — see the
 patch so the original filename round-trips intact. It is off by default to match
 stock SDK behavior; turn it on whenever an attachment's name has any character
 outside ASCII (plain-ASCII names, including symbols, are unaffected).
+
+## Windows and PowerShell
+
+`asana-api` reads and writes UTF-8 everywhere — command output, `--body` /
+`@file` input, and stdin — regardless of the console code page (e.g. cp932 on
+Japanese Windows). A leading UTF-8 BOM on a JSON file or on stdin is accepted,
+so files written by Windows PowerShell 5.1's `Out-File -Encoding utf8` work
+as-is. `cmd.exe` redirection passes these bytes through unchanged; PowerShell
+converts them, so a few settings matter there.
+
+**Both Windows PowerShell 5.1 and PowerShell 7** (checked with 7.6) decode a
+native command's output with `[Console]::OutputEncoding`, which follows the
+console code page. Capturing non-ASCII output — `$r = asana-api ...` or piping
+into another cmdlet — garbles it unless you switch to UTF-8 first:
+
+```powershell
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$tasks = asana-api tasks get-tasks --project <PROJECT_GID> | ConvertFrom-Json
+```
+
+**Windows PowerShell 5.1** additionally:
+
+- **Strips double quotes from native-command arguments.** An inline JSON body
+  (`--body '{"data":{"name":"x"}}'`) or a `--query` with quoted keys reaches
+  `asana-api` without its `"` and fails. Put the JSON in a file
+  (`--body @task.json`) or pipe it (`--body -`). PowerShell 7 passes such
+  arguments intact.
+- **Pipes to native commands as ASCII by default**, so non-ASCII text piped into
+  `--body -` silently becomes `?`. Set a UTF-8 `$OutputEncoding` first (the BOM
+  this adds is accepted):
+
+  ```powershell
+  $OutputEncoding = [Text.Encoding]::UTF8
+  Get-Content task.json -Encoding UTF8 | asana-api tasks create-task --body -
+  ```
+
+- **Writes `>` redirections as UTF-16LE**, so `--output csv --csv-bom > tasks.csv`
+  does not produce the UTF-8-with-BOM file Excel expects. Redirect through
+  `cmd.exe` instead, which keeps the bytes as written:
+
+  ```powershell
+  cmd /c "asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv"
+  ```
+
+  PowerShell 7's `>` keeps the bytes as well.

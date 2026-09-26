@@ -18,7 +18,7 @@ configuration.access_token = os.environ['ASANA_ACCESS_TOKEN']
 api_client = asana.ApiClient(configuration)
 
 api_instance = asana.TasksApi(api_client)
-with open('new-task.json', encoding="utf-8") as f:
+with open('new-task.json', encoding="utf-8-sig") as f:
     body = json.load(f)
 opts = {}
 

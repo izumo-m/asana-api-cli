@@ -867,6 +867,13 @@ class TestResolveBodyFile:
         with pytest.raises(click.BadParameter, match="invalid JSON"):
             resolve_body(f"@{body_file}")
 
+    def test_leading_utf8_bom_is_skipped(self, tmp_path: Path) -> None:
+        # Windows PowerShell 5.1's ``Out-File -Encoding utf8`` writes a BOM,
+        # which json.loads rejects ("Unexpected UTF-8 BOM").
+        body_file = tmp_path / "bom.json"
+        body_file.write_bytes(b'\xef\xbb\xbf{"data": {"name": "bom"}}')
+        assert resolve_body(f"@{body_file}") == {"data": {"name": "bom"}}
+
     def test_non_utf8_file_raises_cleanly(self, tmp_path: Path) -> None:
         """A binary file (or any non-UTF-8 byte sequence) must produce a
         clean ``BadParameter``, not a raw ``UnicodeDecodeError`` traceback."""
@@ -881,6 +888,12 @@ class TestResolveBodyStdin:
         monkeypatch.setattr("sys.stdin", StringIO('{"data": {"name": "stdin"}}'))
         result = resolve_body("-")
         assert result == {"data": {"name": "stdin"}}
+
+    def test_leading_utf8_bom_is_skipped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Windows PowerShell 5.1 prepends a BOM when piping to a native command
+        # under ``$OutputEncoding = [Text.Encoding]::UTF8``.
+        monkeypatch.setattr("sys.stdin", StringIO('\ufeff{"data": {"name": "bom"}}'))
+        assert resolve_body("-") == {"data": {"name": "bom"}}
 
     def test_invalid_stdin_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("sys.stdin", StringIO("not json"))

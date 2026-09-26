@@ -91,7 +91,9 @@ def parse_structured_arg(
     if first == "@":
         path = Path(value[1:])
         try:
-            raw = path.read_text(encoding="utf-8")
+            # ``utf-8-sig`` skips a leading BOM (e.g. from Windows PowerShell
+            # 5.1's ``Out-File -Encoding utf8``), which json.loads rejects.
+            raw = path.read_text(encoding="utf-8-sig")
         except FileNotFoundError as exc:
             raise click.BadParameter(f"File not found: {path}") from exc
         except UnicodeDecodeError as exc:

@@ -128,6 +128,12 @@ $env:ASANA_ACCESS_TOKEN = "2/12345..."
 $env:ASANA_DEFAULT_WORKSPACE = "12345678"   # optional
 ```
 
+PowerShell handles native-command input and output encodings its own way —
+especially Windows PowerShell 5.1, which also strips the double quotes from
+inline JSON arguments. See
+[Windows and PowerShell](https://github.com/izumo-m/asana-api-cli/blob/main/docs/usage.md#windows-and-powershell)
+before scripting with it.
+
 ## Shell completion
 
 `asana-api` is built with Click, which supports dynamic shell completion.
@@ -190,6 +196,7 @@ asana-api tasks get-tasks --project <PROJECT_GID> --limit 100 --full-payload --q
 
 # CSV output is UTF-8 without a BOM by default. Pass --csv-bom for Excel on
 # Windows, which otherwise displays non-ASCII characters as garbled text.
+# (In Windows PowerShell 5.1, redirect via cmd.exe — see docs/usage.md.)
 asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks.csv
 
 # --output none suppresses the success payload — handy for side-effect-only

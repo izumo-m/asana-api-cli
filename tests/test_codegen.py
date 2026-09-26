@@ -250,7 +250,7 @@ class TestBodyForms:
 
     def test_file_reads_at_runtime(self) -> None:
         code = _generate(["create-task", "--body", "@payload.json"])
-        assert "with open('payload.json', encoding=\"utf-8\") as f:" in code
+        assert "with open('payload.json', encoding=\"utf-8-sig\") as f:" in code
         assert "    body = json.load(f)" in code
 
     def test_stdin_reads_at_runtime(self) -> None:
@@ -264,7 +264,7 @@ class TestBodyForms:
         # regardless of --output (it lives in the body branch, not the output
         # reconfigure block, which --output none would otherwise omit).
         code = _generate(["create-task", "--body", "-", "--output", "none"])
-        assert 'sys.stdin.reconfigure(encoding="utf-8")' in code
+        assert 'sys.stdin.reconfigure(encoding="utf-8-sig")' in code
         assert code.index("sys.stdin.reconfigure") < code.index("json.load(sys.stdin)")
 
     def test_file_not_read_at_generation(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -282,6 +282,16 @@ class TestBodyForms:
         code = _generate(["create-task", "--body", f"@{payload}"])
         seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
         assert seen["args"][0] == {"data": {"name": "FromFile"}}
+
+    def test_generated_file_body_skips_utf8_bom(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+    ) -> None:
+        # Same BOM tolerance as ``resolve_body`` (Windows PowerShell 5.1 emits one).
+        payload = tmp_path / "bom.json"
+        payload.write_bytes(b'\xef\xbb\xbf{"data": {"name": "FromBomFile"}}')
+        code = _generate(["create-task", "--body", f"@{payload}"])
+        seen, _, _ = _exec_generated(monkeypatch, code, "create-task", lambda: {"gid": "n"})
+        assert seen["args"][0] == {"data": {"name": "FromBomFile"}}
 
     def test_generated_stdin_body_reads_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         code = _generate(["create-task", "--body", "-"])

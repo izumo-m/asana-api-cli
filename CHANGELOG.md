@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **JSON input with a UTF-8 BOM is accepted.** `--body @file`, `--body -`
+  (stdin), and the `@path` form of `--header-params` / `--retry-strategy`
+  rejected a leading BOM ("Unexpected UTF-8 BOM"), which Windows PowerShell 5.1
+  adds with `Out-File -Encoding utf8` and when piping under
+  `$OutputEncoding = [Text.Encoding]::UTF8`. The BOM is now skipped, including
+  in `--generate-python` scripts that read the body from a file or stdin.
+  `docs/usage.md` gains a "Windows and PowerShell" section covering PowerShell's
+  encoding and quoting pitfalls.
 - **`--generate-python` scripts no longer crash on an infinite or NaN value.**
   A float option given as `inf` / `nan` (e.g. `--request-timeout inf`,
   `--retry-strategy backoff_max=inf`, or `Infinity` in a JSON-form
