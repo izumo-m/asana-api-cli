@@ -105,7 +105,7 @@ Procedure:
    (`asana/rest.py`, `asana/api_client.py`, `asana/configuration.py`) and,
    for the multibyte-filename note, on the upload path in
    `asana/api/attachments_api.py`. Diff those files between the old and new
-   tags (set `old` / `new` to the versions):
+   tags (set `old` / `new` to the versions, without the `v`):
 
    ```bash
    old=5.3.0 new=5.4.0
@@ -116,13 +116,20 @@ Procedure:
    done
    ```
 
-   A file missing from the output is unchanged. If the diff touches only
-   version strings and docstrings, the statements still hold — bump the
-   version each one names. Otherwise re-verify each statement against the
-   new SDK and rewrite it (or drop it once the SDK lifts the limitation).
-   Keep these notes in `docs/` only: code under `src/` refers to them rather
-   than naming an SDK version (`--generate-python` inlines some of its
-   docstrings into users' scripts), so this step never touches `src/` or the
+   A file missing from the output is unchanged — unless `curl` printed an
+   error (e.g. a mistyped version), which leaves that side of the diff empty;
+   fix it and rerun. If the diff touches only version strings and
+   docstrings, the statements still hold — bump the version each one names.
+   Otherwise re-verify each statement against the new SDK and rewrite it (or
+   drop it once the SDK lifts the limitation), along with the short
+   restatements that link to it (e.g. the `--proxy` row in `usage.md` and
+   `SECURITY.md` link to `usage.md#proxies`).
+
+   Tag any new statement of version-specific SDK behavior the same way
+   (`X.Y.Z — the latest version checked`) so the grep above finds it. Keep
+   these notes in `docs/` only: code under `src/` refers to them rather than
+   naming an SDK version (`--generate-python` inlines some of its docstrings
+   into users' scripts), so this step never touches `src/` or the
    generated-code snapshots.
 8. *(Optional, soft improvement)* Review the group descriptions when
    the SDK adds or removes resource groups:
