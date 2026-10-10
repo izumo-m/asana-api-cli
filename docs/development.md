@@ -54,7 +54,10 @@ Procedure:
    otherwise those snapshot guards silently *skip* on the new version instead
    of checking it.
 3. `uv run pytest` — failures in `test_cli_surface.py` /
-   `test_generate_python_snapshots.py` print the diff.
+   `test_generate_python_snapshots.py` print the diff. Also run the
+   lower-bound check, `bash tools/test_python_versions.sh --lowest 3.10 3.11 3.12`
+   (see [`tests/README.md`](../tests/README.md#lower-bound-versions)), to
+   confirm the declared floors — `asana>=5.0.2` included — still pass.
 4. Review the diff — every entry should be explainable by the SDK's release
    notes. Do **not** record SDK-driven surface changes (new groups or opts,
    changed signatures) as this project's own `CHANGELOG.md` entries, and do
