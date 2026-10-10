@@ -63,7 +63,7 @@ Procedure:
    those changes reach users of *any* asana-api-cli version as soon as their
    installed SDK updates — an asana-api-cli release neither delivers nor
    gates them. `CHANGELOG.md` records only what the bump changes in this
-   project itself (typically the curated group descriptions of step 7, under
+   project itself (typically the curated group descriptions of step 8, under
    `### Changed` — a help-string change). When SDK effects are worth
    mentioning for context, attribute them to the SDK: "appears on any
    asana-api-cli version once `python-asana >= X.Y.Z` is installed".
@@ -90,7 +90,38 @@ Procedure:
    fields should now be exposed, and update `docs/sdk-deviations.md`.
    `tests/test_sdk_boilerplate.py` also pins the settable `Configuration`
    set, so a new auth-related property fails that guard too.
-7. *(Optional, soft improvement)* Review the group descriptions when
+7. Re-check the version-pinned notes — statements that describe SDK behavior
+   as of the newest SDK checked:
+
+   ```bash
+   git grep -n 'latest version checked' -- ':!docs/development.md' ':!tests/fixtures'
+   ```
+
+   The current ones rest on the SDK's shared runtime modules
+   (`asana/rest.py`, `asana/api_client.py`, `asana/configuration.py`) and,
+   for the multibyte-filename note, on the upload path in
+   `asana/api/attachments_api.py`. Diff those files between the old and new
+   tags (set `old` / `new` to the versions):
+
+   ```bash
+   old=5.3.0 new=5.4.0
+   for f in rest api_client configuration api/attachments_api; do
+     diff -u --label "v$old/asana/$f.py" --label "v$new/asana/$f.py" \
+       <(curl -fsSL "https://raw.githubusercontent.com/Asana/python-asana/v$old/asana/$f.py") \
+       <(curl -fsSL "https://raw.githubusercontent.com/Asana/python-asana/v$new/asana/$f.py")
+   done
+   ```
+
+   A file missing from the output is unchanged. If the diff touches only
+   version strings and docstrings, the statements still hold — bump the
+   version each one names. Otherwise re-verify each statement against the
+   new SDK and rewrite it (or drop it once the SDK lifts the limitation).
+   Edit only the source text: the `MultibyteFilenameSupport` docstring is
+   also embedded in `tests/fixtures/generate_python/upload_multibyte.py`, so
+   rerun
+   `UPDATE_GENERATE_SNAPSHOTS=1 uv run pytest tests/test_generate_python_snapshots.py`
+   afterwards.
+8. *(Optional, soft improvement)* Review the group descriptions when
    the SDK adds or removes resource groups:
    - [`docs/api-groups.md`](api-groups.md) is the authoritative table
      (CLI group → Asana reference link → short description).
@@ -107,10 +138,11 @@ Procedure:
      [developers.asana.com/llms.txt](https://developers.asana.com/llms.txt)
      (an AI-friendly Markdown index of the reference) and/or the
      individual `/reference/<group>.md` pages.
-8. Commit `uv.lock`, the two `_SNAPSHOT_ASANA_VERSION` bumps, the regenerated
+9. Commit `uv.lock`, the two `_SNAPSHOT_ASANA_VERSION` bumps, the regenerated
    fixtures (`tests/fixtures/cli_surface.json` and any `generate_python/*`
-   snapshots), and any `CHANGELOG.md` entry from step 4 together (plus any
-   group-description edits from step 7).
+   snapshots), any version-pinned note edits from step 7, and any
+   `CHANGELOG.md` entry from step 4 together (plus any group-description
+   edits from step 8).
 
 ## Trying shell completion locally
 
