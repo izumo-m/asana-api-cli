@@ -19,11 +19,12 @@ class MultibyteFilenameSupport:
     Uploading a file whose name has characters outside ASCII through
     ``python-asana`` stores a garbled (mojibake) name on Asana: the SDK's
     multipart encoder emits only ``filename="..."`` and omits the RFC 5987
-    ``filename*=`` parameter the server needs to decode them (for the SDK
-    versions checked, see asana-api-cli's ``docs/usage.md`` §File uploads).
-    This context manager patches
-    ``urllib3.fields.RequestField.make_multipart`` to add
-    ``filename*=utf-8''<percent-encoded>`` for such names, scoped to the
+    ``filename*=`` parameter the server needs to decode them. For the SDK
+    versions checked, see
+    https://github.com/izumo-m/asana-api-cli/blob/main/docs/usage.md#file-uploads
+
+    This context manager patches ``urllib3.fields.RequestField.make_multipart``
+    to add ``filename*=utf-8''<percent-encoded>`` for such names, scoped to the
     ``with`` block::
 
         with MultibyteFilenameSupport():
