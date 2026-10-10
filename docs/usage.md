@@ -405,7 +405,7 @@ Mirroring the SDK, `--proxy` is the only way to configure a proxy — the
 
 ### Credentials in the proxy URL are discarded
 
-As of `python-asana` 5.3.0 — the latest version checked —
+As of `python-asana` 5.4.0 — the latest version checked —
 `--proxy http://user:pass@host:port` parses, but the credentials are **never
 sent**: the SDK stack (`python-asana` → urllib3) does not turn URL userinfo
 into a `Proxy-Authorization` header. urllib3's only built-in proxy-credential
@@ -442,9 +442,11 @@ output a `Proxy-Authorization` header is masked
 
 ## Workspace resolution
 
-A subset of endpoints take a positional `workspace_gid` (e.g.
-`projects get-projects-for-workspace`, `tags create-tag-for-workspace`). For
-those commands the workspace is resolved in order:
+A subset of endpoints require the workspace as a positional argument, named
+`workspace_gid` (e.g. `projects get-projects-for-workspace`,
+`tags create-tag-for-workspace`) or `workspace` (e.g.
+`portfolios get-portfolios`, `webhooks get-webhooks`). For those commands the
+workspace is resolved in order:
 
 1. `--workspace <WORKSPACE_GID>` on the command
 2. `ASANA_DEFAULT_WORKSPACE` environment variable
@@ -456,7 +458,7 @@ like `--project` that the Asana API accepts in place of a workspace.
 
 ## File uploads
 
-In `python-asana` 5.3.0 — the latest version checked, and most likely later
+In `python-asana` 5.4.0 — the latest version checked, and most likely later
 ones too — uploading a file whose name contains non-ASCII characters (accented
 letters, Japanese, emoji, …) stores a garbled (mojibake) filename on Asana.
 This is a long-standing bug in the SDK — see the

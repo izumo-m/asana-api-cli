@@ -13,9 +13,10 @@ Translation rules:
 * Method parameters and ``:param`` lines from the docstring become click
   options. Path GIDs are exposed with the ``_gid`` suffix stripped
   (``task_gid`` → ``--task``).
-* Positional ``workspace_gid`` and the ``workspace`` opt are unified into a
-  single ``--workspace`` option that falls back to
-  ``$ASANA_DEFAULT_WORKSPACE`` only when the parameter is required.
+* A workspace positional (``workspace_gid`` or ``workspace``) and the
+  ``workspace`` opt are unified into a single ``--workspace`` option that
+  falls back to ``$ASANA_DEFAULT_WORKSPACE`` only when the parameter is
+  required.
 * Methods that accept a ``body`` positional get a required ``--body`` option
   routed through ``resolve_body`` (supports ``@file`` / ``-`` / JSON string).
 * Docstring opts (``limit``, ``offset``, ``sync``, ``assignee``, ...) are
@@ -355,7 +356,7 @@ def _escape_help(text: str) -> str:
 #
 #   (Configuration: <name>)  set on asana.Configuration         (global flags)
 #   (ApiClient: <name>)      set on the ApiClient instance       (user_agent, set_default_header)
-#   (args: <name>)           positional method argument          (body / path GID / workspace_gid)
+#   (args: <name>)           positional method argument          (body / path GID / required param)
 #   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
 #   (kwargs: <name>)         boilerplate **kwargs every method accepts (all_params)
 #   (asana-api: extension)   no SDK counterpart                  (CLI-only)
@@ -575,7 +576,7 @@ class _Operation:
 
     @property
     def workspace_positional(self) -> str | None:
-        """The path positional that is a workspace GID, if any (``workspace_gid``)."""
+        """The positional that is a workspace GID, if any (``workspace_gid`` / ``workspace``)."""
         return next((n for n in self.path_positionals if _is_workspace_param(n)), None)
 
     @property
@@ -786,12 +787,12 @@ def _body_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
 def _workspace_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
     """Render the unified ``--workspace`` option.
 
-    ``--workspace`` is polymorphic: a positional ``workspace_gid`` on some
-    endpoints, an ``opts['workspace']`` on others. It is labelled for whichever
-    shape this method declares so the SDK destination stays accurate. The
-    env-var fallback (``ASANA_DEFAULT_WORKSPACE``) applies only when the param
-    is required — i.e. a path positional; optional-workspace endpoints (e.g.
-    ``get-tasks``) are deliberately not auto-filled.
+    ``--workspace`` is polymorphic: a positional ``workspace_gid`` or
+    ``workspace`` on some endpoints, an ``opts['workspace']`` on others. It is
+    labelled for whichever shape this method declares so the SDK destination
+    stays accurate. The env-var fallback (``ASANA_DEFAULT_WORKSPACE``) applies
+    only when the param is required — i.e. a positional; optional-workspace
+    endpoints (e.g. ``get-tasks``) are deliberately not auto-filled.
     """
     wp = op.workspace_positional
     if wp is not None:

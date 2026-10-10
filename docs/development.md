@@ -32,7 +32,8 @@ tools/                          # Maintenance scripts; usage in tools/README.md
 ├── e2e_init.py                 # One-time fixture provisioner for tests/e2e/
 ├── publish_pypi.sh             # Manual build + twine upload to PyPI
 ├── tag_version.sh              # Create the annotated git tag from the pyproject version
-└── test_python_versions.sh     # Run the tests on several Python versions
+├── test_python_versions.sh     # Run the tests on several Python versions
+└── update_dev_deps.sh          # Upgrade the dev-only packages in uv.lock
 ```
 
 See [`tools/README.md`](../tools/README.md) for what each script does and how
@@ -52,9 +53,13 @@ Procedure:
 2. Bump `_SNAPSHOT_ASANA_VERSION` to the new version in **both**
    `tests/test_cli_surface.py` and `tests/test_generate_python_snapshots.py` —
    otherwise those snapshot guards silently *skip* on the new version instead
-   of checking it.
+   of checking it. (`tests/test_sdk_version_notes.py` fails if the two
+   differ.)
 3. `uv run pytest` — failures in `test_cli_surface.py` /
-   `test_generate_python_snapshots.py` print the diff.
+   `test_generate_python_snapshots.py` print the diff. Also run the
+   lower-bound check, `bash tools/test_python_versions.sh --lowest 3.10 3.11 3.12`
+   (see [`tests/README.md`](../tests/README.md#lower-bound-versions)), to
+   confirm the declared floors — `asana>=5.0.2` included — still pass.
 4. Review the diff — every entry should be explainable by the SDK's release
    notes. Do **not** record SDK-driven surface changes (new groups or opts,
    changed signatures) as this project's own `CHANGELOG.md` entries, and do
@@ -63,7 +68,7 @@ Procedure:
    those changes reach users of *any* asana-api-cli version as soon as their
    installed SDK updates — an asana-api-cli release neither delivers nor
    gates them. `CHANGELOG.md` records only what the bump changes in this
-   project itself (typically the curated group descriptions of step 7, under
+   project itself (typically the curated group descriptions of step 8, under
    `### Changed` — a help-string change). When SDK effects are worth
    mentioning for context, attribute them to the SDK: "appears on any
    asana-api-cli version once `python-asana >= X.Y.Z` is installed".
@@ -90,7 +95,46 @@ Procedure:
    fields should now be exposed, and update `docs/sdk-deviations.md`.
    `tests/test_sdk_boilerplate.py` also pins the settable `Configuration`
    set, so a new auth-related property fails that guard too.
-7. *(Optional, soft improvement)* Review the group descriptions when
+7. Re-check the version-pinned notes — statements that describe SDK behavior
+   as of the newest SDK checked:
+
+   ```bash
+   git grep -n 'latest version checked' -- ':!docs/development.md'
+   ```
+
+   The current ones rest on the SDK's shared runtime modules
+   (`asana/rest.py`, `asana/api_client.py`, `asana/configuration.py`) and,
+   for the multibyte-filename note, on the upload path in
+   `asana/api/attachments_api.py`. Diff those files between the old and new
+   tags (set `old` / `new` to the versions, without the `v`):
+
+   ```bash
+   old=5.3.0 new=5.4.0
+   for f in rest api_client configuration api/attachments_api; do
+     diff -u --label "v$old/asana/$f.py" --label "v$new/asana/$f.py" \
+       <(curl -fsSL "https://raw.githubusercontent.com/Asana/python-asana/v$old/asana/$f.py") \
+       <(curl -fsSL "https://raw.githubusercontent.com/Asana/python-asana/v$new/asana/$f.py")
+   done
+   ```
+
+   A file missing from the output is unchanged — unless `curl` printed an
+   error (e.g. a mistyped version), which leaves that side of the diff empty;
+   fix it and rerun. If the diff touches only version strings and
+   docstrings, the statements still hold — bump the version each one names.
+   Otherwise re-verify each statement against the new SDK and rewrite it (or
+   drop it once the SDK lifts the limitation), along with the short
+   restatements that link to it (e.g. the `--proxy` row in `usage.md` and
+   `SECURITY.md` link to `usage.md#proxies`).
+
+   Tag any new statement of version-specific SDK behavior the same way
+   (`X.Y.Z — the latest version checked`) so the grep above finds it. Keep
+   these notes in `docs/` only: code under `src/` refers to them rather than
+   naming an SDK version (`--generate-python` inlines some of its docstrings
+   into users' scripts), so this step never touches `src/` or the
+   generated-code snapshots. `tests/test_sdk_version_notes.py` enforces both:
+   once step 2 moves `_SNAPSHOT_ASANA_VERSION`, it fails until every tag under
+   `docs/` names that version, and it fails on any tag in `src/`.
+8. *(Optional, soft improvement)* Review the group descriptions when
    the SDK adds or removes resource groups:
    - [`docs/api-groups.md`](api-groups.md) is the authoritative table
      (CLI group → Asana reference link → short description).
@@ -107,10 +151,14 @@ Procedure:
      [developers.asana.com/llms.txt](https://developers.asana.com/llms.txt)
      (an AI-friendly Markdown index of the reference) and/or the
      individual `/reference/<group>.md` pages.
-8. Commit `uv.lock`, the two `_SNAPSHOT_ASANA_VERSION` bumps, the regenerated
+9. Commit `uv.lock`, the two `_SNAPSHOT_ASANA_VERSION` bumps, the regenerated
    fixtures (`tests/fixtures/cli_surface.json` and any `generate_python/*`
-   snapshots), and any `CHANGELOG.md` entry from step 4 together (plus any
-   group-description edits from step 7).
+   snapshots), any version-pinned note edits from step 7, and any
+   `CHANGELOG.md` entry from step 4 together (plus any group-description
+   edits from step 8).
+10. *(Optional)* With no release planned, merge to `main` anyway so the
+    default branch shows the verified SDK — see
+    [`release.md` §Merging to `main` without a release](release.md#merging-to-main-without-a-release).
 
 ## Trying shell completion locally
 
