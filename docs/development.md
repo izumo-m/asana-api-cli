@@ -156,6 +156,9 @@ Procedure:
    snapshots), any version-pinned note edits from step 7, and any
    `CHANGELOG.md` entry from step 4 together (plus any group-description
    edits from step 8).
+10. *(Optional)* With no release planned, merge to `main` anyway so the
+    default branch shows the verified SDK — see
+    [`release.md` §Merging to `main` without a release](release.md#merging-to-main-without-a-release).
 
 ## Trying shell completion locally
 

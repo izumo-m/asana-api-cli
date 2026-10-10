@@ -24,3 +24,14 @@ Release steps run from a developer machine; PyPI publication is automated via ta
 5. Push everything in one go: `git push origin main <branch> vX.Y.Z`.
 
 The tag push triggers `.github/workflows/publish.yml`, which builds and uploads to PyPI.
+
+## Merging to `main` without a release
+
+`main` may also take a merge that is not a release — e.g. after an `asana` SDK
+bump ([`development.md` §Bumping the asana SDK](development.md#bumping-the-asana-sdk))
+that changes nothing users install, to put the verified state on the default
+branch. Merge with `git merge --no-ff <branch>` and a message that says so
+(e.g. `Merge branch 'develop': verified with python-asana X.Y.Z (no release)`),
+leave the `pyproject.toml` version as is, and do not tag the merge: releases
+are the tagged merge commits. Push with `git push origin main <branch>`;
+without a tag, `publish.yml` does not run.
