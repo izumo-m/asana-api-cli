@@ -53,7 +53,8 @@ Procedure:
 2. Bump `_SNAPSHOT_ASANA_VERSION` to the new version in **both**
    `tests/test_cli_surface.py` and `tests/test_generate_python_snapshots.py` —
    otherwise those snapshot guards silently *skip* on the new version instead
-   of checking it.
+   of checking it. (`tests/test_sdk_version_notes.py` fails if the two
+   differ.)
 3. `uv run pytest` — failures in `test_cli_surface.py` /
    `test_generate_python_snapshots.py` print the diff. Also run the
    lower-bound check, `bash tools/test_python_versions.sh --lowest 3.10 3.11 3.12`
@@ -130,7 +131,9 @@ Procedure:
    these notes in `docs/` only: code under `src/` refers to them rather than
    naming an SDK version (`--generate-python` inlines some of its docstrings
    into users' scripts), so this step never touches `src/` or the
-   generated-code snapshots.
+   generated-code snapshots. `tests/test_sdk_version_notes.py` enforces both:
+   once step 2 moves `_SNAPSHOT_ASANA_VERSION`, it fails until every tag under
+   `docs/` names that version, and it fails on any tag in `src/`.
 8. *(Optional, soft improvement)* Review the group descriptions when
    the SDK adds or removes resource groups:
    - [`docs/api-groups.md`](api-groups.md) is the authoritative table
