@@ -7,6 +7,7 @@ locates the repository root itself.
 |---|---|
 | [`test_python_versions.sh`](#test_python_versionssh) | Run the test suite on several Python versions |
 | [`e2e_init.py`](#e2e_initpy) | Provision the standing fixtures the e2e tests need in the test workspace |
+| [`update_dev_deps.sh`](#update_dev_depssh) | Upgrade the development-side packages in `uv.lock`, leaving the runtime ones put |
 | [`tag_version.sh`](#tag_versionsh) | Create the annotated `vX.Y.Z` git tag from the `pyproject.toml` version |
 | [`publish_pypi.sh`](#publish_pypish) | Build the sdist / wheel and upload them to PyPI by hand |
 
@@ -69,6 +70,27 @@ exactly the expected set. Treat the projects as test-dedicated. Transient
 failures (HTTP 5xx / 429) are retried with backoff, and writes are spaced at
 least 0.5 s apart to stay under Asana's per-minute rate limit, so the first
 full run takes roughly 12 minutes (1500 task creations × 0.5 s).
+
+## `update_dev_deps.sh`
+
+Upgrades the development-side packages in `uv.lock` and syncs `.venv` — step 1
+of the release procedure ([`docs/release.md`](../docs/release.md)).
+
+```bash
+bash tools/update_dev_deps.sh
+```
+
+- `uv sync --upgrade-group dev` alone moves only the packages listed in the
+  `dev` group (ruff, pytest, ...). The ones only they pull in (cryptography,
+  nodejs-wheel-binaries, readme-renderer, ...) would stay at their locked
+  versions, so the script upgrades those too: every package the `dev` group
+  reaches and the runtime dependencies do not, read from `uv export`.
+- Anything the runtime dependencies reach (`asana`, `click`, `urllib3`,
+  `certifi`, ...) stays put: the released package resolves those at install
+  time, and an `asana` upgrade goes through
+  [`docs/development.md` §Bumping the asana SDK](../docs/development.md#bumping-the-asana-sdk).
+- It does not commit. Review the resolver output (e.g. a yanked-package
+  warning) and the `uv.lock` diff, then run the tests.
 
 ## `tag_version.sh`
 

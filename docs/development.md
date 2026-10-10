@@ -32,7 +32,8 @@ tools/                          # Maintenance scripts; usage in tools/README.md
 ├── e2e_init.py                 # One-time fixture provisioner for tests/e2e/
 ├── publish_pypi.sh             # Manual build + twine upload to PyPI
 ├── tag_version.sh              # Create the annotated git tag from the pyproject version
-└── test_python_versions.sh     # Run the tests on several Python versions
+├── test_python_versions.sh     # Run the tests on several Python versions
+└── update_dev_deps.sh          # Upgrade the dev-only packages in uv.lock
 ```
 
 See [`tools/README.md`](../tools/README.md) for what each script does and how
