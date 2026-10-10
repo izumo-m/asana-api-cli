@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # Bring the development-side dependencies in uv.lock up to date.
 #
-# `uv sync --upgrade-group dev` alone moves only the dev group's direct entries
-# (ruff, pytest, ...); packages that only the dev group pulls in
-# (cryptography, nodejs-wheel-binaries, readme-renderer, ...) stay at their
-# locked versions. This script also upgrades those: every package the dev
-# group reaches but the runtime dependencies do not. Anything the runtime
-# dependencies reach (asana, click, urllib3, certifi, ...) stays put — the
-# released package resolves those at install time, and an asana upgrade goes
-# through docs/development.md §Bumping the asana SDK.
+# Upgrades every package the dev group reaches but the runtime dependencies do
+# not — the group's own entries (ruff, pytest, ...) and the packages only they
+# pull in (cryptography, nodejs-wheel-binaries, readme-renderer, ...), which
+# `uv sync --upgrade-group dev` alone leaves at their locked versions. Anything
+# the runtime dependencies reach (asana, click, urllib3, certifi, ...) stays
+# put, even when a dev entry also needs it — the released package resolves
+# those at install time, and an asana upgrade goes through
+# docs/development.md §Bumping the asana SDK.
 #
-# Rewrites uv.lock and syncs .venv. Review the resolver output (e.g. a yanked
-# package warning) and the uv.lock diff before committing.
+# Rewrites uv.lock and syncs .venv, then lists the dev group's entries that a
+# pyproject.toml bound still holds below their latest release (e.g. a new major
+# behind `<7`). Review the resolver output (e.g. a yanked package warning) and
+# the uv.lock diff before committing.
 #
 # Usage:
 #   bash tools/update_dev_deps.sh
@@ -28,14 +30,32 @@ locked_names() {
     LC_ALL=C sort -u
 }
 
-dev_only=$(LC_ALL=C comm -23 <(locked_names --only-group dev) <(locked_names --no-dev))
+# Plain command substitutions, so a failing `uv export` stops the script
+# (a failure inside a process substitution would go unnoticed).
+dev=$(locked_names --only-group dev)
+runtime=$(locked_names --no-dev)
+if [[ -z "$dev" || -z "$runtime" ]]; then
+  echo "error: uv export listed no dev or no runtime packages" >&2
+  exit 1
+fi
+dev_only=$(LC_ALL=C comm -23 <(printf '%s\n' "$dev") <(printf '%s\n' "$runtime"))
 
-args=(--upgrade-group dev)
+args=(sync)
 count=0
 for pkg in $dev_only; do
   args+=(--upgrade-package "$pkg")
   count=$((count + 1))
 done
 
-echo "Upgrading the dev group and its $count dev-only packages (runtime dependencies stay put)"
-uv sync "${args[@]}"
+echo "Upgrading $count dev-only packages; runtime dependencies stay put"
+uv "${args[@]}"
+
+# Direct dev entries still behind their latest release after the upgrade are
+# held there by a bound in pyproject.toml.
+held=$(uv tree --quiet --outdated --only-group dev --depth 1 --frozen |
+  sed -n 's/^[^a-z]*\(.* (group: dev) (latest: .*)\)$/  \1/p')
+if [[ -n "$held" ]]; then
+  echo
+  echo "Held below their latest release by a pyproject.toml bound (raise it deliberately):"
+  echo "$held"
+fi

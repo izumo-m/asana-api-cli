@@ -80,15 +80,20 @@ of the release procedure ([`docs/release.md`](../docs/release.md)).
 bash tools/update_dev_deps.sh
 ```
 
-- `uv sync --upgrade-group dev` alone moves only the packages listed in the
-  `dev` group (ruff, pytest, ...). The ones only they pull in (cryptography,
-  nodejs-wheel-binaries, readme-renderer, ...) would stay at their locked
-  versions, so the script upgrades those too: every package the `dev` group
-  reaches and the runtime dependencies do not, read from `uv export`.
+- It upgrades every package the `dev` group reaches and the runtime
+  dependencies do not, read from `uv export`: the group's own entries (ruff,
+  pytest, ...) and the ones only they pull in (cryptography,
+  nodejs-wheel-binaries, readme-renderer, ...). `uv sync --upgrade-group dev`
+  alone would move only the former.
 - Anything the runtime dependencies reach (`asana`, `click`, `urllib3`,
-  `certifi`, ...) stays put: the released package resolves those at install
-  time, and an `asana` upgrade goes through
+  `certifi`, ...) stays put, even when a dev entry also needs it: the
+  released package resolves those at install time, and an `asana` upgrade
+  goes through
   [`docs/development.md` §Bumping the asana SDK](../docs/development.md#bumping-the-asana-sdk).
+- Afterwards it lists the `dev` entries that a bound in `pyproject.toml`
+  still holds below their latest release (e.g. a new major behind
+  `twine<7`). Raising such a bound is a deliberate change of its own: check
+  the new release's changelog first.
 - It does not commit. Review the resolver output (e.g. a yanked-package
   warning) and the `uv.lock` diff, then run the tests.
 

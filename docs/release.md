@@ -7,7 +7,8 @@ Release steps run from a developer machine; PyPI publication is automated via ta
    group plus every package only it pulls in — `uv sync --upgrade-group dev`
    alone leaves those transitive ones behind; see
    [`tools/README.md`](../tools/README.md#update_dev_depssh)), review the
-   resolver output for warnings (e.g. a yanked package), run `uv run pytest`
+   resolver output for warnings (e.g. a yanked package) and the dev entries
+   it reports as held back by a `pyproject.toml` bound, run `uv run pytest`
    (plus `ruff` / `basedpyright` if those moved — a new version may flag new
    findings), and commit the result as `chore: update locked dependencies`.
    Runtime dependencies (`asana`, `click`, ...) and everything they pull in
