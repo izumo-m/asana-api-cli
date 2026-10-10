@@ -137,7 +137,8 @@ How the CLI surface is derived from the SDK at runtime:
   option: `snake_case` → `kebab-case`, trailing `_gid` stripped (`task_gid` →
   `--task`).
 - **Role.** A *required* parameter (no default) maps to a positional SDK argument
-  (`body`, a path GID, `workspace_gid`); an *optional* one to an `opts` entry.
+  (`body`, a path GID such as `task_gid`, or another required parameter such as
+  `workspace` or `parent`); an *optional* one to an `opts` entry.
   `body` is always the first argument when present.
 - **Classification.** Settable `Configuration` properties become global flags;
   the SDK's uniform `all_params` `**kwargs` become common per-command options.
@@ -164,7 +165,7 @@ metadata.
 |---|---|
 | `(Configuration: <name>)` | property set on `asana.Configuration` (the global flags) |
 | `(ApiClient: <name>)` | setting on the `ApiClient` instance (`user_agent`, `set_default_header`) — the client-setter globals |
-| `(args: <name>)` | positional method argument — `body`, a path GID, or `workspace_gid` |
+| `(args: <name>)` | positional method argument — `body`, a path GID, or another required parameter (`workspace`, `parent`, ...) |
 | `(opts: <name>)` | entry in the method's `opts` dict (a docstring `:param`) |
 | `(kwargs: <name>)` | boilerplate `**kwargs` every method accepts (its `all_params`) |
 | `(asana-api: extension)` | no SDK counterpart (CLI-only; also in `sdk-deviations.md`) |
