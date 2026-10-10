@@ -442,9 +442,11 @@ output a `Proxy-Authorization` header is masked
 
 ## Workspace resolution
 
-A subset of endpoints take a positional `workspace_gid` (e.g.
-`projects get-projects-for-workspace`, `tags create-tag-for-workspace`). For
-those commands the workspace is resolved in order:
+A subset of endpoints require the workspace as a positional argument, named
+`workspace_gid` (e.g. `projects get-projects-for-workspace`,
+`tags create-tag-for-workspace`) or `workspace` (e.g.
+`portfolios get-portfolios`, `webhooks get-webhooks`). For those commands the
+workspace is resolved in order:
 
 1. `--workspace <WORKSPACE_GID>` on the command
 2. `ASANA_DEFAULT_WORKSPACE` environment variable
