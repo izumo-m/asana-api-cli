@@ -2769,6 +2769,24 @@
           "returns_iterator": false
         },
         {
+          "command": "rollup-project",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "rollup_project",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "project_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
           "command": "search-projects-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -3064,14 +3082,11 @@
               "name": "opt_fields",
               "py_type": "list[str]",
               "required": false
-            },
-            {
-              "name": "workspace",
-              "py_type": "str",
-              "required": false
             }
           ],
-          "positional": [],
+          "positional": [
+            "workspace"
+          ],
           "returns_iterator": true
         },
         {
@@ -3247,18 +3262,8 @@
           "does_upload": false,
           "has_opts": true,
           "method": "create_status_for_object",
-          "paginatable": true,
+          "paginatable": false,
           "params": [
-            {
-              "name": "limit",
-              "py_type": "int",
-              "required": false
-            },
-            {
-              "name": "offset",
-              "py_type": "str",
-              "required": false
-            },
             {
               "name": "opt_fields",
               "py_type": "list[str]",
@@ -3397,6 +3402,11 @@
           "paginatable": true,
           "params": [
             {
+              "name": "created_after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
               "name": "limit",
               "py_type": "int",
               "required": false
@@ -3409,6 +3419,16 @@
             {
               "name": "opt_fields",
               "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "sort_ascending",
+              "py_type": "bool",
               "required": false
             }
           ],
@@ -3425,6 +3445,11 @@
           "paginatable": true,
           "params": [
             {
+              "name": "created_after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
               "name": "limit",
               "py_type": "int",
               "required": false
@@ -3437,6 +3462,16 @@
             {
               "name": "opt_fields",
               "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "sort_ascending",
+              "py_type": "bool",
               "required": false
             }
           ],
@@ -4261,6 +4296,24 @@
           "params": [],
           "positional": [
             "body",
+            "task_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "command": "rollup-task",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "rollup_task",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
             "task_gid"
           ],
           "returns_iterator": false
