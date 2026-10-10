@@ -98,7 +98,7 @@ Procedure:
    as of the newest SDK checked:
 
    ```bash
-   git grep -n 'latest version checked' -- ':!docs/development.md' ':!tests/fixtures'
+   git grep -n 'latest version checked' -- ':!docs/development.md'
    ```
 
    The current ones rest on the SDK's shared runtime modules
@@ -120,11 +120,10 @@ Procedure:
    version strings and docstrings, the statements still hold — bump the
    version each one names. Otherwise re-verify each statement against the
    new SDK and rewrite it (or drop it once the SDK lifts the limitation).
-   Edit only the source text: the `MultibyteFilenameSupport` docstring is
-   also embedded in `tests/fixtures/generate_python/upload_multibyte.py`, so
-   rerun
-   `UPDATE_GENERATE_SNAPSHOTS=1 uv run pytest tests/test_generate_python_snapshots.py`
-   afterwards.
+   Keep these notes in `docs/` only: code under `src/` refers to them rather
+   than naming an SDK version (`--generate-python` inlines some of its
+   docstrings into users' scripts), so this step never touches `src/` or the
+   generated-code snapshots.
 8. *(Optional, soft improvement)* Review the group descriptions when
    the SDK adds or removes resource groups:
    - [`docs/api-groups.md`](api-groups.md) is the authoritative table
