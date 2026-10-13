@@ -84,6 +84,20 @@ def iter_strings(obj: Any) -> Iterator[str]:
             yield from iter_strings(item)
 
 
+_URLSAFE_TO_STANDARD = str.maketrans("-_", "+/")
+
+
+def _urlsafe_b64decode(s: str) -> bytes:
+    """``base64.urlsafe_b64decode`` as it behaves through Python 3.14.
+
+    The standard alphabet's ``+`` / ``/`` keep their meaning, so a candidate
+    in either alphabet (or a mix) decodes. Python 3.15 deprecates passing
+    them to ``urlsafe_b64decode`` (a ``FutureWarning``), and a later release
+    will discard them.
+    """
+    return base64.b64decode(s.translate(_URLSAFE_TO_STANDARD))
+
+
 def _decode_base64(candidate: str) -> str | None:
     """*candidate* decoded as printable UTF-8 text, or None.
 
@@ -92,7 +106,7 @@ def _decode_base64(candidate: str) -> str | None:
     what keeps this from flagging every opaque-but-harmless blob.
     """
     padded = candidate + "=" * (-len(candidate) % 4)
-    for decoder in (base64.urlsafe_b64decode, base64.b64decode):
+    for decoder in (_urlsafe_b64decode, base64.b64decode):
         try:
             raw = decoder(padded)
         except (binascii.Error, ValueError):

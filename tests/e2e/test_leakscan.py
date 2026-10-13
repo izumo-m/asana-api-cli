@@ -40,6 +40,16 @@ class TestScanString:
         findings = ls.scan_string(f"cursor={blob}")
         assert any("hidden in base64" in f for f in findings)
 
+    @pytest.mark.filterwarnings("error")
+    def test_standard_alphabet_base64_decodes_without_warning(self) -> None:
+        # ``/`` is in the standard alphabet only. Python 3.15 deprecates
+        # ``urlsafe_b64decode`` accepting it (a FutureWarning; a later release
+        # discards it), so the scan must not depend on that.
+        blob = base64.b64encode(b'{"parent": "1214927779918259", "note": "???"}').decode()
+        assert "/" in blob
+        findings = ls.scan_string(f"cursor={blob}")
+        assert any("hidden in base64" in f for f in findings)
+
     def test_bare_gid_and_email_and_presigned_url(self) -> None:
         findings = ls.scan_string(
             '{"gid": "1214927779918259", "email": "real.person@example.com", '
