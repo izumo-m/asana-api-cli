@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The search commands now accept their dotted filters.**
+  `tasks search-tasks-for-workspace` and `projects search-projects-for-workspace`
+  were missing their dotted filters, so e.g. `--followers.any me` failed with
+  `No such option`. They are now available, with the dot kept:
+  `--followers.any`, `--tags.all`, `--created-by.not`, `--due-on.before`,
+  `--modified-at.after`, and so on — see each command's `--help`
+  ([#1](https://github.com/izumo-m/asana-api-cli/issues/1)). Custom field
+  filters (`custom_fields.<gid>.value` and the like) are still not available.
+
 ## [3.3.2] - 2026-09-26
 
 ### Security

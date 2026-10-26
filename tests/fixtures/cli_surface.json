@@ -2799,8 +2799,38 @@
               "required": false
             },
             {
+              "name": "completed_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "completed_at.before",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
               "name": "completed_on",
               "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "completed_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "completed_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "created_at.before",
+              "py_type": "datetime",
               "required": false
             },
             {
@@ -2809,13 +2839,63 @@
               "required": false
             },
             {
+              "name": "created_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "due_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "due_at.before",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
               "name": "due_on",
               "py_type": "date",
               "required": false
             },
             {
+              "name": "due_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "due_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "members.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "members.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
               "name": "opt_fields",
               "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "owner.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "portfolios.any",
+              "py_type": "str",
               "required": false
             },
             {
@@ -2831,6 +2911,21 @@
             {
               "name": "start_on",
               "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "start_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "start_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "teams.any",
+              "py_type": "str",
               "required": false
             },
             {
@@ -4326,8 +4421,43 @@
           "paginatable": false,
           "params": [
             {
+              "name": "assigned_by.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "assigned_by.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "assignee.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "assignee.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "commented_on_by.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
               "name": "completed",
               "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "completed_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "completed_at.before",
+              "py_type": "datetime",
               "required": false
             },
             {
@@ -4336,13 +4466,83 @@
               "required": false
             },
             {
+              "name": "completed_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "completed_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "created_at.before",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "created_by.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "created_by.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
               "name": "created_on",
               "py_type": "date",
               "required": false
             },
             {
+              "name": "created_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "due_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "due_at.before",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
               "name": "due_on",
               "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "due_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "due_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "followers.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "followers.not",
+              "py_type": "str",
               "required": false
             },
             {
@@ -4366,7 +4566,32 @@
               "required": false
             },
             {
+              "name": "liked_by.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "modified_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "modified_at.before",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
               "name": "modified_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "modified_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "modified_on.before",
               "py_type": "date",
               "required": false
             },
@@ -4376,7 +4601,42 @@
               "required": false
             },
             {
+              "name": "portfolios.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "projects.all",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "projects.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "projects.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
               "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "sections.all",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "sections.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "sections.not",
               "py_type": "str",
               "required": false
             },
@@ -4393,6 +4653,36 @@
             {
               "name": "start_on",
               "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "start_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "start_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "tags.all",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "tags.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "tags.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "teams.any",
+              "py_type": "str",
               "required": false
             },
             {

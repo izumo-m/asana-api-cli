@@ -760,6 +760,37 @@ class TestArgumentForwarding:
         opts = mock.call_args_list[0].args[1]
         assert opts["opt_fields"] == "name,gid"
 
+    def test_dotted_opt_reaches_opts_under_sdk_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--assignee.any`` lands in opts as ``assignee.any`` (the SDK sends
+        opts as the query string), distinct from the undotted ``--due-on``."""
+        cmd = _build_command("TasksApi", "search_tasks_for_workspace")
+        mock = _patch(monkeypatch, "TasksApi", "search_tasks_for_workspace", return_value=iter([]))
+        result = make_runner().invoke(
+            cmd,
+            [
+                "--workspace",
+                "W",
+                "--assignee.any",
+                "me",
+                "--created-by.not",
+                "123",
+                "--due-on.before",
+                "2026-01-01",
+                "--due-on",
+                "2026-02-01",
+            ],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args == (
+            "W",
+            {
+                "assignee.any": "me",
+                "created_by.not": "123",
+                "due_on.before": "2026-01-01",
+                "due_on": "2026-02-01",
+            },
+        )
+
     def test_optional_unset_is_omitted_from_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An optional opt the user did not supply must NOT be sent as ``None``."""
         cmd = _build_command("TasksApi", "get_task")

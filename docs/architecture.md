@@ -22,7 +22,7 @@ Runtime-introspection wrapper around `python-asana`. API group stubs are registe
 
 1. One Click subgroup per `*Api` class (`TasksApi` → `tasks`).
 2. One Click command per method (`get_tasks` → `get-tasks`).
-3. Click options per docstring `:param:` line; `snake_case` → `kebab-case`, trailing `_gid` stripped (`task_gid` → `--task`).
+3. Click options per docstring `:param:` line; `snake_case` → `kebab-case`, trailing `_gid` stripped (`task_gid` → `--task`). A dotted opt keeps its dot (`created_by.any` → `--created-by.any`); its Click dest is `created_by__any` (`cli.py:_opts_param_dest`), and the `opts` key stays the dotted SDK name.
 
 Method-level introspection is deferred per group so top-level `--help` cost stays flat as the SDK grows.
 

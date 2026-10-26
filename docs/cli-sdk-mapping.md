@@ -135,7 +135,8 @@ How the CLI surface is derived from the SDK at runtime:
 - **Naming.** `*Api` classes become groups (`TasksApi` → `tasks`), methods become
   commands (`get_tasks` → `get-tasks`), and each docstring `:param:` becomes an
   option: `snake_case` → `kebab-case`, trailing `_gid` stripped (`task_gid` →
-  `--task`).
+  `--task`). A dotted opt (the search endpoints' query filters) keeps its dot
+  and stays the dotted `opts` key: `created_by.any` → `--created-by.any`.
 - **Role.** A *required* parameter (no default) maps to a positional SDK argument
   (`body`, a path GID such as `task_gid`, or another required parameter such as
   `workspace` or `parent`); an *optional* one to an `opts` entry.

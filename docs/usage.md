@@ -40,7 +40,9 @@ scopes:
   command path, not before it.
 - **Command parameters** — the SDK method's own inputs (`--project`, `--task`,
   `--body`, …), derived per command from the SDK and effectively unbounded.
-  They are **not** listed here; see each command's `--help`.
+  They are **not** listed here; see each command's `--help`. The search
+  commands' dotted filters keep their dot: `--followers.any me`,
+  `--due-on.before 2026-01-01`.
 
 Every option's `--help` line ends with a `(<kind>: <name>)` label naming where
 its value lands in the SDK (`(Configuration: host)`, `(opts: opt_fields)`,

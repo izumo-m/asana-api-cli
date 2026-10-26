@@ -12,7 +12,8 @@ Translation rules:
 * ``get_tasks`` → command ``get-tasks``.
 * Method parameters and ``:param`` lines from the docstring become click
   options. Path GIDs are exposed with the ``_gid`` suffix stripped
-  (``task_gid`` → ``--task``).
+  (``task_gid`` → ``--task``). A dotted opt keeps its dot
+  (``created_by.any`` → ``--created-by.any``).
 * A workspace positional (``workspace_gid`` or ``workspace``) and the
   ``workspace`` opt are unified into a single ``--workspace`` option that
   falls back to ``$ASANA_DEFAULT_WORKSPACE`` only when the parameter is
@@ -164,7 +165,9 @@ def resolve_workspace(
 # Name conversion
 # ---------------------------------------------------------------------------
 
-_PARAM_RE = re.compile(r"^\s*:param\s+(\S+)\s+(\w+)\s*:\s*(.*)$")
+# The name allows dotted segments: the search endpoints declare query filters
+# such as ``followers.any`` / ``due_on.before`` as ``:param`` lines.
+_PARAM_RE = re.compile(r"^\s*:param\s+(\S+)\s+(\w+(?:\.\w+)*)\s*:\s*(.*)$")
 _WORKSPACE_PARAMS: frozenset[str] = frozenset({"workspace_gid", "workspace"})
 
 
@@ -328,6 +331,15 @@ def _option_name(param_name: str) -> str:
     if param_name.endswith("_gid"):
         return param_name[:-4]
     return param_name
+
+
+def _opts_param_dest(param_name: str) -> str:
+    """Click dest for an ``opts`` param; ``followers.any`` → ``followers__any``.
+
+    A dotted SDK name is not a Python identifier, so click cannot use it as a
+    dest. The ``opts`` dict key stays the dotted SDK name.
+    """
+    return param_name.replace(".", "__")
 
 
 def _is_workspace_param(name: str) -> bool:
@@ -734,12 +746,17 @@ def _decls(flag: str, dest: str, reserved: frozenset[str]) -> list[str]:
 
     If ``flag`` collides with a built-in CLI flag (in ``reserved``), the SDK
     param yields: it is exposed as ``--sdk-<name>`` with an *explicit* ``dest``
-    equal to the SDK param name, so the call path (which pops by param name) is
-    unchanged and the ``(opts/args: <name>)`` help label still shows the real
-    name. Otherwise the bare ``[flag]`` is used (dest auto-derives to ``dest``).
+    (the key the call path pops: the SDK param name, ``_opts_param_dest`` of it
+    for an opt), so the call path is unchanged and the ``(opts/args: <name>)``
+    help label still shows the real name. Otherwise the bare ``[flag]`` is used
+    (dest auto-derives to ``dest``), except for a dotted flag
+    (``--followers.any``), which click cannot derive a dest from: it gets
+    ``dest`` explicitly too.
     """
     if flag in reserved:
         return [f"--sdk-{flag.removeprefix('--')}", dest]
+    if "." in flag:
+        return [flag, dest]
     return [flag]
 
 
@@ -837,7 +854,7 @@ def _plain_opt_option(
         kw["required"] = True
     else:
         kw["default"] = None
-    return click.Option(_decls(flag, p.name, reserved), **kw)
+    return click.Option(_decls(flag, _opts_param_dest(p.name), reserved), **kw)
 
 
 def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) -> int | None:
@@ -985,7 +1002,7 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     for p in op.opts_params:
         if _is_workspace_param(p.name):
             continue
-        value = kwargs.pop(p.name, None)
+        value = kwargs.pop(_opts_param_dest(p.name), None)
         if p.required or value is not None:
             opts[p.name] = value
     workspace_opt = op.workspace_opt

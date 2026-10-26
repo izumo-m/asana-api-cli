@@ -190,6 +190,7 @@ _COMMANDS = {
     "get-task": ("TasksApi", "get_task"),
     "create-task": ("TasksApi", "create_task"),
     "delete-task": ("TasksApi", "delete_task"),
+    "search-tasks-for-workspace": ("TasksApi", "search_tasks_for_workspace"),
     "create-attachment-for-object": ("AttachmentsApi", "create_attachment_for_object"),
 }
 
@@ -223,6 +224,12 @@ class TestCallEquivalence:
             # Non-finite floats must render as ``float('inf')``, not a bare ``inf``.
             ("get-tasks", ["--request-timeout", "inf"], lambda: iter([])),
             ("get-tasks", ["--header-params", '{"X-Req": -Infinity}'], lambda: iter([])),
+            # Dotted opts keep their dotted SDK key in the generated ``opts`` dict.
+            (
+                "search-tasks-for-workspace",
+                ["--workspace", "111", "--assignee.any", "me", "--due-on.before", "2026-01-01"],
+                lambda: iter([]),
+            ),
         ],
     )
     def test_same_call(
