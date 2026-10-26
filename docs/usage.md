@@ -535,14 +535,18 @@ into another cmdlet — garbles it unless you switch to UTF-8 first:
 $tasks = asana-api tasks get-tasks --project <PROJECT_GID> | ConvertFrom-Json
 ```
 
+Both also read an argument that starts with `@` as splatting, so an unquoted
+`@file` value such as `--body @task.json` is a parse error before `asana-api`
+runs. Quote it (`--body '@task.json'`) or escape the `@` with a backtick
+(``--body `@task.json``).
+
 **Windows PowerShell 5.1** additionally:
 
 - **Strips double quotes from native-command arguments.** An inline JSON body
   (`--body '{"data":{"name":"x"}}'`), an inline JSON `--opts`, or a `--query`
   with quoted keys reaches `asana-api` without its `"` and fails. Put the JSON
-  in a file (`--body @task.json`, `--opts '@opts.json'`) or pipe it
-  (`--body -`). PowerShell 7 passes such
-  arguments intact.
+  in a file (`--body '@task.json'`, `--opts '@opts.json'`) or pipe it
+  (`--body -`). PowerShell 7 passes such arguments intact.
 - **Pipes to native commands as ASCII by default**, so non-ASCII text piped into
   `--body -` silently becomes `?`. Set a UTF-8 `$OutputEncoding` first (the BOM
   this adds is accepted):

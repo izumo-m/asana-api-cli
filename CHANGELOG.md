@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#1](https://github.com/izumo-m/asana-api-cli/issues/1)). Custom field
   filters (`custom_fields.<gid>.value` and the like) go through the new
   `--opts`.
+- **The PowerShell notes in `docs/usage.md` now quote `@file` arguments.** They
+  suggested `--body @task.json`, which PowerShell (5.1 and 7) rejects as a parse
+  error because it reads a leading `@` as splatting. Write `--body '@task.json'`.
 
 ## [3.3.2] - 2026-09-26
 
