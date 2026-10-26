@@ -134,6 +134,9 @@ class _Imports:
             lines.append("import jq  # requires: pip install jq")
         if self.tabulate:
             lines.append("from tabulate import tabulate")
+            # tabulate uses wcwidth only if installed; without it, wide (CJK)
+            # characters misalign and the table differs from the CLI's.
+            lines.append("import wcwidth  # noqa: F401  # requires: pip install wcwidth")
         return lines
 
 

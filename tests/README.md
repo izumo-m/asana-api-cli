@@ -58,7 +58,7 @@ the current release on 2023-12-16. To see what PyPI offered on a given date,
 resolve with uv's `--exclude-newer`:
 
 ```bash
-printf '%s\n' "asana==5.0.2" click tabulate jq \
+printf '%s\n' "asana==5.0.2" click tabulate jq wcwidth \
   | uv pip compile --python-version 3.10 --exclude-newer 2023-12-16T23:59:59Z -
 ```
 

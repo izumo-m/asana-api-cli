@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import click
 import pytest
+import wcwidth
 from _cli_runner import full_output, make_runner
 from asana.rest import ApiException
 
@@ -116,6 +117,77 @@ class TestFormatOutputTable:
         _format_output([], output_format="table", jq_query=None)
         assert capsys.readouterr().out == ""
 
+    @staticmethod
+    def _last_column_starts(lines: list[str]) -> set[int]:
+        """On-screen column where each line's last field starts (the field must
+        be left-aligned text, not a right-aligned number)."""
+        return {wcwidth.wcswidth(line[: line.rindex(" ") + 1]) for line in lines}
+
+    def test_wide_characters_keep_columns_aligned(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # A Japanese character takes two columns on screen. Without wcwidth,
+        # tabulate counted it as one and over-padded the cell, pushing the rest
+        # of the row to the right.
+        data = [
+            {"name": "状態", "x": "a"},
+            {"name": "abcdefghij", "x": "b"},
+            {"name": "事推1課勤怠連絡  2026/9/1～", "x": "c"},
+        ]
+        _format_output(data, output_format="table", jq_query=None)
+        lines = capsys.readouterr().out.splitlines()
+        assert len(lines) == 5  # header, rule, 3 rows
+        assert len(self._last_column_starts(lines)) == 1
+
+    def test_tabs_are_expanded(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # wcwidth counts a string with a tab as width -1, which padded the cell
+        # far out of line; the tab is expanded to spaces instead.
+        data = [
+            {"name": "a\tb", "x": "p"},
+            {"name": "line1\nline2", "x": "q"},
+            {"name": "abcdefghijk", "x": "r"},
+        ]
+        _format_output(data, output_format="table", jq_query=None)
+        out = capsys.readouterr().out
+        assert "\t" not in out
+        assert "a       b" in out  # expandtabs(8)
+        # The multiline cell's second line has no second column.
+        lines = [line for line in out.splitlines() if line.strip() != "line2"]
+        assert len(self._last_column_starts(lines)) == 1
+
+    def test_header_tabs_are_expanded(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # Keys can come from data, e.g. --query 'map({(.name): .value}) | add'.
+        _format_output([{"na\tme": "abc", "x": "p"}], output_format="table", jq_query=None)
+        lines = capsys.readouterr().out.splitlines()
+        assert "\t" not in "\n".join(lines)
+        assert len(self._last_column_starts(lines)) == 1
+
+    def test_crlf_cell_with_wide_characters(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # tabulate measured "\r\n" as two breaks but drew it as one, so every
+        # row went out of line.
+        data = [{"name": "1行目のメモ\r\n2行目のメモです", "x": "p"}, {"name": "abc", "x": "q"}]
+        _format_output(data, output_format="table", jq_query=None)
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[2].startswith("1行目のメモ") and lines[3] == "2行目のメモです"
+        # Every line but the continuation has the second column at one place.
+        assert len(self._last_column_starts(lines[:3] + lines[4:])) == 1
+        # The rule spans the widest line, "2行目のメモです" (15 columns).
+        assert lines[1].split()[0] == "-" * 15
+
+    @pytest.mark.parametrize("brk", ["\u2028", "\x0b", "\x85", "\r"])
+    def test_other_line_breaks_keep_every_line(
+        self, capsys: pytest.CaptureFixture[str], brk: str
+    ) -> None:
+        # str.splitlines breaks at these too; tabulate used to drop the line
+        # after them when another cell of the table was multiline.
+        data = [{"gid": "1", "notes": f"first{brk}second"}, {"gid": "2", "notes": "x\ny"}]
+        _format_output(data, output_format="table", jq_query=None)
+        out = capsys.readouterr().out
+        assert [line.split()[-1] for line in out.splitlines()[2:]] == [
+            "first",
+            "second",
+            "x",
+            "y",
+        ]
+
 
 class TestFormatOutputCsv:
     def test_dict_as_csv(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -130,6 +202,11 @@ class TestFormatOutputCsv:
         _format_output(data, output_format="csv", jq_query=None)
         lines = capsys.readouterr().out.strip().splitlines()
         assert len(lines) == 3  # header + 2 rows
+
+    def test_tabs_are_kept(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # Only the table expands tabs (for alignment); csv keeps the data as is.
+        _format_output({"name": "a\tb"}, output_format="csv", jq_query=None)
+        assert capsys.readouterr().out.splitlines()[1] == "a\tb"
 
     def test_empty_list_produces_no_output(self, capsys: pytest.CaptureFixture[str]) -> None:
         _format_output([], output_format="csv", jq_query=None)

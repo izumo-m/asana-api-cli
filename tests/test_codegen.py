@@ -375,6 +375,17 @@ class TestOutputEquivalence:
             pytest.param(
                 lambda: iter([{"gid": "1", "name": "あ"}, {"gid": "2", "name": "b"}]), id="rows"
             ),
+            # Wide characters, a tab, and a multiline cell: the table's width path.
+            pytest.param(
+                lambda: iter(
+                    [
+                        {"gid": "1", "name": "事推1課勤怠連絡  2026/9/1～"},
+                        {"gid": "2", "name": "a\tb"},
+                        {"gid": "3", "name": "line1\nline2"},
+                    ]
+                ),
+                id="wide_tab_multiline",
+            ),
             pytest.param(lambda: iter([]), id="empty"),
         ],
     )
@@ -722,6 +733,13 @@ class TestGeneratedScriptHygiene:
         assert code.count("def scalar_text(") == 1
         assert code.count("def to_rows(") == 1
         assert "from tabulate import tabulate" in code
+        # tabulate measures wide characters only with wcwidth installed.
+        assert "import wcwidth" in code
+
+    def test_wcwidth_import_only_for_tables(self) -> None:
+        code = _generate(["get-task", "--task", "1", "--output", "csv"])
+        assert "tabulate" not in code
+        assert "wcwidth" not in code
 
 
 class TestHeader:

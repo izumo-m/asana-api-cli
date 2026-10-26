@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `sections`: `add-task-for-section`, `create-section-for-project`,
     `insert-section-for-project`, `update-section`
   - `task-templates instantiate-task`
+- **`--output table` lines up columns that contain Japanese text.** A
+  Japanese (or other East Asian wide) character takes two columns on screen,
+  but was counted as one, so the rest of its row was pushed to the right.
+  Widths are now measured with `wcwidth`, a new dependency. A tab in a table
+  cell or header is expanded to spaces, so it stays in line too. The same
+  applies to `--exception-output table`, and scripts made by
+  `--generate-python` that print a table now import `wcwidth` to match.
 - **The PowerShell notes in `docs/usage.md` now quote `@file` arguments.** They
   suggested `--body @task.json`, which PowerShell (5.1 and 7) rejects as a parse
   error because it reads a leading `@` as splatting. Write `--body '@task.json'`.

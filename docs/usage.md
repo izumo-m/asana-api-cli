@@ -139,6 +139,15 @@ asana-api tasks get-tasks --project <PROJECT_GID> --output csv --csv-bom > tasks
 asana-api tasks delete-task --task <TASK_GID> --output none
 ```
 
+`--output table` aligns its columns by on-screen width, counting a Japanese
+(or other East Asian wide) character as two columns. Characters whose width
+depends on the terminal, such as `①`, `○` or `─` (East Asian Ambiguous), count
+as one; a terminal or font that draws them wide shifts the rest of that row.
+A tab in a cell or header is expanded to spaces, since its on-screen width
+depends on where it lands; csv, json and text keep the data as is. Other control
+characters (e.g. a BEL or NUL in the data) are printed as is and throw their row
+out of line.
+
 A `--query` expression that does not compile is rejected before the API call
 (exit `2`, nothing sent). One that compiles still runs under `--output none`, so
 a jq runtime error against the payload surfaces (exit `2`) regardless of the
@@ -165,9 +174,10 @@ asana-api tasks get-task --task <TASK_GID> --generate-python > fetch_task.py
 
 The emitted script is self-contained — it never imports `asana_api_cli`, only
 `asana` and the standard library (plus `jq` when you use `--query` or
-`--exception-query`, `tabulate` when you use the `table` format for `--output`
-or `--exception-output`, and `urllib3` — already a `python-asana` dependency —
-when you use `--multibyte-filenames`). It reproduces:
+`--exception-query`, `tabulate` and `wcwidth` when you use the `table` format
+for `--output` or `--exception-output`, and `urllib3` — already a
+`python-asana` dependency — when you use `--multibyte-filenames`). It
+reproduces:
 
 - **Configuration** — every global option you passed (`--host`, `--retry-strategy`,
   `--user-agent`, …), applied to `asana.Configuration` / `ApiClient` exactly as
