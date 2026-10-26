@@ -1021,6 +1021,73 @@ class TestExtraOpts:
         assert mock.call_count == 0
 
 
+class TestBodyInOpts:
+    """Methods that read the body from ``opts['body']`` (e.g.
+    ``create_section_for_project(project_gid, opts)``) get it there, not as a
+    positional. Before ``--body`` was exposed for them, every call raised
+    ``KeyError: 'body'``."""
+
+    def _create_section(
+        self, monkeypatch: pytest.MonkeyPatch, args: list[str], stdin: str | None = None
+    ) -> tuple[Any, MagicMock]:
+        cmd = _build_command("SectionsApi", "create_section_for_project")
+        mock = _patch(monkeypatch, "SectionsApi", "create_section_for_project", return_value={})
+        return make_runner().invoke(cmd, ["--project", "P", *args], input=stdin), mock
+
+    def test_body_lands_in_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(monkeypatch, ["--body", '{"data": {"name": "S"}}'])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args == ("P", {"body": {"data": {"name": "S"}}})
+
+    def test_body_follows_the_other_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(
+            monkeypatch,
+            ["--body", '{"data": {}}', "--opt-fields", "name", "--opts", "x=1"],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert list(mock.call_args_list[0].args[1].items()) == [
+            ("opt_fields", "name"),
+            ("x", "1"),
+            ("body", {"data": {}}),
+        ]
+
+    def test_body_from_file(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        path = tmp_path / "body.json"
+        path.write_text('{"data": {"name": "F"}}', encoding="utf-8-sig")
+        result, mock = self._create_section(monkeypatch, ["--body", f"@{path}"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {"body": {"data": {"name": "F"}}}
+
+    def test_body_from_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(
+            monkeypatch, ["--body", "-"], stdin='{"data": {"name": "I"}}'
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {"body": {"data": {"name": "I"}}}
+
+    def test_missing_body_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(monkeypatch, [])
+        assert result.exit_code == 2, full_output(result)
+        assert "--body" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_body_key_in_opts_conflicts_with_body(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(
+            monkeypatch, ["--body", '{"data": {}}', "--opts", '{"body": {"data": {}}}']
+        )
+        assert result.exit_code == 2, full_output(result)
+        assert "'body' is also set by --body" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_bad_body_exits_2_before_token_check(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        runtime.access_token = ""  # restored by the autouse _isolated_runtime fixture
+        result, mock = self._create_section(monkeypatch, ["--body", "{not valid json"])
+        assert result.exit_code == 2, full_output(result)
+        assert "invalid JSON" in full_output(result)
+        assert mock.call_count == 0
+
+
 class TestMultibyteFilenamesUploadFlag:
     """``--multibyte-filenames`` is a per-command flag on upload commands only.
 

@@ -191,6 +191,7 @@ _COMMANDS = {
     "create-task": ("TasksApi", "create_task"),
     "delete-task": ("TasksApi", "delete_task"),
     "search-tasks-for-workspace": ("TasksApi", "search_tasks_for_workspace"),
+    "create-section-for-project": ("SectionsApi", "create_section_for_project"),
     "create-attachment-for-object": ("AttachmentsApi", "create_attachment_for_object"),
 }
 
@@ -241,6 +242,12 @@ class TestCallEquivalence:
                 ["--workspace", "111", "--opts", '{"custom_fields.1.contains": "a, b", "x": 1}'],
                 lambda: iter([]),
             ),
+            # A body the method reads from ``opts['body']`` lands there, last.
+            (
+                "create-section-for-project",
+                ["--project", "1", "--body", '{"data": {"name": "S"}}', "--opt-fields", "name"],
+                lambda: {"gid": "2"},
+            ),
         ],
     )
     def test_same_call(
@@ -254,6 +261,10 @@ class TestCallEquivalence:
         cli_call, _ = _cli_execute(monkeypatch, cmd, flags, factory)
         gen_call, _, _ = _exec_generated(monkeypatch, code, cmd, factory)
         assert gen_call == cli_call
+        # Key order too: it is the query-string order.
+        assert [list(a.items()) if isinstance(a, dict) else a for a in gen_call["args"]] == [
+            list(a.items()) if isinstance(a, dict) else a for a in cli_call["args"]
+        ]
 
 
 class TestBodyForms:

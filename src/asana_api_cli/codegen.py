@@ -461,8 +461,8 @@ def _render_body(raw_body: str, needs: _Imports) -> list[str]:
 def _render_call_setup(plan: CallPlan, needs: _Imports) -> list[str]:
     """The API instance and the body / opts literals — everything before the call."""
     lines = [f"api_instance = asana.{plan.api_cls.__name__}(api_client)"]
-    if plan.has_body:
-        assert plan.raw_body is not None  # has_body ⟺ a required --body was given
+    if plan.has_body or plan.body_in_opts:
+        assert plan.raw_body is not None  # either ⟺ a required --body was given
         lines += _render_body(plan.raw_body, needs)
     if plan.has_opts:
         opts = (
@@ -471,6 +471,9 @@ def _render_call_setup(plan: CallPlan, needs: _Imports) -> list[str]:
             else pprint.pformat(plan.opts, sort_dicts=False)
         )
         lines.append(f"opts = {opts}")
+        if plan.body_in_opts:
+            # Last, as ``execute_call_plan`` adds it.
+            lines.append('opts["body"] = body')
     return lines
 
 

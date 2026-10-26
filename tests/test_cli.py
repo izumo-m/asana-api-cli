@@ -525,6 +525,27 @@ class TestBuiltCommands:
         assert opt.opts == ["--assignee.any"]
         assert "(opts: assignee.any)" in (opt.help or "")
 
+    def test_body_in_opts_commands_get_a_required_body(self, api_classes: list[type]) -> None:
+        # Whole-SDK sweep: a method that reads ``opts['body']`` gets exactly one
+        # required ``--body`` labeled ``(opts: body)``; a positional body keeps
+        # ``(args: body)``.
+        seen = 0
+        for cls in api_classes:
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                bodies = [
+                    p for p in cmd.params if isinstance(p, click.Option) and "--body" in p.opts
+                ]
+                where = f"{cls.__name__}.{op.method_name}"
+                assert len(bodies) == (1 if op.has_body or op.body_in_opts else 0), where
+                if op.body_in_opts:
+                    seen += 1
+                    assert bodies[0].required, where
+                    assert "(opts: body)" in (bodies[0].help or ""), where
+                elif op.has_body:
+                    assert "(args: body)" in (bodies[0].help or ""), where
+        assert seen, "no body_in_opts command found"
+
     def test_opts_option_iff_method_takes_opts(self, api_classes: list[type]) -> None:
         # Whole-SDK sweep: ``--opts`` (raw entries for the SDK ``opts`` dict) is on
         # exactly the commands whose method takes ``opts``.

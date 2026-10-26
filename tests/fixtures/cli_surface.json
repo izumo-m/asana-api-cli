@@ -4,6 +4,7 @@
       "class_name": "AIStudioUsageAPIApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-ai-studio-runs",
           "does_upload": false,
           "has_opts": true,
@@ -42,6 +43,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-ai-studio-seats",
           "does_upload": false,
           "has_opts": true,
@@ -81,6 +83,7 @@
       "class_name": "AccessRequestsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "approve-access-request",
           "does_upload": false,
           "has_opts": false,
@@ -93,6 +96,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-access-request",
           "does_upload": false,
           "has_opts": false,
@@ -105,6 +109,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-access-requests",
           "does_upload": false,
           "has_opts": true,
@@ -128,6 +133,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "reject-access-request",
           "does_upload": false,
           "has_opts": false,
@@ -146,6 +152,7 @@
       "class_name": "AgentsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-agent",
           "does_upload": false,
           "has_opts": true,
@@ -164,6 +171,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-agents-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -198,6 +206,7 @@
       "class_name": "AllocationsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-allocation",
           "does_upload": false,
           "has_opts": true,
@@ -216,6 +225,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-allocation",
           "does_upload": false,
           "has_opts": false,
@@ -228,6 +238,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-allocation",
           "does_upload": false,
           "has_opts": true,
@@ -246,6 +257,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-allocations",
           "does_upload": false,
           "has_opts": true,
@@ -287,6 +299,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-allocation",
           "does_upload": false,
           "has_opts": true,
@@ -312,6 +325,7 @@
       "class_name": "AttachmentsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-attachment-for-object",
           "does_upload": true,
           "has_opts": true,
@@ -358,6 +372,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-attachment",
           "does_upload": false,
           "has_opts": false,
@@ -370,6 +385,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-attachment",
           "does_upload": false,
           "has_opts": true,
@@ -388,6 +404,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-attachments-for-object",
           "does_upload": false,
           "has_opts": true,
@@ -422,6 +439,7 @@
       "class_name": "AuditLogAPIApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-audit-log-events",
           "does_upload": false,
           "has_opts": true,
@@ -481,6 +499,7 @@
       "class_name": "BatchAPIApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-batch-request",
           "does_upload": false,
           "has_opts": true,
@@ -505,6 +524,7 @@
       "class_name": "BudgetsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-budget",
           "does_upload": false,
           "has_opts": false,
@@ -517,6 +537,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-budget",
           "does_upload": false,
           "has_opts": false,
@@ -529,6 +550,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-budget",
           "does_upload": false,
           "has_opts": true,
@@ -547,6 +569,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-budgets",
           "does_upload": false,
           "has_opts": false,
@@ -559,6 +582,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-budget",
           "does_upload": false,
           "has_opts": true,
@@ -584,6 +608,7 @@
       "class_name": "CustomFieldSettingsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-custom-field-settings-for-goal",
           "does_upload": false,
           "has_opts": true,
@@ -612,6 +637,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-custom-field-settings-for-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -640,6 +666,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-custom-field-settings-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -668,6 +695,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-custom-field-settings-for-team",
           "does_upload": false,
           "has_opts": true,
@@ -692,6 +720,7 @@
       "class_name": "CustomFieldsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-custom-field",
           "does_upload": false,
           "has_opts": true,
@@ -710,6 +739,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": true,
           "command": "create-enum-option-for-custom-field",
           "does_upload": false,
           "has_opts": true,
@@ -728,6 +758,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-custom-field",
           "does_upload": false,
           "has_opts": false,
@@ -740,6 +771,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-custom-field",
           "does_upload": false,
           "has_opts": true,
@@ -758,6 +790,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-custom-fields-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -786,6 +819,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": true,
           "command": "insert-enum-option-for-custom-field",
           "does_upload": false,
           "has_opts": true,
@@ -804,6 +838,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": true,
           "command": "update-custom-field",
           "does_upload": false,
           "has_opts": true,
@@ -822,6 +857,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": true,
           "command": "update-enum-option",
           "does_upload": false,
           "has_opts": true,
@@ -846,6 +882,7 @@
       "class_name": "CustomTypesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-custom-type",
           "does_upload": false,
           "has_opts": true,
@@ -864,6 +901,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-custom-types",
           "does_upload": false,
           "has_opts": true,
@@ -906,6 +944,7 @@
       "class_name": "EventsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-events",
           "does_upload": false,
           "has_opts": true,
@@ -935,6 +974,7 @@
       "class_name": "ExportsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-graph-export",
           "does_upload": false,
           "has_opts": false,
@@ -947,6 +987,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-resource-export",
           "does_upload": false,
           "has_opts": false,
@@ -965,6 +1006,7 @@
       "class_name": "GoalRelationshipsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "add-supporting-relationship",
           "does_upload": false,
           "has_opts": true,
@@ -984,6 +1026,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-goal-relationship",
           "does_upload": false,
           "has_opts": true,
@@ -1002,6 +1045,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-goal-relationships",
           "does_upload": false,
           "has_opts": true,
@@ -1035,6 +1079,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "remove-supporting-relationship",
           "does_upload": false,
           "has_opts": false,
@@ -1048,6 +1093,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-goal-relationship",
           "does_upload": false,
           "has_opts": true,
@@ -1073,6 +1119,7 @@
       "class_name": "GoalsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "add-custom-field-setting-for-goal",
           "does_upload": false,
           "has_opts": false,
@@ -1086,6 +1133,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-followers",
           "does_upload": false,
           "has_opts": true,
@@ -1105,6 +1153,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-goal",
           "does_upload": false,
           "has_opts": true,
@@ -1123,6 +1172,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-goal-metric",
           "does_upload": false,
           "has_opts": true,
@@ -1142,6 +1192,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-goal",
           "does_upload": false,
           "has_opts": false,
@@ -1154,6 +1205,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-goal",
           "does_upload": false,
           "has_opts": true,
@@ -1172,6 +1224,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-goals",
           "does_upload": false,
           "has_opts": true,
@@ -1233,6 +1286,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-parent-goals-for-goal",
           "does_upload": false,
           "has_opts": true,
@@ -1251,6 +1305,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "remove-custom-field-setting-for-goal",
           "does_upload": false,
           "has_opts": false,
@@ -1264,6 +1319,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-followers",
           "does_upload": false,
           "has_opts": true,
@@ -1283,6 +1339,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-goal",
           "does_upload": false,
           "has_opts": true,
@@ -1302,6 +1359,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-goal-metric",
           "does_upload": false,
           "has_opts": true,
@@ -1327,6 +1385,7 @@
       "class_name": "JobsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-job",
           "does_upload": false,
           "has_opts": true,
@@ -1351,6 +1410,7 @@
       "class_name": "MembershipsApi",
       "commands": [
         {
+          "body_in_opts": true,
           "command": "create-membership",
           "does_upload": false,
           "has_opts": true,
@@ -1361,6 +1421,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-membership",
           "does_upload": false,
           "has_opts": false,
@@ -1373,6 +1434,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-membership",
           "does_upload": false,
           "has_opts": false,
@@ -1385,6 +1447,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-memberships",
           "does_upload": false,
           "has_opts": true,
@@ -1426,6 +1489,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-membership",
           "does_upload": false,
           "has_opts": false,
@@ -1445,6 +1509,7 @@
       "class_name": "OooEntriesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-ooo-entry",
           "does_upload": false,
           "has_opts": true,
@@ -1463,6 +1528,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-ooo-entry",
           "does_upload": false,
           "has_opts": false,
@@ -1475,6 +1541,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-ooo-entries",
           "does_upload": false,
           "has_opts": true,
@@ -1514,6 +1581,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-ooo-entry",
           "does_upload": false,
           "has_opts": true,
@@ -1532,6 +1600,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-ooo-entry",
           "does_upload": false,
           "has_opts": true,
@@ -1557,6 +1626,7 @@
       "class_name": "OrganizationExportsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-organization-export",
           "does_upload": false,
           "has_opts": true,
@@ -1575,6 +1645,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-organization-export",
           "does_upload": false,
           "has_opts": true,
@@ -1599,6 +1670,7 @@
       "class_name": "PortfolioMembershipsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-portfolio-membership",
           "does_upload": false,
           "has_opts": true,
@@ -1617,6 +1689,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-portfolio-memberships",
           "does_upload": false,
           "has_opts": true,
@@ -1658,6 +1731,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-portfolio-memberships-for-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1697,6 +1771,7 @@
       "class_name": "PortfoliosApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "add-custom-field-setting-for-portfolio",
           "does_upload": false,
           "has_opts": false,
@@ -1710,6 +1785,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-item-for-portfolio",
           "does_upload": false,
           "has_opts": false,
@@ -1723,6 +1799,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-members-for-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1742,6 +1819,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1760,6 +1838,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-portfolio",
           "does_upload": false,
           "has_opts": false,
@@ -1772,6 +1851,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": true,
           "command": "duplicate-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1790,6 +1870,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-items-for-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1818,6 +1899,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1836,6 +1918,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-portfolios",
           "does_upload": false,
           "has_opts": true,
@@ -1874,6 +1957,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "remove-custom-field-setting-for-portfolio",
           "does_upload": false,
           "has_opts": false,
@@ -1887,6 +1971,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-item-for-portfolio",
           "does_upload": false,
           "has_opts": false,
@@ -1900,6 +1985,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-members-for-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1919,6 +2005,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -1944,6 +2031,7 @@
       "class_name": "ProjectBriefsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-project-brief",
           "does_upload": false,
           "has_opts": true,
@@ -1963,6 +2051,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-project-brief",
           "does_upload": false,
           "has_opts": false,
@@ -1975,6 +2064,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project-brief",
           "does_upload": false,
           "has_opts": true,
@@ -1993,6 +2083,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-project-brief",
           "does_upload": false,
           "has_opts": true,
@@ -2018,6 +2109,7 @@
       "class_name": "ProjectMembershipsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-project-membership",
           "does_upload": false,
           "has_opts": true,
@@ -2036,6 +2128,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project-memberships-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2075,6 +2168,7 @@
       "class_name": "ProjectPortfolioSettingsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-project-portfolio-setting",
           "does_upload": false,
           "has_opts": true,
@@ -2093,6 +2187,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project-portfolio-settings-for-portfolio",
           "does_upload": false,
           "has_opts": true,
@@ -2121,6 +2216,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-project-portfolio-settings-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2149,6 +2245,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-project-portfolio-setting",
           "does_upload": false,
           "has_opts": true,
@@ -2174,6 +2271,7 @@
       "class_name": "ProjectStatusesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-project-status-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2193,6 +2291,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-project-status",
           "does_upload": false,
           "has_opts": false,
@@ -2205,6 +2304,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project-status",
           "does_upload": false,
           "has_opts": true,
@@ -2223,6 +2323,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project-statuses-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2257,6 +2358,7 @@
       "class_name": "ProjectTemplatesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "delete-project-template",
           "does_upload": false,
           "has_opts": false,
@@ -2269,6 +2371,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project-template",
           "does_upload": false,
           "has_opts": true,
@@ -2287,6 +2390,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project-templates",
           "does_upload": false,
           "has_opts": true,
@@ -2323,6 +2427,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-project-templates-for-team",
           "does_upload": false,
           "has_opts": true,
@@ -2351,6 +2456,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": true,
           "command": "instantiate-project",
           "does_upload": false,
           "has_opts": true,
@@ -2375,6 +2481,7 @@
       "class_name": "ProjectsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "add-custom-field-setting-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2394,6 +2501,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-followers-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2413,6 +2521,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-members-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2432,6 +2541,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-project",
           "does_upload": false,
           "has_opts": true,
@@ -2450,6 +2560,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-project-for-team",
           "does_upload": false,
           "has_opts": true,
@@ -2469,6 +2580,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-project-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -2488,6 +2600,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-project",
           "does_upload": false,
           "has_opts": false,
@@ -2500,6 +2613,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": true,
           "command": "duplicate-project",
           "does_upload": false,
           "has_opts": true,
@@ -2518,6 +2632,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-project",
           "does_upload": false,
           "has_opts": true,
@@ -2536,6 +2651,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-projects",
           "does_upload": false,
           "has_opts": true,
@@ -2582,6 +2698,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-projects-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -2615,6 +2732,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-projects-for-team",
           "does_upload": false,
           "has_opts": true,
@@ -2648,6 +2766,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-projects-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -2681,6 +2800,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-task-counts-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2699,6 +2819,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "project-save-as-template",
           "does_upload": false,
           "has_opts": true,
@@ -2718,6 +2839,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-custom-field-setting-for-project",
           "does_upload": false,
           "has_opts": false,
@@ -2731,6 +2853,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-followers-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2750,6 +2873,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-members-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -2769,6 +2893,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "rollup-project",
           "does_upload": false,
           "has_opts": true,
@@ -2787,6 +2912,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "search-projects-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -2940,6 +3066,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-project",
           "does_upload": false,
           "has_opts": true,
@@ -2965,6 +3092,7 @@
       "class_name": "RatesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-rate",
           "does_upload": false,
           "has_opts": true,
@@ -2983,6 +3111,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-rate",
           "does_upload": false,
           "has_opts": false,
@@ -2995,6 +3124,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-rate",
           "does_upload": false,
           "has_opts": true,
@@ -3013,6 +3143,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-rates",
           "does_upload": false,
           "has_opts": true,
@@ -3049,6 +3180,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-rate",
           "does_upload": false,
           "has_opts": true,
@@ -3074,6 +3206,7 @@
       "class_name": "ReactionsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-reactions-on-object",
           "does_upload": false,
           "has_opts": true,
@@ -3104,6 +3237,7 @@
       "class_name": "RolesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-role",
           "does_upload": false,
           "has_opts": true,
@@ -3122,6 +3256,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-role",
           "does_upload": false,
           "has_opts": false,
@@ -3134,6 +3269,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-role",
           "does_upload": false,
           "has_opts": true,
@@ -3152,6 +3288,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-roles",
           "does_upload": false,
           "has_opts": true,
@@ -3185,6 +3322,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-role",
           "does_upload": false,
           "has_opts": true,
@@ -3210,6 +3348,7 @@
       "class_name": "RulesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "trigger-rule",
           "does_upload": false,
           "has_opts": false,
@@ -3229,6 +3368,7 @@
       "class_name": "SectionsApi",
       "commands": [
         {
+          "body_in_opts": true,
           "command": "add-task-for-section",
           "does_upload": false,
           "has_opts": true,
@@ -3241,6 +3381,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": true,
           "command": "create-section-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -3259,6 +3400,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-section",
           "does_upload": false,
           "has_opts": false,
@@ -3271,6 +3413,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-section",
           "does_upload": false,
           "has_opts": true,
@@ -3289,6 +3432,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-sections-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -3317,6 +3461,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": true,
           "command": "insert-section-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -3329,6 +3474,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": true,
           "command": "update-section",
           "does_upload": false,
           "has_opts": true,
@@ -3353,6 +3499,7 @@
       "class_name": "StatusUpdatesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-status-for-object",
           "does_upload": false,
           "has_opts": true,
@@ -3371,6 +3518,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-status",
           "does_upload": false,
           "has_opts": false,
@@ -3383,6 +3531,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-status",
           "does_upload": false,
           "has_opts": true,
@@ -3401,6 +3550,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-statuses-for-object",
           "does_upload": false,
           "has_opts": true,
@@ -3440,6 +3590,7 @@
       "class_name": "StoriesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-story-for-goal",
           "does_upload": false,
           "has_opts": true,
@@ -3459,6 +3610,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-story-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -3478,6 +3630,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-story",
           "does_upload": false,
           "has_opts": false,
@@ -3490,6 +3643,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-stories-for-goal",
           "does_upload": false,
           "has_opts": true,
@@ -3533,6 +3687,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-stories-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -3576,6 +3731,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-story",
           "does_upload": false,
           "has_opts": true,
@@ -3594,6 +3750,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-story",
           "does_upload": false,
           "has_opts": true,
@@ -3619,6 +3776,7 @@
       "class_name": "TagsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-tag",
           "does_upload": false,
           "has_opts": true,
@@ -3637,6 +3795,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-tag-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -3656,6 +3815,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-tag",
           "does_upload": false,
           "has_opts": false,
@@ -3668,6 +3828,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-tag",
           "does_upload": false,
           "has_opts": true,
@@ -3686,6 +3847,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-tags",
           "does_upload": false,
           "has_opts": true,
@@ -3717,6 +3879,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-tags-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -3745,6 +3908,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-tags-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -3773,6 +3937,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-tag",
           "does_upload": false,
           "has_opts": true,
@@ -3798,6 +3963,7 @@
       "class_name": "TaskTemplatesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "delete-task-template",
           "does_upload": false,
           "has_opts": false,
@@ -3810,6 +3976,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-task-template",
           "does_upload": false,
           "has_opts": true,
@@ -3828,6 +3995,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-task-templates",
           "does_upload": false,
           "has_opts": true,
@@ -3859,6 +4027,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": true,
           "command": "instantiate-task",
           "does_upload": false,
           "has_opts": true,
@@ -3883,6 +4052,7 @@
       "class_name": "TasksApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "add-dependencies-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -3896,6 +4066,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-dependents-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -3909,6 +4080,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-followers-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -3928,6 +4100,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-project-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -3941,6 +4114,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "add-tag-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -3954,6 +4128,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-subtask-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -3973,6 +4148,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-task",
           "does_upload": false,
           "has_opts": true,
@@ -3991,6 +4167,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-task",
           "does_upload": false,
           "has_opts": false,
@@ -4003,6 +4180,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "duplicate-task",
           "does_upload": false,
           "has_opts": true,
@@ -4022,6 +4200,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-dependencies-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -4050,6 +4229,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-dependents-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -4078,6 +4258,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-subtasks-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -4106,6 +4287,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-task",
           "does_upload": false,
           "has_opts": true,
@@ -4124,6 +4306,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-task-for-custom-id",
           "does_upload": false,
           "has_opts": false,
@@ -4137,6 +4320,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-tasks",
           "does_upload": false,
           "has_opts": true,
@@ -4198,6 +4382,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-tasks-for-project",
           "does_upload": false,
           "has_opts": true,
@@ -4231,6 +4416,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-tasks-for-section",
           "does_upload": false,
           "has_opts": true,
@@ -4264,6 +4450,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-tasks-for-tag",
           "does_upload": false,
           "has_opts": true,
@@ -4292,6 +4479,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-tasks-for-user-task-list",
           "does_upload": false,
           "has_opts": true,
@@ -4325,6 +4513,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "remove-dependencies-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -4338,6 +4527,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-dependents-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -4351,6 +4541,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-follower-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -4370,6 +4561,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-project-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -4383,6 +4575,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "remove-tag-for-task",
           "does_upload": false,
           "has_opts": false,
@@ -4396,6 +4589,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "rollup-task",
           "does_upload": false,
           "has_opts": true,
@@ -4414,6 +4608,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "search-tasks-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -4697,6 +4892,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "set-parent-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -4716,6 +4912,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-task",
           "does_upload": false,
           "has_opts": true,
@@ -4741,6 +4938,7 @@
       "class_name": "TeamMembershipsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-team-membership",
           "does_upload": false,
           "has_opts": true,
@@ -4759,6 +4957,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-team-memberships",
           "does_upload": false,
           "has_opts": true,
@@ -4800,6 +4999,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-team-memberships-for-team",
           "does_upload": false,
           "has_opts": true,
@@ -4828,6 +5028,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-team-memberships-for-user",
           "does_upload": false,
           "has_opts": true,
@@ -4863,6 +5064,7 @@
       "class_name": "TeamsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "add-user-for-team",
           "does_upload": false,
           "has_opts": true,
@@ -4882,6 +5084,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "create-team",
           "does_upload": false,
           "has_opts": true,
@@ -4900,6 +5103,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-team",
           "does_upload": false,
           "has_opts": true,
@@ -4918,6 +5122,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-teams-for-user",
           "does_upload": false,
           "has_opts": true,
@@ -4947,6 +5152,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-teams-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -4975,6 +5181,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "remove-user-for-team",
           "does_upload": false,
           "has_opts": false,
@@ -4988,6 +5195,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-team",
           "does_upload": false,
           "has_opts": true,
@@ -5013,6 +5221,7 @@
       "class_name": "TimePeriodsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-time-period",
           "does_upload": false,
           "has_opts": true,
@@ -5031,6 +5240,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-time-periods",
           "does_upload": false,
           "has_opts": true,
@@ -5075,6 +5285,7 @@
       "class_name": "TimeTrackingCategoriesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-time-tracking-category",
           "does_upload": false,
           "has_opts": true,
@@ -5093,6 +5304,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-time-tracking-category",
           "does_upload": false,
           "has_opts": false,
@@ -5105,6 +5317,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-time-tracking-categories",
           "does_upload": false,
           "has_opts": true,
@@ -5138,6 +5351,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-time-tracking-category",
           "does_upload": false,
           "has_opts": true,
@@ -5156,6 +5370,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-time-tracking-entries-for-time-tracking-category",
           "does_upload": false,
           "has_opts": true,
@@ -5194,6 +5409,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-time-tracking-category",
           "does_upload": false,
           "has_opts": true,
@@ -5219,6 +5435,7 @@
       "class_name": "TimeTrackingEntriesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-time-tracking-entry",
           "does_upload": false,
           "has_opts": true,
@@ -5238,6 +5455,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-time-tracking-entry",
           "does_upload": false,
           "has_opts": false,
@@ -5250,6 +5468,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-time-tracking-entries",
           "does_upload": false,
           "has_opts": true,
@@ -5316,6 +5535,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-time-tracking-entries-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -5344,6 +5564,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-time-tracking-entry",
           "does_upload": false,
           "has_opts": true,
@@ -5362,6 +5583,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-time-tracking-entry",
           "does_upload": false,
           "has_opts": true,
@@ -5387,6 +5609,7 @@
       "class_name": "TimesheetApprovalStatusesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-timesheet-approval-status",
           "does_upload": false,
           "has_opts": true,
@@ -5405,6 +5628,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-timesheet-approval-status",
           "does_upload": false,
           "has_opts": true,
@@ -5423,6 +5647,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-timesheet-approval-statuses",
           "does_upload": false,
           "has_opts": true,
@@ -5471,6 +5696,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-timesheet-approval-status",
           "does_upload": false,
           "has_opts": true,
@@ -5496,6 +5722,7 @@
       "class_name": "TypeaheadApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "typeahead-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -5536,6 +5763,7 @@
       "class_name": "UserTaskListsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-user-task-list",
           "does_upload": false,
           "has_opts": true,
@@ -5554,6 +5782,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-user-task-list-for-user",
           "does_upload": false,
           "has_opts": true,
@@ -5579,6 +5808,7 @@
       "class_name": "UsersApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-favorites-for-user",
           "does_upload": false,
           "has_opts": true,
@@ -5609,6 +5839,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-user",
           "does_upload": false,
           "has_opts": true,
@@ -5632,6 +5863,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-user-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -5651,6 +5883,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-users",
           "does_upload": false,
           "has_opts": true,
@@ -5687,6 +5920,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-users-for-team",
           "does_upload": false,
           "has_opts": true,
@@ -5710,6 +5944,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-users-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -5733,6 +5968,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-user",
           "does_upload": false,
           "has_opts": true,
@@ -5757,6 +5993,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-user-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -5783,6 +6020,7 @@
       "class_name": "WebhooksApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "create-webhook",
           "does_upload": false,
           "has_opts": true,
@@ -5801,6 +6039,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "delete-webhook",
           "does_upload": false,
           "has_opts": false,
@@ -5813,6 +6052,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-webhook",
           "does_upload": false,
           "has_opts": true,
@@ -5831,6 +6071,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-webhooks",
           "does_upload": false,
           "has_opts": true,
@@ -5864,6 +6105,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "update-webhook",
           "does_upload": false,
           "has_opts": true,
@@ -5889,6 +6131,7 @@
       "class_name": "WorkspaceMembershipsApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "get-workspace-membership",
           "does_upload": false,
           "has_opts": true,
@@ -5907,6 +6150,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-workspace-memberships-for-user",
           "does_upload": false,
           "has_opts": true,
@@ -5935,6 +6179,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-workspace-memberships-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -5974,6 +6219,7 @@
       "class_name": "WorkspacesApi",
       "commands": [
         {
+          "body_in_opts": false,
           "command": "add-user-for-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -5993,6 +6239,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-workspace",
           "does_upload": false,
           "has_opts": true,
@@ -6011,6 +6258,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "get-workspace-events",
           "does_upload": false,
           "has_opts": true,
@@ -6029,6 +6277,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "get-workspaces",
           "does_upload": false,
           "has_opts": true,
@@ -6055,6 +6304,7 @@
           "returns_iterator": true
         },
         {
+          "body_in_opts": false,
           "command": "remove-user-for-workspace",
           "does_upload": false,
           "has_opts": false,
@@ -6068,6 +6318,7 @@
           "returns_iterator": false
         },
         {
+          "body_in_opts": false,
           "command": "update-workspace",
           "does_upload": false,
           "has_opts": true,

@@ -75,10 +75,11 @@ Procedure:
 5. Regenerate the fixtures (exact command in each test's module docstring):
    - `tests/fixtures/cli_surface.json` — the CLI surface. Besides commands and
      options it pins each command's `paginatable` / `returns_iterator` /
-     `does_upload` classification, so a new array-response or upload endpoint
-     surfaces here as a fixture diff — there is no separate hand-maintained set.
-     (`tests/test_sdk_boilerplate.py` independently proves those two classifiers
-     still match the SDK source on the installed version.)
+     `does_upload` / `body_in_opts` classification, so a new array-response,
+     upload, or body-in-`opts` endpoint surfaces here as a fixture diff — there
+     is no separate hand-maintained set. (`tests/test_sdk_boilerplate.py`
+     independently proves the last three classifiers still match the SDK source
+     on the installed version.)
    - `tests/fixtures/generate_python/*.py` via
      `UPDATE_GENERATE_SNAPSHOTS=1 uv run pytest tests/test_generate_python_snapshots.py`.
 6. Verify Asana auth is still Bearer-token-only — confirm the new SDK still

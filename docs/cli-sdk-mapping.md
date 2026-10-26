@@ -152,7 +152,13 @@ How the CLI surface is derived from the SDK at runtime:
 - **Role.** A *required* parameter (no default) maps to a positional SDK argument
   (`body`, a path GID such as `task_gid`, or another required parameter such as
   `workspace` or `parent`); an *optional* one to an `opts` entry.
-  `body` is always the first argument when present.
+  A positional `body` is always the first argument. A few methods instead take
+  the body inside `opts` (they read `opts['body']`, e.g.
+  `sections create-section-for-project`; `_Operation.body_in_opts`): `--body`
+  then lands in `opts['body']`, labeled `(opts: body)`, and is still required —
+  the SDK reads it unconditionally, although its docs mark it optional. As the
+  SDK passes `opts` as the query string unchanged, it also sends such a body
+  there.
 - **Classification.** Settable `Configuration` properties become global flags;
   the SDK's uniform `all_params` `**kwargs` become common per-command options.
   An SDK bump that adds either fails `tests/test_sdk_boilerplate.py`, forcing a

@@ -31,6 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#1](https://github.com/izumo-m/asana-api-cli/issues/1)). Custom field
   filters (`custom_fields.<gid>.value` and the like) go through the new
   `--opts`.
+- **Some commands that send a request body work now.** They always failed with
+  `KeyError: 'body'`: the SDK expects their body inside `opts`, and the CLI
+  offered no way to pass it. They now take a required `--body`, like other
+  commands with a body:
+  - `custom-fields`: `create-enum-option-for-custom-field`,
+    `insert-enum-option-for-custom-field`, `update-custom-field`,
+    `update-enum-option`
+  - `memberships create-membership`
+  - `portfolios duplicate-portfolio`
+  - `project-templates instantiate-project`
+  - `projects duplicate-project`
+  - `sections`: `add-task-for-section`, `create-section-for-project`,
+    `insert-section-for-project`, `update-section`
+  - `task-templates instantiate-task`
 - **The PowerShell notes in `docs/usage.md` now quote `@file` arguments.** They
   suggested `--body @task.json`, which PowerShell (5.1 and 7) rejects as a parse
   error because it reads a leading `@` as splatting. Write `--body '@task.json'`.
