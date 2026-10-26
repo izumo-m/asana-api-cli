@@ -230,6 +230,17 @@ class TestCallEquivalence:
                 ["--workspace", "111", "--assignee.any", "me", "--due-on.before", "2026-01-01"],
                 lambda: iter([]),
             ),
+            # ``--opts`` entries land in the same ``opts`` dict, after the named ones.
+            (
+                "search-tasks-for-workspace",
+                ["--workspace", "111", "--completed", "true", "--opts", "custom_fields.1.value=2"],
+                lambda: iter([]),
+            ),
+            (
+                "search-tasks-for-workspace",
+                ["--workspace", "111", "--opts", '{"custom_fields.1.contains": "a, b", "x": 1}'],
+                lambda: iter([]),
+            ),
         ],
     )
     def test_same_call(

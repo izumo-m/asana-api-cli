@@ -98,7 +98,9 @@ the command path.
 | `--exception-query EXPR` | `jq` filter over the error envelope — see [Error handling](#error-handling) |
 
 Paginatable commands additionally expose `--limit` (per-page size) and
-`--offset` (cursor) — see [Pagination](#pagination).
+`--offset` (cursor) — see [Pagination](#pagination). Commands whose SDK method
+takes an `opts` dict (most of them) also accept `--opts VALUE`, extra entries
+for that dict — see [Filters without their own option](#filters-without-their-own-option).
 
 ### CLI-only flags
 
@@ -331,15 +333,17 @@ If both an alias and its replacement are given (e.g. `--page-size 50 --limit
 
 ## Structured values
 
-`--retry-strategy` and `--header-params` share one value format. The value's
-first character selects how it is parsed:
+`--retry-strategy`, `--header-params`, and `--opts` share one value format. The
+value's first character selects how it is parsed:
 
 - `{...}` — a JSON object.
 - `@<path>` — read the file at `<path>` and parse it as a JSON object.
 - otherwise — shorthand `key=value[,key=value...]`.
 
-Shorthand accepts scalar values only (`int` / `float` / `bool` / `str`); bool
-accepts `true` / `false` (case-insensitive), and `1` / `0` are rejected. Fields
+Shorthand accepts scalar values only. `--retry-strategy` converts each to its
+field's type (`int` / `float` / `bool` / `str`); bool accepts `true` / `false`
+(case-insensitive), and `1` / `0` are rejected. `--header-params` and `--opts`
+keep shorthand values as strings, with surrounding spaces trimmed. Fields
 whose type is a list (for `--retry-strategy`: `allowed_methods`,
 `status_forcelist`, `remove_headers_on_redirect`) must use the JSON or `@file`
 form, since commas would collide with the shorthand separator. Unspecified
@@ -353,6 +357,45 @@ asana-api --retry-strategy '{"total":3,"status_forcelist":[429,500]}' tasks get-
 Only `--body` reads JSON from stdin (`-`). The structured options do **not**
 accept `-` (multiple stdin readers in one invocation would be order-dependent);
 pipe via process substitution instead: `--retry-strategy @<(echo '{"total":3}')`.
+
+## Filters without their own option
+
+Some query filters have no option of their own because part of their name is a
+gid: the search commands' custom field filters (`custom_fields.<gid>.value`,
+`.is_set`, `.contains`, …) and the custom task type filter
+`custom_types.<gid>.custom_type_status_option.gid`. Pass them with `--opts`,
+which adds entries to the SDK method's `opts` dict; the SDK sends that dict as
+the query string unchanged. `--opts` takes a [structured value](#structured-values)
+and is available on every command whose SDK method takes `opts`.
+
+```bash
+# An enum custom field set to a given option, and another field set at all
+asana-api tasks search-tasks-for-workspace --workspace <WORKSPACE_GID> \
+  --opts 'custom_fields.<FIELD_GID>.value=<ENUM_OPTION_GID>,custom_fields.<FIELD_GID_2>.is_set=true'
+
+# A value with a comma needs the JSON form
+asana-api tasks search-tasks-for-workspace --workspace <WORKSPACE_GID> \
+  --opts '{"custom_fields.<FIELD_GID>.contains": "Tokyo, Japan"}'
+
+# A custom task type's status (Asana requires resource_subtype=custom with it)
+asana-api tasks search-tasks-for-workspace --workspace <WORKSPACE_GID> --resource-subtype custom \
+  --opts 'custom_types.<TYPE_GID>.custom_type_status_option.gid=<STATUS_OPTION_GID>'
+```
+
+- The entries follow the other options' in the dict. A key that another option
+  also sets, such as `--due-on` together with `--opts due_on=...`, is an error
+  (exit `2`), and so is a second `--opts`: put every entry in one value.
+- Shorthand values are strings, with surrounding spaces trimmed. The JSON form
+  keeps the spaces and the JSON type; JSON `true` is sent as `True`, which Asana
+  accepts as well.
+- For a key that has its own option, use that option: it converts the value to
+  the type the SDK expects, and a string can fail there (`--opts limit=10` stops
+  with a `TypeError`, `--limit 10` works).
+- Keys are not checked, and the search endpoints silently ignore a parameter
+  they do not know. A misspelled key (`custom_fields.<gid>.valeu`) or a value
+  that shorthand splits at a comma (`contains=a,x=b` sends `contains=a` and
+  `x=b`) drops that condition without an error. To see exactly what is sent,
+  add `--debug`, or print the equivalent code with `--generate-python`.
 
 ## Debugging and headers
 
@@ -495,9 +538,10 @@ $tasks = asana-api tasks get-tasks --project <PROJECT_GID> | ConvertFrom-Json
 **Windows PowerShell 5.1** additionally:
 
 - **Strips double quotes from native-command arguments.** An inline JSON body
-  (`--body '{"data":{"name":"x"}}'`) or a `--query` with quoted keys reaches
-  `asana-api` without its `"` and fails. Put the JSON in a file
-  (`--body @task.json`) or pipe it (`--body -`). PowerShell 7 passes such
+  (`--body '{"data":{"name":"x"}}'`), an inline JSON `--opts`, or a `--query`
+  with quoted keys reaches `asana-api` without its `"` and fails. Put the JSON
+  in a file (`--body @task.json`, `--opts '@opts.json'`) or pipe it
+  (`--body -`). PowerShell 7 passes such
   arguments intact.
 - **Pipes to native commands as ASCII by default**, so non-ASCII text piped into
   `--body -` silently becomes `?`. Set a UTF-8 `$OutputEncoding` first (the BOM

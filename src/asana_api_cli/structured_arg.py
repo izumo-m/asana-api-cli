@@ -1,7 +1,7 @@
 """Hybrid parser for structured option values.
 
-Used by `--retry-strategy` and `--header-params` so they share a single
-input format. The parser dispatches by the
+Used by `--retry-strategy`, `--header-params`, and `--opts` so they share a
+single input format. The parser dispatches by the
 first character of the value:
 
 * ``{...}`` — parse as a JSON object
@@ -249,6 +249,24 @@ def header_params_callback(
     for name in headers:
         _check_header_name(name)
     return headers
+
+
+def extra_opts_callback(
+    _ctx: click.Context, _param: click.Parameter, values: tuple[str, ...]
+) -> dict[str, Any] | None:
+    """Click ``callback`` for ``--opts``: :func:`parse_structured_arg` without a
+    schema, given at most once.
+
+    The option is ``multiple=True`` only to catch a second ``--opts``: replacing
+    the first, as a plain option would, silently drops its entries — and with
+    them a search condition, which only shows as wider results.
+    """
+    if not values:
+        return None
+    value, *rest = values
+    if rest:
+        raise click.BadParameter("Given more than once; put every entry in one --opts.")
+    return parse_structured_arg(value)
 
 
 def default_header_callback(

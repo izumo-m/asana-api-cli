@@ -525,6 +525,20 @@ class TestBuiltCommands:
         assert opt.opts == ["--assignee.any"]
         assert "(opts: assignee.any)" in (opt.help or "")
 
+    def test_opts_option_iff_method_takes_opts(self, api_classes: list[type]) -> None:
+        # Whole-SDK sweep: ``--opts`` (raw entries for the SDK ``opts`` dict) is on
+        # exactly the commands whose method takes ``opts``.
+        for cls in api_classes:
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                extra = [
+                    p for p in cmd.params if isinstance(p, click.Option) and "--opts" in p.opts
+                ]
+                where = f"{cls.__name__}.{op.method_name}"
+                assert len(extra) == (1 if op.has_opts else 0), where
+                if extra:
+                    assert "(args: opts)" in (extra[0].help or ""), where
+
     def test_gid_positional_uses_gid_metavar_and_example(self, get_task_cmd: click.Command) -> None:
         # Per issue #15: the SDK descriptions for ``*_gid`` params are
         # uninformative ("The task to operate on." or "Globally unique

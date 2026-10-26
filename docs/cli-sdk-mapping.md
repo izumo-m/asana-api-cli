@@ -15,8 +15,9 @@ what each option *does* (behavior, examples), see [`usage.md`](usage.md); for
   (injected per command by `_make_command`); `formatter.py:formatted` renders the result.
 - Common per-command options injected by `_make_command` in `cli.py`: the
   boilerplate per-call kwargs (`_make_per_call_kwarg_options`) on **every**
-  command, the pagination deprecation aliases on paginatable commands only, and
-  the `--multibyte-filenames` extension on upload commands only.
+  command, `--opts` on commands whose method takes `opts`, the pagination
+  deprecation aliases on paginatable commands only, and the
+  `--multibyte-filenames` extension on upload commands only.
 
 **Excluded** — options *generated at runtime* by introspecting each SDK method's
 docstring `:param` lines (`opt_fields`, `workspace`, positional args,
@@ -70,7 +71,7 @@ In the **"SDK destination"** column:
 | `--page-limit N` | `Configuration.page_limit` | Via `runtime`, applied in `AsanaSession.__init__` |
 | `--generate-python` | *(none)* | CLI-only mode: consumed into `runtime.generate_python`; switches the leaf callback to emit equivalent SDK code via `codegen.render_python` instead of executing. Behavior in [`usage.md`](usage.md#generating-python-code); rationale in [`sdk-deviations.md`](sdk-deviations.md) |
 
-`--retry-strategy` and `--header-params` accept a shared structured-value format
+`--retry-strategy`, `--header-params`, and `--opts` accept a shared structured-value format
 (`k=v` / JSON / `@file`); the syntax is documented in
 [`usage.md`](usage.md#structured-values).
 
@@ -89,6 +90,17 @@ forwarded straight to the SDK call as a kwarg — no `runtime` round-trip.
 The `--limit` / `--offset` flags are docstring-derived (per-method) and appear
 only on commands whose SDK method declares them — same category as `--sync` /
 `--assignee` / other per-method opts.
+
+## Raw `opts` entries (`_make_command`)
+
+Present on every command whose SDK method takes an `opts` dict (`op.has_opts`).
+The SDK sends that dict as the query string unchanged, so any key reaches the
+request — including keys no docstring-derived option covers, such as the search
+endpoints' `custom_fields.<gid>.value`.
+
+| Flag | SDK destination | Mapping mechanism |
+|---|---|---|
+| `--opts VALUE` | positional argument `opts` | Parsed by `structured_arg` (no key check; a second `--opts` is exit 2); `build_call_plan` appends the entries after the docstring-derived options' (`_merge_extra_opts`) and rejects a key one of them also set with exit 2 (see [`sdk-deviations.md`](sdk-deviations.md)) |
 
 ## Output formatter options (`formatter.py:make_formatter_options`)
 
@@ -166,7 +178,7 @@ metadata.
 |---|---|
 | `(Configuration: <name>)` | property set on `asana.Configuration` (the global flags) |
 | `(ApiClient: <name>)` | setting on the `ApiClient` instance (`user_agent`, `set_default_header`) — the client-setter globals |
-| `(args: <name>)` | positional method argument — `body`, a path GID, or another required parameter (`workspace`, `parent`, ...) |
+| `(args: <name>)` | positional method argument — `body`, a path GID, another required parameter (`workspace`, `parent`, ...), or the whole `opts` dict (`--opts`) |
 | `(opts: <name>)` | entry in the method's `opts` dict (a docstring `:param`) |
 | `(kwargs: <name>)` | boilerplate `**kwargs` every method accepts (its `all_params`) |
 | `(asana-api: extension)` | no SDK counterpart (CLI-only; also in `sdk-deviations.md`) |

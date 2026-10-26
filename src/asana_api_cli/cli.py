@@ -67,6 +67,7 @@ from asana_api_cli.session import (
     runtime,
 )
 from asana_api_cli.structured_arg import (
+    extra_opts_callback,
     header_params_callback,
 )
 from asana_api_cli.version import version_string
@@ -368,7 +369,8 @@ def _escape_help(text: str) -> str:
 #
 #   (Configuration: <name>)  set on asana.Configuration         (global flags)
 #   (ApiClient: <name>)      set on the ApiClient instance       (user_agent, set_default_header)
-#   (args: <name>)           positional method argument          (body / path GID / required param)
+#   (args: <name>)           positional method argument          (body / path GID / required param;
+#                                                                 the whole opts dict for --opts)
 #   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
 #   (kwargs: <name>)         boilerplate **kwargs every method accepts (all_params)
 #   (asana-api: extension)   no SDK counterpart                  (CLI-only)
@@ -857,6 +859,50 @@ def _plain_opt_option(
     return click.Option(_decls(flag, _opts_param_dest(p.name), reserved), **kw)
 
 
+def _extra_opts_option() -> click.Option:
+    """Render ``--opts``: extra entries for the SDK ``opts`` dict.
+
+    The SDK sends ``opts`` as the query string unchanged, so any key reaches the
+    request — including ones no docstring-derived option covers, chiefly the
+    search endpoints' gid-keyed filters (``custom_fields.<gid>.value``).
+    :func:`build_call_plan` appends the entries after the named options' and
+    rejects a key that one of them also set.
+    """
+    return click.Option(
+        ["--opts", "extra_opts"],
+        multiple=True,
+        callback=extra_opts_callback,
+        help=(
+            "Extra entries for the opts dict, e.g. a filter with no option of its "
+            "own such as custom_fields.<gid>.value. VALUE: 'k1=v1,k2=v2,...', JSON "
+            "object, or @path; use JSON when a value contains a comma. Keys are not "
+            "checked; the search endpoints ignore unknown ones. A key that another "
+            f"option also sets, or a second --opts, is an error. {_sdk_dest('args', 'opts')}"
+        ),
+    )
+
+
+def _merge_extra_opts(opts: dict[str, Any], extra_opts: dict[str, Any]) -> None:
+    """Append the ``--opts`` entries to *opts*, the dict built from the named options.
+
+    The SDK has a single ``opts`` dict, so a key that both set has no SDK-faithful
+    winner: it is rejected (exit 2), naming the option that set it.
+    """
+    ctx = click.get_current_context(silent=True)
+    flags: dict[str, str] = {}
+    if ctx is not None:
+        flags = {
+            p.name: p.opts[0]
+            for p in ctx.command.params
+            if isinstance(p, click.Option) and p.name is not None
+        }
+    for key, value in extra_opts.items():
+        if key in opts:
+            by = flags.get(_opts_param_dest(key), "another option")
+            raise click.BadParameter(f"{key!r} is also set by {by}.", param_hint="--opts")
+        opts[key] = value
+
+
 def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) -> int | None:
     """Resolve the deprecated pagination aliases and return the effective item
     limit. Pops ``all_items`` / ``page_size`` / ``max_items`` from ``kwargs``
@@ -974,6 +1020,8 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     # Upload-only extension (absent on other commands). The callback already
     # installed the live patch; this is carried for the generate renderer.
     multibyte = kwargs.pop("multibyte_filenames", False)
+    # ``--opts`` (absent on commands without opts), already parsed to a dict.
+    extra_opts = kwargs.pop("extra_opts", None)
 
     # Deprecated aliases (--all-items / --page-size / --max-items): warn and fold
     # into their canonical replacements.
@@ -1008,6 +1056,8 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     workspace_opt = op.workspace_opt
     if workspace_opt is not None and resolved_workspace is not None:
         opts[workspace_opt.name] = resolved_workspace
+    if extra_opts:
+        _merge_extra_opts(opts, extra_opts)
 
     # Path positionals in function-signature order. Body is prepended in
     # :func:`execute_call_plan` (it is always the first positional in python-asana).
@@ -1155,6 +1205,9 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
             options.append(_workspace_option(op, reserved))
         else:
             options.append(_plain_opt_option(p, api_cls, op, reserved))
+    # ``--opts`` closes the tier: raw entries for the same ``opts`` dict.
+    if op.has_opts:
+        options.append(_extra_opts_option())
 
     # Tier 3 — boilerplate per-call kwargs (the SDK ``all_params``), common to
     # every command. ``--page-limit`` / ``--return-page-iterator`` stay global

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--opts` passes query parameters that have no option of their own**, such
+  as the search commands' custom field filters:
+  `asana-api tasks search-tasks-for-workspace --opts 'custom_fields.<gid>.value=<option_gid>'`.
+  It takes the same value forms as `--header-params` (`key=value,...`, a JSON
+  object, or `@file`) and is available on every command whose SDK method takes
+  an `opts` dict. A key that another option also sets, or a second `--opts`,
+  is an error (exit `2`).
+  Keys are not checked, and the search endpoints ignore unknown ones, so a typo
+  drops that condition silently. See
+  [docs/usage.md](docs/usage.md#filters-without-their-own-option).
+
 ### Fixed
 
 - **The search commands now accept their dotted filters.**
@@ -16,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--followers.any`, `--tags.all`, `--created-by.not`, `--due-on.before`,
   `--modified-at.after`, and so on — see each command's `--help`
   ([#1](https://github.com/izumo-m/asana-api-cli/issues/1)). Custom field
-  filters (`custom_fields.<gid>.value` and the like) are still not available.
+  filters (`custom_fields.<gid>.value` and the like) go through the new
+  `--opts`.
 
 ## [3.3.2] - 2026-09-26
 
