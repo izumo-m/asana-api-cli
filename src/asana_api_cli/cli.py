@@ -12,7 +12,8 @@ Translation rules:
 * ``get_tasks`` → command ``get-tasks``.
 * Method parameters and ``:param`` lines from the docstring become click
   options. Path GIDs are exposed with the ``_gid`` suffix stripped
-  (``task_gid`` → ``--task``).
+  (``task_gid`` → ``--task``). A dotted opt keeps its dot
+  (``created_by.any`` → ``--created-by.any``).
 * A workspace positional (``workspace_gid`` or ``workspace``) and the
   ``workspace`` opt are unified into a single ``--workspace`` option that
   falls back to ``$ASANA_DEFAULT_WORKSPACE`` only when the parameter is
@@ -66,6 +67,7 @@ from asana_api_cli.session import (
     runtime,
 )
 from asana_api_cli.structured_arg import (
+    extra_opts_callback,
     header_params_callback,
 )
 from asana_api_cli.version import version_string
@@ -164,7 +166,9 @@ def resolve_workspace(
 # Name conversion
 # ---------------------------------------------------------------------------
 
-_PARAM_RE = re.compile(r"^\s*:param\s+(\S+)\s+(\w+)\s*:\s*(.*)$")
+# The name allows dotted segments: the search endpoints declare query filters
+# such as ``followers.any`` / ``due_on.before`` as ``:param`` lines.
+_PARAM_RE = re.compile(r"^\s*:param\s+(\S+)\s+(\w+(?:\.\w+)*)\s*:\s*(.*)$")
 _WORKSPACE_PARAMS: frozenset[str] = frozenset({"workspace_gid", "workspace"})
 
 
@@ -247,6 +251,7 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "Goals": "Manage organizational goals and metrics",
     "Jobs": "Check status of async background jobs",
     "Memberships": "Manage memberships across object types",
+    "Notifications": "Read and mark a user's Inbox notifications",
     "OooEntries": "Manage out-of-office (OOO) entries",
     "OrganizationExports": "Trigger and download org-wide exports",
     "PortfolioMemberships": "Read who has access to portfolios",
@@ -259,11 +264,13 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "Projects": "Manage projects, members, and followers",
     "Rates": "Manage per-user billing rates on projects",
     "Reactions": "Read emoji reactions on stories",
+    "Records": "Manage records (rows) in tables",
     "Roles": "Manage user roles within a workspace",
     "Rules": "Trigger Asana rule via incoming webhook",
     "Sections": "Manage project sections (board/list)",
     "StatusUpdates": "Post status updates on any object",
     "Stories": "Manage stories (comments + activity)",
+    "Tables": "Manage tables and their custom field columns",
     "Tags": "Manage tags applied to tasks",
     "TaskTemplates": "Instantiate or remove task templates",
     "Tasks": "Manage tasks, subtasks, and dependencies",
@@ -330,6 +337,15 @@ def _option_name(param_name: str) -> str:
     return param_name
 
 
+def _opts_param_dest(param_name: str) -> str:
+    """Click dest for an ``opts`` param; ``followers.any`` → ``followers__any``.
+
+    A dotted SDK name is not a Python identifier, so click cannot use it as a
+    dest. The ``opts`` dict key stays the dotted SDK name.
+    """
+    return param_name.replace(".", "__")
+
+
 def _is_workspace_param(name: str) -> bool:
     return name in _WORKSPACE_PARAMS
 
@@ -356,7 +372,8 @@ def _escape_help(text: str) -> str:
 #
 #   (Configuration: <name>)  set on asana.Configuration         (global flags)
 #   (ApiClient: <name>)      set on the ApiClient instance       (user_agent, set_default_header)
-#   (args: <name>)           positional method argument          (body / path GID / required param)
+#   (args: <name>)           positional method argument          (body / path GID / required param;
+#                                                                 the whole opts dict for --opts)
 #   (opts: <name>)           entry in the method ``opts`` dict   (docstring :param)
 #   (kwargs: <name>)         boilerplate **kwargs every method accepts (all_params)
 #   (asana-api: extension)   no SDK counterpart                  (CLI-only)
@@ -513,6 +530,19 @@ class _Operation:
     @property
     def has_body(self) -> bool:
         return "body" in self.positional
+
+    @property
+    def body_in_opts(self) -> bool:
+        """True iff the SDK method reads its request body from ``opts['body']``.
+
+        A handful of python-asana methods (e.g. ``create_section_for_project(
+        project_gid, opts)``) take the body inside ``opts`` instead of as the
+        first positional: the docstring declares ``:param dict body:`` but the
+        signature has no ``body``. The SDK reads it unconditionally, so a call
+        without it raises ``KeyError``. Held exact by
+        ``tests/test_sdk_boilerplate.py`` (a source scan for ``opts['body']``).
+        """
+        return self.has_opts and "body" in self.params and not self.has_body
 
     @property
     def path_positionals(self) -> list[str]:
@@ -734,12 +764,17 @@ def _decls(flag: str, dest: str, reserved: frozenset[str]) -> list[str]:
 
     If ``flag`` collides with a built-in CLI flag (in ``reserved``), the SDK
     param yields: it is exposed as ``--sdk-<name>`` with an *explicit* ``dest``
-    equal to the SDK param name, so the call path (which pops by param name) is
-    unchanged and the ``(opts/args: <name>)`` help label still shows the real
-    name. Otherwise the bare ``[flag]`` is used (dest auto-derives to ``dest``).
+    (the key the call path pops: the SDK param name, ``_opts_param_dest`` of it
+    for an opt), so the call path is unchanged and the ``(opts/args: <name>)``
+    help label still shows the real name. Otherwise the bare ``[flag]`` is used
+    (dest auto-derives to ``dest``), except for a dotted flag
+    (``--followers.any``), which click cannot derive a dest from: it gets
+    ``dest`` explicitly too.
     """
     if flag in reserved:
         return [f"--sdk-{flag.removeprefix('--')}", dest]
+    if "." in flag:
+        return [flag, dest]
     return [flag]
 
 
@@ -778,7 +813,8 @@ def _body_option(op: _Operation, reserved: frozenset[str]) -> click.Option:
     )
     bp = op.params.get("body")
     sdk_desc = _escape_help(bp.description) if bp and bp.description else ""
-    help_text = f"{sdk_desc} {body_format} {_sdk_dest('args', 'body')}".strip()
+    label = _sdk_dest("opts" if op.body_in_opts else "args", "body")
+    help_text = f"{sdk_desc} {body_format} {label}".strip()
     return click.Option(
         _decls("--body", "body", reserved), required=True, metavar="JSON", help=help_text
     )
@@ -837,7 +873,54 @@ def _plain_opt_option(
         kw["required"] = True
     else:
         kw["default"] = None
-    return click.Option(_decls(flag, p.name, reserved), **kw)
+    return click.Option(_decls(flag, _opts_param_dest(p.name), reserved), **kw)
+
+
+def _extra_opts_option() -> click.Option:
+    """Render ``--opts``: extra entries for the SDK ``opts`` dict.
+
+    The SDK sends ``opts`` as the query string unchanged, so any key reaches the
+    request — including ones no docstring-derived option covers, chiefly the
+    search endpoints' gid-keyed filters (``custom_fields.<gid>.value``).
+    :func:`build_call_plan` appends the entries after the named options' and
+    rejects a key that one of them also set.
+    """
+    return click.Option(
+        ["--opts", "extra_opts"],
+        multiple=True,
+        callback=extra_opts_callback,
+        help=(
+            "Extra entries for the opts dict, e.g. a filter with no option of its "
+            "own such as custom_fields.<gid>.value. VALUE: 'k1=v1,k2=v2,...', JSON "
+            "object, or @path; use JSON when a value contains a comma. Keys are not "
+            "checked; the search endpoints ignore unknown ones. A key that another "
+            f"option also sets, or a second --opts, is an error. {_sdk_dest('args', 'opts')}"
+        ),
+    )
+
+
+def _merge_extra_opts(
+    opts: dict[str, Any], extra_opts: dict[str, Any], *, also_set: tuple[str, ...] = ()
+) -> None:
+    """Append the ``--opts`` entries to *opts*, the dict built from the named options.
+
+    The SDK has a single ``opts`` dict, so a key that both set has no SDK-faithful
+    winner: it is rejected (exit 2), naming the option that set it. *also_set*
+    names keys a named option fills in later (``body``).
+    """
+    ctx = click.get_current_context(silent=True)
+    flags: dict[str, str] = {}
+    if ctx is not None:
+        flags = {
+            p.name: p.opts[0]
+            for p in ctx.command.params
+            if isinstance(p, click.Option) and p.name is not None
+        }
+    for key, value in extra_opts.items():
+        if key in opts or key in also_set:
+            by = flags.get(_opts_param_dest(key), "another option")
+            raise click.BadParameter(f"{key!r} is also set by {by}.", param_hint="--opts")
+        opts[key] = value
 
 
 def _apply_deprecated_aliases(kwargs: dict[str, Any], item_limit: int | None) -> int | None:
@@ -909,9 +992,11 @@ class CallPlan:
     work.
 
     ``raw_body`` is the unresolved ``--body`` string (a ``@file`` path, ``-`` for
-    stdin, or a JSON literal); ``has_body`` distinguishes "no body positional"
-    from one that is present. Resolution (:func:`resolve_body` — reading the file
-    / stdin, parsing the JSON) is deferred to :func:`execute_call_plan` so the
+    stdin, or a JSON literal); ``has_body`` / ``body_in_opts`` say where it goes —
+    the first positional, or ``opts['body']`` (see :attr:`_Operation.body_in_opts`)
+    — and both are false for a method without one. Resolution (:func:`resolve_body`
+    — reading the file / stdin, parsing the JSON) is deferred to
+    :func:`execute_call_plan` so the
     generate path can emit per-form code (inline a literal, or read ``@file`` /
     stdin at the generated script's run time) without reading anything itself.
     ``api_cls`` is the class, not an instance — instantiation needs the session's
@@ -922,6 +1007,7 @@ class CallPlan:
     method_name: str
     has_opts: bool
     has_body: bool
+    body_in_opts: bool
     raw_body: str | None
     path_call_args: list[Any]
     opts: dict[str, Any]
@@ -957,6 +1043,8 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     # Upload-only extension (absent on other commands). The callback already
     # installed the live patch; this is carried for the generate renderer.
     multibyte = kwargs.pop("multibyte_filenames", False)
+    # ``--opts`` (absent on commands without opts), already parsed to a dict.
+    extra_opts = kwargs.pop("extra_opts", None)
 
     # Deprecated aliases (--all-items / --page-size / --max-items): warn and fold
     # into their canonical replacements.
@@ -965,8 +1053,9 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     # Carry the raw ``--body`` string unresolved: ``execute_call_plan`` resolves
     # it (reads ``@file`` / stdin, parses the JSON) at call time, and the generate
     # renderer emits per-form code instead — neither reads it here. ``--body`` is
-    # click-required, so the pop always yields a value when ``has_body``.
-    raw_body = kwargs.pop("body") if op.has_body else None
+    # click-required, so the pop always yields a value when the method takes one
+    # (as its first positional, or in ``opts['body']``).
+    raw_body = kwargs.pop("body") if op.has_body or op.body_in_opts else None
 
     # Workspace resolution is session-free (an explicit value or the
     # ``ASANA_DEFAULT_WORKSPACE`` env-var fallback — no client, no token), so it
@@ -985,15 +1074,18 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
     for p in op.opts_params:
         if _is_workspace_param(p.name):
             continue
-        value = kwargs.pop(p.name, None)
+        value = kwargs.pop(_opts_param_dest(p.name), None)
         if p.required or value is not None:
             opts[p.name] = value
     workspace_opt = op.workspace_opt
     if workspace_opt is not None and resolved_workspace is not None:
         opts[workspace_opt.name] = resolved_workspace
+    if extra_opts:
+        # ``opts['body']`` is filled at call time, after ``--body`` is resolved.
+        _merge_extra_opts(opts, extra_opts, also_set=("body",) if op.body_in_opts else ())
 
-    # Path positionals in function-signature order. Body is prepended in
-    # :func:`execute_call_plan` (it is always the first positional in python-asana).
+    # Path positionals in function-signature order. A positional body is
+    # prepended in :func:`execute_call_plan` (python-asana always puts it first).
     path_call_args: list[Any] = []
     for name in op.path_positionals:
         if _is_workspace_param(name):
@@ -1021,6 +1113,7 @@ def build_call_plan(op: _Operation, api_cls: type, kwargs: dict[str, Any]) -> Ca
         method_name=op.method_name,
         has_opts=op.has_opts,
         has_body=op.has_body,
+        body_in_opts=op.body_in_opts,
         raw_body=raw_body,
         path_call_args=path_call_args,
         opts=opts,
@@ -1039,16 +1132,22 @@ def execute_call_plan(plan: CallPlan) -> Any:
     :func:`build_call_plan`; the ``--body`` value is resolved here (reading
     ``@file`` / stdin, parsing the JSON), session-free, before the session opens.
     """
-    # Body is always the first positional in python-asana. ``has_body`` (not the
-    # resolved value) is the gate, so a body that parses to ``None`` (``--body
-    # null``) is still passed through. ``resolve_body`` reads ``@file`` / stdin
-    # and may raise ``click.BadParameter`` (exit 2) — before the session opens,
-    # so a bad body never reaches the token check.
-    if plan.has_body:
-        assert plan.raw_body is not None  # has_body ⟺ a required --body was given
-        call_args: list[Any] = [resolve_body(plan.raw_body), *plan.path_call_args]
-    else:
-        call_args = list(plan.path_call_args)
+    # A body is the first positional in python-asana, or ``opts['body']`` for the
+    # ``body_in_opts`` methods (added last, after the other entries; the generated
+    # script does the same). The flags (not the resolved value) are the gate, so a
+    # body that parses to ``None`` (``--body null``) is still passed through.
+    # ``resolve_body`` reads ``@file`` / stdin and may raise ``click.BadParameter``
+    # (exit 2) — before the session opens, so a bad body never reaches the token
+    # check.
+    call_args: list[Any] = list(plan.path_call_args)
+    opts = plan.opts
+    if plan.has_body or plan.body_in_opts:
+        assert plan.raw_body is not None  # either ⟺ a required --body was given
+        body = resolve_body(plan.raw_body)
+        if plan.has_body:
+            call_args.insert(0, body)
+        else:
+            opts = {**plan.opts, "body": body}
 
     with AsanaSession.from_env() as session:
         api = plan.api_cls(session.client)
@@ -1059,7 +1158,7 @@ def execute_call_plan(plan: CallPlan) -> Any:
         # would silently no-op --request-timeout / --header-params / --item-limit
         # / --full-payload on every no-opts endpoint.
         result = (
-            method(*call_args, plan.opts, **plan.method_kwargs)
+            method(*call_args, opts, **plan.method_kwargs)
             if plan.has_opts
             else method(*call_args, **plan.method_kwargs)
         )
@@ -1091,9 +1190,10 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     1. **Path / body positionals**, in the function-signature order
        (``op.positional``) — e.g. ``add_dependencies_for_task(self, body,
        task_gid)`` renders ``--body`` then ``--task``.
-    2. **Opts**, in the SDK docstring's ``:param`` order. python-asana never
-       marks an opt ``(required)`` — required inputs are always positionals —
-       so there is no required/optional split to order by.
+    2. **Opts**, in the SDK docstring's ``:param`` order, led by ``--body`` when
+       the method reads it from ``opts['body']`` (the one required opt).
+       python-asana never marks an opt ``(required)``, so there is no
+       required/optional split to order by.
     3. **Boilerplate per-call kwargs** (the SDK ``all_params``), plus the
        upload / deprecation extensions where they apply.
     4. **Output-formatting options** (``--output`` / ``--query`` / ``--csv-bom``
@@ -1132,12 +1232,19 @@ def _make_command(api_cls: type, op: _Operation) -> click.Command:
     # Tier 2 — opts in the SDK docstring's ``:param`` order (``op.opts_params``
     # preserves it). python-asana never marks an opt ``(required)``, so there is
     # no required/optional split to sort by. ``introspect_to_manifest`` keeps a
-    # name-sorted canonical order instead — see the note there.
+    # name-sorted canonical order instead — see the note there. A body the method
+    # reads from ``opts['body']`` leads the tier (it is required, and the SDK
+    # docs list it first in ``opts``).
+    if op.body_in_opts:
+        options.append(_body_option(op, reserved))
     for p in op.opts_params:
         if _is_workspace_param(p.name):
             options.append(_workspace_option(op, reserved))
         else:
             options.append(_plain_opt_option(p, api_cls, op, reserved))
+    # ``--opts`` closes the tier: raw entries for the same ``opts`` dict.
+    if op.has_opts:
+        options.append(_extra_opts_option())
 
     # Tier 3 — boilerplate per-call kwargs (the SDK ``all_params``), common to
     # every command. ``--page-limit`` / ``--return-page-iterator`` stay global
@@ -1331,20 +1438,10 @@ def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -
 )
 def main() -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
-    # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
-    # stream encodings are the locale code page (e.g. cp932 on Japanese
-    # Windows): stdout/stderr raise UnicodeEncodeError when writing non-ASCII
-    # data, and stdin silently misdecodes a UTF-8 ``--body -`` payload.
-    # Reconfigure all three to UTF-8 so the same input/output works on every
-    # platform. The hasattr guard keeps CliRunner's in-memory streams (used
-    # by tests) from blowing up, since StringIO has no reconfigure().
-    #
     # The global flags are parsed into the root context and written to
     # ``runtime`` by ``GroupWithGlobalOptions.invoke`` → ``_consume_global_options``
-    # before this callback runs, so there is nothing to apply here.
-    for stream in (sys.stdin, sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
+    # before this callback runs, so there is nothing to apply here. The streams
+    # are set to UTF-8 even earlier, in ``GroupWithGlobalOptions.main``.
 
 
 def _register_groups(root: click.Group) -> None:
@@ -1403,6 +1500,7 @@ def introspect_to_manifest() -> dict[str, Any]:
                     # matches the SDK source on the installed version.
                     "returns_iterator": op.returns_iterator,
                     "does_upload": op.does_upload,
+                    "body_in_opts": op.body_in_opts,
                     "params": [
                         {
                             "name": p.name,

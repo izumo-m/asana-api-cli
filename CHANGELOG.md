@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-11-07
+
+### Added
+
+- **`--opts` passes query parameters that have no option of their own**, such
+  as the search commands' custom field filters:
+  `asana-api tasks search-tasks-for-workspace --opts 'custom_fields.<gid>.value=<option_gid>'`.
+  It takes the same value forms as `--header-params` (`key=value,...`, a JSON
+  object, or `@file`) and is available on every command whose SDK method takes
+  an `opts` dict. A key that another option also sets, or a second `--opts`,
+  is an error (exit `2`).
+  Keys are not checked, and the search endpoints ignore unknown ones, so a typo
+  drops that condition silently. See
+  [docs/usage.md](docs/usage.md#filters-without-their-own-option).
+
+### Changed
+
+- **`asana-api --help` describes the `notifications`, `records`, and `tables`
+  groups** in its own words. The groups themselves come from the SDK and appear
+  on any asana-api-cli version once `python-asana >= 5.5.1` is installed.
+
+### Fixed
+
+- **`asana-api --help` no longer fails when its output is redirected on Japanese
+  Windows.** With `asana-api --help > help.txt` or a pipe, it stopped with
+  `UnicodeEncodeError` (exit `1`) under a code page such as cp932. It now prints
+  UTF-8, like every other command.
+- **The search commands now accept their dotted filters.**
+  `tasks search-tasks-for-workspace` and `projects search-projects-for-workspace`
+  were missing their dotted filters, so e.g. `--followers.any me` failed with
+  `No such option`. They are now available, with the dot kept:
+  `--followers.any`, `--tags.all`, `--created-by.not`, `--due-on.before`,
+  `--modified-at.after`, and so on — see each command's `--help`
+  ([#1](https://github.com/izumo-m/asana-api-cli/issues/1)). Custom field
+  filters (`custom_fields.<gid>.value` and the like) go through the new
+  `--opts`.
+- **Some commands that send a request body work now.** They always failed with
+  `KeyError: 'body'`: the SDK expects their body inside `opts`, and the CLI
+  offered no way to pass it. They now take a required `--body`, like other
+  commands with a body:
+  - `custom-fields`: `create-enum-option-for-custom-field`,
+    `insert-enum-option-for-custom-field`, `update-custom-field`,
+    `update-enum-option`
+  - `memberships create-membership`
+  - `portfolios duplicate-portfolio`
+  - `project-templates instantiate-project`
+  - `projects duplicate-project`
+  - `sections`: `add-task-for-section`, `create-section-for-project`,
+    `insert-section-for-project`, `update-section`
+  - `task-templates instantiate-task`
+- **`--output table` lines up columns that contain Japanese text.** A
+  Japanese (or other East Asian wide) character takes two columns on screen,
+  but was counted as one, so the rest of its row was pushed to the right.
+  Widths are now measured with `wcwidth`, a new dependency. A tab in a table
+  cell or header is expanded to spaces, so it stays in line too. The same
+  applies to `--exception-output table`, and scripts made by
+  `--generate-python` that print a table now import `wcwidth` to match.
+- **The PowerShell notes in `docs/usage.md` now quote `@file` arguments.** They
+  suggested `--body @task.json`, which PowerShell (5.1 and 7) rejects as a parse
+  error because it reads a leading `@` as splatting. Write `--body '@task.json'`.
+
 ## [3.3.2] - 2026-09-26
 
 ### Security
@@ -536,7 +597,8 @@ Combining a deprecated alias with its replacement (e.g.
 
 - Initial release.
 
-[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.2...HEAD
+[Unreleased]: https://github.com/izumo-m/asana-api-cli/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/izumo-m/asana-api-cli/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/izumo-m/asana-api-cli/compare/v3.2.0...v3.3.0

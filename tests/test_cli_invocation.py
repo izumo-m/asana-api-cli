@@ -17,6 +17,7 @@ import dataclasses
 import http.client
 import json
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -760,6 +761,37 @@ class TestArgumentForwarding:
         opts = mock.call_args_list[0].args[1]
         assert opts["opt_fields"] == "name,gid"
 
+    def test_dotted_opt_reaches_opts_under_sdk_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``--assignee.any`` lands in opts as ``assignee.any`` (the SDK sends
+        opts as the query string), distinct from the undotted ``--due-on``."""
+        cmd = _build_command("TasksApi", "search_tasks_for_workspace")
+        mock = _patch(monkeypatch, "TasksApi", "search_tasks_for_workspace", return_value=iter([]))
+        result = make_runner().invoke(
+            cmd,
+            [
+                "--workspace",
+                "W",
+                "--assignee.any",
+                "me",
+                "--created-by.not",
+                "123",
+                "--due-on.before",
+                "2026-01-01",
+                "--due-on",
+                "2026-02-01",
+            ],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args == (
+            "W",
+            {
+                "assignee.any": "me",
+                "created_by.not": "123",
+                "due_on.before": "2026-01-01",
+                "due_on": "2026-02-01",
+            },
+        )
+
     def test_optional_unset_is_omitted_from_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An optional opt the user did not supply must NOT be sent as ``None``."""
         cmd = _build_command("TasksApi", "get_task")
@@ -803,6 +835,257 @@ class TestArgumentForwarding:
             "_request_timeout": 5.0,
             "header_params": {"X-Trace": "abc"},
         }
+
+
+class TestExtraOpts:
+    """``--opts`` appends raw entries to the SDK ``opts`` dict, after the named
+    options' — the way to reach keys with no option of their own, such as the
+    search endpoints' ``custom_fields.<gid>.value``."""
+
+    def _search(self, monkeypatch: pytest.MonkeyPatch, args: list[str]) -> tuple[Any, MagicMock]:
+        cmd = _build_command("TasksApi", "search_tasks_for_workspace")
+        mock = _patch(monkeypatch, "TasksApi", "search_tasks_for_workspace", return_value=iter([]))
+        return make_runner().invoke(cmd, ["--workspace", "W", *args]), mock
+
+    def test_shorthand_reaches_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._search(
+            monkeypatch, ["--opts", "custom_fields.123.value=456,custom_fields.789.is_set=true"]
+        )
+        assert result.exit_code == 0, full_output(result)
+        # Shorthand values stay strings: ``true`` is sent as typed.
+        assert mock.call_args_list[0].args == (
+            "W",
+            {"custom_fields.123.value": "456", "custom_fields.789.is_set": "true"},
+        )
+
+    def test_json_keeps_commas_and_spaces(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._search(
+            monkeypatch, ["--opts", '{"custom_fields.1.contains": " a, b "}']
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {"custom_fields.1.contains": " a, b "}
+
+    def test_file_form_skips_bom(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        path = tmp_path / "opts.json"
+        path.write_text('{"custom_fields.1.value": "2"}', encoding="utf-8-sig")
+        result, mock = self._search(monkeypatch, ["--opts", f"@{path}"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {"custom_fields.1.value": "2"}
+
+    def test_appended_after_named_options(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._search(
+            monkeypatch,
+            [
+                "--opts",
+                "custom_fields.1.is_set=true",
+                "--completed",
+                "true",
+                "--assignee.any",
+                "me",
+            ],
+        )
+        assert result.exit_code == 0, full_output(result)
+        opts = mock.call_args_list[0].args[1]
+        assert list(opts.items()) == [
+            ("assignee.any", "me"),
+            ("completed", True),
+            ("custom_fields.1.is_set", "true"),
+        ]
+
+    def test_custom_types_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._search(
+            monkeypatch,
+            [
+                "--resource-subtype",
+                "custom",
+                "--opts",
+                "custom_types.111.custom_type_status_option.gid=222",
+            ],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {
+            "resource_subtype": "custom",
+            "custom_types.111.custom_type_status_option.gid": "222",
+        }
+
+    def test_projects_search(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        if not hasattr(asana.ProjectsApi, "search_projects_for_workspace"):
+            pytest.skip("search_projects_for_workspace needs python-asana >= 5.3.0")
+        cmd = _build_command("ProjectsApi", "search_projects_for_workspace")
+        mock = _patch(
+            monkeypatch, "ProjectsApi", "search_projects_for_workspace", return_value=iter([])
+        )
+        result = make_runner().invoke(
+            cmd, ["--workspace", "W", "--opts", "custom_fields.1.is_set=true"]
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args == ("W", {"custom_fields.1.is_set": "true"})
+
+    def test_key_of_an_unset_named_option_is_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._search(monkeypatch, ["--opts", "due_on=2026-01-01"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {"due_on": "2026-01-01"}
+
+    def test_empty_object_is_a_no_op(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._search(monkeypatch, ["--opts", "{}"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args == ("W", {})
+
+    def test_conflict_with_named_option_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._search(
+            monkeypatch, ["--due-on", "2026-01-01", "--opts", "due_on=2026-02-01"]
+        )
+        assert result.exit_code == 2, full_output(result)
+        assert "'due_on' is also set by --due-on" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_conflict_with_dotted_option_names_its_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        result, mock = self._search(
+            monkeypatch, ["--assignee.any", "me", "--opts", '{"assignee.any": "x"}']
+        )
+        assert result.exit_code == 2, full_output(result)
+        assert "'assignee.any' is also set by --assignee.any" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_conflict_with_workspace_opt_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=iter([]))
+        result = make_runner().invoke(cmd, ["--workspace", "W", "--opts", "workspace=X"])
+        assert result.exit_code == 2, full_output(result)
+        assert "'workspace' is also set by --workspace" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_conflict_with_page_size_alias_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # ``--page-size`` folds into ``limit`` before the merge.
+        cmd = _build_command("TasksApi", "get_tasks")
+        mock = _patch(monkeypatch, "TasksApi", "get_tasks", return_value=iter([]))
+        result = make_runner().invoke(
+            cmd, ["--project", "P", "--page-size", "5", "--opts", '{"limit": 10}']
+        )
+        assert result.exit_code == 2, full_output(result)
+        assert "'limit' is also set by --limit" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_second_opts_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A plain option would let the second replace the first, silently
+        # dropping its entries (and the search condition they carry).
+        result, mock = self._search(
+            monkeypatch,
+            ["--opts", "custom_fields.1.value=2", "--opts", "custom_fields.3.is_set=true"],
+        )
+        assert result.exit_code == 2, full_output(result)
+        assert "Given more than once" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_upload_form_param_via_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # The SDK moves ``parent`` etc. from opts to form params itself; ``--opts``
+        # only has to land them in opts.
+        cmd = _build_command("AttachmentsApi", "create_attachment_for_object")
+        mock = _patch(
+            monkeypatch, "AttachmentsApi", "create_attachment_for_object", return_value={}
+        )
+        result = make_runner().invoke(
+            cmd, ["--resource-subtype", "external", "--url", "https://x", "--opts", "parent=123"]
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[0] == {
+            "resource_subtype": "external",
+            "url": "https://x",
+            "parent": "123",
+        }
+
+    def test_upload_conflict_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cmd = _build_command("AttachmentsApi", "create_attachment_for_object")
+        mock = _patch(
+            monkeypatch, "AttachmentsApi", "create_attachment_for_object", return_value={}
+        )
+        result = make_runner().invoke(cmd, ["--parent", "1", "--opts", "parent=2"])
+        assert result.exit_code == 2, full_output(result)
+        assert "'parent' is also set by --parent" in full_output(result)
+        assert mock.call_count == 0
+
+    @pytest.mark.parametrize(
+        "value",
+        ["custom_fields.1.value", "{not json", '["a"]', "@/nonexistent/opts.json", "-", ""],
+    )
+    def test_malformed_value_exits_2_before_token_check(
+        self, monkeypatch: pytest.MonkeyPatch, value: str
+    ) -> None:
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        runtime.access_token = ""  # restored by the autouse _isolated_runtime fixture
+        result, mock = self._search(monkeypatch, ["--opts", value])
+        assert result.exit_code == 2, full_output(result)
+        assert "--opts" in full_output(result)
+        assert mock.call_count == 0
+
+
+class TestBodyInOpts:
+    """Methods that read the body from ``opts['body']`` (e.g.
+    ``create_section_for_project(project_gid, opts)``) get it there, not as a
+    positional. Before ``--body`` was exposed for them, every call raised
+    ``KeyError: 'body'``."""
+
+    def _create_section(
+        self, monkeypatch: pytest.MonkeyPatch, args: list[str], stdin: str | None = None
+    ) -> tuple[Any, MagicMock]:
+        cmd = _build_command("SectionsApi", "create_section_for_project")
+        mock = _patch(monkeypatch, "SectionsApi", "create_section_for_project", return_value={})
+        return make_runner().invoke(cmd, ["--project", "P", *args], input=stdin), mock
+
+    def test_body_lands_in_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(monkeypatch, ["--body", '{"data": {"name": "S"}}'])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args == ("P", {"body": {"data": {"name": "S"}}})
+
+    def test_body_follows_the_other_opts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(
+            monkeypatch,
+            ["--body", '{"data": {}}', "--opt-fields", "name", "--opts", "x=1"],
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert list(mock.call_args_list[0].args[1].items()) == [
+            ("opt_fields", "name"),
+            ("x", "1"),
+            ("body", {"data": {}}),
+        ]
+
+    def test_body_from_file(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        path = tmp_path / "body.json"
+        path.write_text('{"data": {"name": "F"}}', encoding="utf-8-sig")
+        result, mock = self._create_section(monkeypatch, ["--body", f"@{path}"])
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {"body": {"data": {"name": "F"}}}
+
+    def test_body_from_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(
+            monkeypatch, ["--body", "-"], stdin='{"data": {"name": "I"}}'
+        )
+        assert result.exit_code == 0, full_output(result)
+        assert mock.call_args_list[0].args[1] == {"body": {"data": {"name": "I"}}}
+
+    def test_missing_body_exits_2(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(monkeypatch, [])
+        assert result.exit_code == 2, full_output(result)
+        assert "--body" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_body_key_in_opts_conflicts_with_body(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        result, mock = self._create_section(
+            monkeypatch, ["--body", '{"data": {}}', "--opts", '{"body": {"data": {}}}']
+        )
+        assert result.exit_code == 2, full_output(result)
+        assert "'body' is also set by --body" in full_output(result)
+        assert mock.call_count == 0
+
+    def test_bad_body_exits_2_before_token_check(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        runtime.access_token = ""  # restored by the autouse _isolated_runtime fixture
+        result, mock = self._create_section(monkeypatch, ["--body", "{not valid json"])
+        assert result.exit_code == 2, full_output(result)
+        assert "invalid JSON" in full_output(result)
+        assert mock.call_count == 0
 
 
 class TestMultibyteFilenamesUploadFlag:

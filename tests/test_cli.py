@@ -115,14 +115,13 @@ class TestGroupShortHelp:
 
     def test_every_currently_loaded_sdk_group_renders_non_empty_help(self) -> None:
         # Doesn't fail when a new SDK group is missing from the dict (that
-        # path goes through the humanize fallback by design) — just checks
-        # the fallback also produces something readable.
+        # path goes through the humanize fallback by design, and the fallback
+        # for a one-word class is the class name itself) — just checks there
+        # is some help text.
         for cls in _enumerate_api_classes():
             short_name = cls.__name__[:-3]  # strip "Api"
             help_text = _group_short_help(short_name)
-            assert help_text and help_text != short_name, (
-                f"{short_name} produces empty or unchanged help: {help_text!r}"
-            )
+            assert help_text, f"{short_name} produces empty help: {help_text!r}"
 
     def test_group_descriptions_match_docs(self) -> None:
         """``docs/api-groups.md`` is the authoritative source for these
@@ -221,6 +220,25 @@ class TestDocstringParse:
         assert params["task_gid"].required is True
         assert "(required)" not in params["task_gid"].description
         assert params["opt_fields"].py_type == "list[str]"
+
+    def test_dotted_param_detection(self) -> None:
+        """The search endpoints declare dotted query filters (``followers.any``,
+        ``due_on.before``). Each is its own param and does not end up in the
+        description of the param before it."""
+        doc = """Search tasks
+
+        :param str text: Full-text search.
+        :param str followers.any: Comma-separated list of user identifiers.
+        :param date due_on.before: ISO 8601 date string
+        :param date due_on: ISO 8601 date string or `null`
+        :return: TaskResponseArray
+        """
+        params = _parse_params(doc)
+        assert list(params) == ["text", "followers.any", "due_on.before", "due_on"]
+        assert params["text"].description == "Full-text search."
+        assert params["followers.any"].py_type == "str"
+        assert params["due_on.before"].py_type == "date"
+        assert params["due_on.before"].description == "ISO 8601 date string"
 
 
 # ---------------------------------------------------------------------------
@@ -363,10 +381,11 @@ class TestFlagCollisions:
     def test_no_command_has_duplicate_dests(self) -> None:
         """Sibling of the duplicate-flag sweep, but on the click *dest*
         (``p.name``). ``_decls`` resolves a flag collision by renaming the SDK
-        flag to ``--sdk-<name>`` while KEEPING its dest = the SDK param name.
-        If that dest also belongs to another option on the command, the two
-        distinct flags share one dest: click stores only one in ``ctx.params``
-        and the other option reads the wrong value. E.g. a future SDK opt named
+        flag to ``--sdk-<name>`` while KEEPING its dest = the SDK param name
+        (``_opts_param_dest`` of it for an opt). If that dest also belongs to
+        another option on the command, the two distinct flags share one dest:
+        click stores only one in ``ctx.params`` and the other option reads the
+        wrong value. E.g. a future SDK opt named
         ``all_items`` on a paginatable command renders as ``--sdk-all-items``
         (dest ``all_items``), colliding in dest with the ``--all-items``
         deprecation alias (also dest ``all_items``). The flag sweep above misses
@@ -409,6 +428,17 @@ class TestReservedFlags:
 
     def test_decls_prefixes_and_preserves_dest_on_collision(self) -> None:
         assert _decls("--query", "query", frozenset({"--query"})) == ["--sdk-query", "query"]
+
+    def test_decls_passes_explicit_dest_for_dotted_flag(self) -> None:
+        # click cannot derive a dest from ``--followers.any``.
+        assert _decls("--followers.any", "followers__any", frozenset()) == [
+            "--followers.any",
+            "followers__any",
+        ]
+        assert _decls("--followers.any", "followers__any", frozenset({"--followers.any"})) == [
+            "--sdk-followers.any",
+            "followers__any",
+        ]
 
     def test_static_reserved_covers_each_own_flag_family(self) -> None:
         reserved = _static_reserved_flags()
@@ -480,6 +510,54 @@ class TestBuiltCommands:
             if isinstance(p, click.Option) and "--opt-fields" in p.opts
         )
         assert "(opts: opt_fields)" in (opt_fields.help or "")
+
+    def test_dotted_opt_keeps_dot_in_flag_and_label(self, tasks_cls: type) -> None:
+        # ``assignee.any`` → ``--assignee.any``; the label shows the dotted SDK
+        # name, the dest is the identifier click needs.
+        op = next(
+            o for o in _operations_for(tasks_cls) if o.method_name == "search_tasks_for_workspace"
+        )
+        cmd = _make_command(tasks_cls, op)
+        opt = next(
+            p for p in cmd.params if isinstance(p, click.Option) and p.name == "assignee__any"
+        )
+        assert opt.opts == ["--assignee.any"]
+        assert "(opts: assignee.any)" in (opt.help or "")
+
+    def test_body_in_opts_commands_get_a_required_body(self, api_classes: list[type]) -> None:
+        # Whole-SDK sweep: a method that reads ``opts['body']`` gets exactly one
+        # required ``--body`` labeled ``(opts: body)``; a positional body keeps
+        # ``(args: body)``.
+        seen = 0
+        for cls in api_classes:
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                bodies = [
+                    p for p in cmd.params if isinstance(p, click.Option) and "--body" in p.opts
+                ]
+                where = f"{cls.__name__}.{op.method_name}"
+                assert len(bodies) == (1 if op.has_body or op.body_in_opts else 0), where
+                if op.body_in_opts:
+                    seen += 1
+                    assert bodies[0].required, where
+                    assert "(opts: body)" in (bodies[0].help or ""), where
+                elif op.has_body:
+                    assert "(args: body)" in (bodies[0].help or ""), where
+        assert seen, "no body_in_opts command found"
+
+    def test_opts_option_iff_method_takes_opts(self, api_classes: list[type]) -> None:
+        # Whole-SDK sweep: ``--opts`` (raw entries for the SDK ``opts`` dict) is on
+        # exactly the commands whose method takes ``opts``.
+        for cls in api_classes:
+            for op in _operations_for(cls):
+                cmd = _make_command(cls, op)
+                extra = [
+                    p for p in cmd.params if isinstance(p, click.Option) and "--opts" in p.opts
+                ]
+                where = f"{cls.__name__}.{op.method_name}"
+                assert len(extra) == (1 if op.has_opts else 0), where
+                if extra:
+                    assert "(args: opts)" in (extra[0].help or ""), where
 
     def test_gid_positional_uses_gid_metavar_and_example(self, get_task_cmd: click.Command) -> None:
         # Per issue #15: the SDK descriptions for ``*_gid`` params are

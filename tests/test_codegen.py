@@ -190,6 +190,8 @@ _COMMANDS = {
     "get-task": ("TasksApi", "get_task"),
     "create-task": ("TasksApi", "create_task"),
     "delete-task": ("TasksApi", "delete_task"),
+    "search-tasks-for-workspace": ("TasksApi", "search_tasks_for_workspace"),
+    "create-section-for-project": ("SectionsApi", "create_section_for_project"),
     "create-attachment-for-object": ("AttachmentsApi", "create_attachment_for_object"),
 }
 
@@ -223,6 +225,29 @@ class TestCallEquivalence:
             # Non-finite floats must render as ``float('inf')``, not a bare ``inf``.
             ("get-tasks", ["--request-timeout", "inf"], lambda: iter([])),
             ("get-tasks", ["--header-params", '{"X-Req": -Infinity}'], lambda: iter([])),
+            # Dotted opts keep their dotted SDK key in the generated ``opts`` dict.
+            (
+                "search-tasks-for-workspace",
+                ["--workspace", "111", "--assignee.any", "me", "--due-on.before", "2026-01-01"],
+                lambda: iter([]),
+            ),
+            # ``--opts`` entries land in the same ``opts`` dict, after the named ones.
+            (
+                "search-tasks-for-workspace",
+                ["--workspace", "111", "--completed", "true", "--opts", "custom_fields.1.value=2"],
+                lambda: iter([]),
+            ),
+            (
+                "search-tasks-for-workspace",
+                ["--workspace", "111", "--opts", '{"custom_fields.1.contains": "a, b", "x": 1}'],
+                lambda: iter([]),
+            ),
+            # A body the method reads from ``opts['body']`` lands there, last.
+            (
+                "create-section-for-project",
+                ["--project", "1", "--body", '{"data": {"name": "S"}}', "--opt-fields", "name"],
+                lambda: {"gid": "2"},
+            ),
         ],
     )
     def test_same_call(
@@ -236,6 +261,10 @@ class TestCallEquivalence:
         cli_call, _ = _cli_execute(monkeypatch, cmd, flags, factory)
         gen_call, _, _ = _exec_generated(monkeypatch, code, cmd, factory)
         assert gen_call == cli_call
+        # Key order too: it is the query-string order.
+        assert [list(a.items()) if isinstance(a, dict) else a for a in gen_call["args"]] == [
+            list(a.items()) if isinstance(a, dict) else a for a in cli_call["args"]
+        ]
 
 
 class TestBodyForms:
@@ -345,6 +374,17 @@ class TestOutputEquivalence:
         [
             pytest.param(
                 lambda: iter([{"gid": "1", "name": "あ"}, {"gid": "2", "name": "b"}]), id="rows"
+            ),
+            # Wide characters, a tab, and a multiline cell: the table's width path.
+            pytest.param(
+                lambda: iter(
+                    [
+                        {"gid": "1", "name": "事推1課勤怠連絡  2026/9/1～"},
+                        {"gid": "2", "name": "a\tb"},
+                        {"gid": "3", "name": "line1\nline2"},
+                    ]
+                ),
+                id="wide_tab_multiline",
             ),
             pytest.param(lambda: iter([]), id="empty"),
         ],
@@ -693,6 +733,13 @@ class TestGeneratedScriptHygiene:
         assert code.count("def scalar_text(") == 1
         assert code.count("def to_rows(") == 1
         assert "from tabulate import tabulate" in code
+        # tabulate measures wide characters only with wcwidth installed.
+        assert "import wcwidth" in code
+
+    def test_wcwidth_import_only_for_tables(self) -> None:
+        code = _generate(["get-task", "--task", "1", "--output", "csv"])
+        assert "tabulate" not in code
+        assert "wcwidth" not in code
 
 
 class TestHeader:

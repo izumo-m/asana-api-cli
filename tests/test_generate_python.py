@@ -14,6 +14,7 @@ CLI) is covered in ``tests/test_codegen.py``.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import asana
@@ -153,3 +154,40 @@ class TestGenerateModeStillValidatesInput:
         result = make_runner().invoke(cmd, ["--generate-python", "--body", "{not valid json"])
 
         assert result.exit_code == 2, full_output(result)
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            ["--opts", "{not valid json"],
+            # A key that a named option also sets.
+            ["--due-on", "2026-01-01", "--opts", "due_on=2026-02-01"],
+        ],
+    )
+    def test_bad_opts_exits_2(self, monkeypatch: pytest.MonkeyPatch, extra: list[str]) -> None:
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        cmd = _build_command("TasksApi", "search_tasks_for_workspace")
+
+        result = make_runner().invoke(cmd, ["--generate-python", "--workspace", "1", *extra])
+
+        assert result.exit_code == 2, full_output(result)
+        assert "--opts" in full_output(result)
+
+    def test_opts_file_is_read_at_generation(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Like ``--header-params @file``: the file is parsed while the command line
+        # is, so its entries are inlined and the script does not read it.
+        monkeypatch.delenv("ASANA_ACCESS_TOKEN", raising=False)
+        path = tmp_path / "opts.json"
+        path.write_text('{"custom_fields.1.value": "2"}', encoding="utf-8")
+        cmd = _build_command("TasksApi", "search_tasks_for_workspace")
+
+        result = make_runner().invoke(
+            cmd, ["--generate-python", "--workspace", "1", "--opts", f"@{path}"]
+        )
+
+        assert result.exit_code == 0, full_output(result)
+        assert "opts = {'custom_fields.1.value': '2'}" in result.stdout
+        # Only the header comment repeating the command line may name the file.
+        body = [ln for ln in result.stdout.splitlines() if not ln.startswith("# Equivalent to:")]
+        assert not [ln for ln in body if str(path) in ln]

@@ -10,6 +10,7 @@ from typing import Any
 
 import asana
 from tabulate import tabulate
+import wcwidth  # noqa: F401  # requires: pip install wcwidth
 
 def scalar_text(value: Any) -> str:
     """Single-cell text representation.
@@ -43,7 +44,24 @@ def to_rows(data: Any) -> list[dict[str, Any]] | None:
     return None
 
 def format_table(rows: list[dict[str, Any]]) -> str:
-    """Table text for *rows*. Pure (no I/O); the caller guards the empty case."""
+    r"""Table text for *rows*. Pure (no I/O); the caller guards the empty case.
+
+    tabulate measures wide (CJK) characters with ``wcwidth``, and in that mode
+    two things break a cell's layout, so headers and cells are normalized first:
+
+    * ``wcwidth`` counts a string containing a tab as width -1, padding the cell
+      far out of line (a tab's on-screen width depends on its column anyway):
+      tabs are expanded to spaces.
+    * tabulate measures the lines of a multiline cell split at ``\r`` / ``\n``
+      but draws the lines ``str.splitlines`` yields, which also breaks at
+      ``\v``, ``\f``, ``\x85``, U+2028 and others and keeps ``\r\n`` as one
+      break — so lines went missing or out of line: every break becomes ``\n``.
+    """
+
+    def cell(text: str) -> str:
+        return "\n".join(text.splitlines()).expandtabs()
+
+    rows = [{cell(k): cell(v) if isinstance(v, str) else v for k, v in row.items()} for row in rows]
     return tabulate(rows, headers="keys", tablefmt="simple")
 
 for _stream in (sys.stdout, sys.stderr):

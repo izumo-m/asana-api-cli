@@ -49,6 +49,7 @@ CRUD coverage — SDK methods are the ground truth.
 | `goals`                       | [Goals](https://developers.asana.com/reference/goals)                                                 | Manage organizational goals and metrics    |
 | `jobs`                        | [Jobs](https://developers.asana.com/reference/jobs)                                                   | Check status of async background jobs      |
 | `memberships`                 | [Memberships](https://developers.asana.com/reference/memberships)                                     | Manage memberships across object types     |
+| `notifications`               | [Notifications](https://developers.asana.com/reference/notifications)                                 | Read and mark a user's Inbox notifications |
 | `ooo-entries`                 | [Out-of-Office Entries](https://developers.asana.com/reference/ooo-entries)                           | Manage out-of-office (OOO) entries         |
 | `organization-exports`        | [Organization Exports](https://developers.asana.com/reference/organization-exports)                   | Trigger and download org-wide exports      |
 | `portfolio-memberships`       | [Portfolio Memberships](https://developers.asana.com/reference/portfolio-memberships)                 | Read who has access to portfolios          |
@@ -61,11 +62,13 @@ CRUD coverage — SDK methods are the ground truth.
 | `projects`                    | [Projects](https://developers.asana.com/reference/projects)                                           | Manage projects, members, and followers    |
 | `rates`                       | [Rates](https://developers.asana.com/reference/rates)                                                 | Manage per-user billing rates on projects  |
 | `reactions`                   | [Reactions](https://developers.asana.com/reference/reactions)                                         | Read emoji reactions on stories            |
+| `records`                     | [Records](https://developers.asana.com/reference/records)                                             | Manage records (rows) in tables            |
 | `roles`                       | [Roles](https://developers.asana.com/reference/roles)                                                 | Manage user roles within a workspace       |
 | `rules`                       | [Rules](https://developers.asana.com/reference/rules)                                                 | Trigger Asana rule via incoming webhook    |
 | `sections`                    | [Sections](https://developers.asana.com/reference/sections)                                           | Manage project sections (board/list)       |
 | `status-updates`              | [Status Updates](https://developers.asana.com/reference/status-updates)                               | Post status updates on any object          |
 | `stories`                     | [Stories](https://developers.asana.com/reference/stories)                                             | Manage stories (comments + activity)       |
+| `tables`                      | [Tables](https://developers.asana.com/reference/tables)                                               | Manage tables and their custom field columns|
 | `tags`                        | [Tags](https://developers.asana.com/reference/tags)                                                   | Manage tags applied to tasks               |
 | `task-templates`              | [Task Templates](https://developers.asana.com/reference/task-templates)                               | Instantiate or remove task templates       |
 | `tasks`                       | [Tasks](https://developers.asana.com/reference/tasks)                                                 | Manage tasks, subtasks, and dependencies   |

@@ -1,5 +1,5 @@
 """Tests for asana_api_cli.structured_arg — the hybrid parser shared by
-``--retry-strategy`` and ``--header-params``.
+``--retry-strategy``, ``--header-params``, and ``--opts``.
 
 Covers the three input forms (JSON / @file / shorthand), the schema-driven
 validation and type coercion, and the error path for list-typed fields in

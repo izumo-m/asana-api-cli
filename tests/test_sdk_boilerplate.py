@@ -19,7 +19,7 @@ bump fails loudly and forces a conscious classification — a global flag
 (Configuration) or a common per-command ``(kwargs: ...)`` option, with the
 matching SDK-destination label (see ``docs/cli-sdk-mapping.md``).
 
-Two further guards prove the CLI's runtime *classifiers* still agree with the
+Three further guards prove the CLI's runtime *classifiers* still agree with the
 SDK source on the installed version — each derives both sides from the SDK, so
 neither needs maintenance across a bump:
 
@@ -34,10 +34,17 @@ neither needs maintenance across a bump:
   (``:return:`` type ending in ``Array`` — see ``_Operation.returns_iterator``).
   The test proves that proxy equals the true signal (a source scan for the
   iterator constructor).
+* ``test_body_in_opts_detection_matches_source`` — a few methods read their
+  request body from ``opts['body']`` instead of a ``body`` positional; the
+  runtime detects them by a cheap proxy (a docstring ``body`` param missing from
+  the signature — see ``_Operation.body_in_opts``) and exposes ``--body`` for
+  them. The test proves that proxy equals the true signal (a source scan for
+  the ``opts['body']`` read).
 
-The *which-commands* question — the exact set of upload / iterator endpoints —
+The *which-commands* question — the exact set of upload / iterator /
+body-in-opts endpoints —
 is snapshotted per-command in ``tests/fixtures/cli_surface.json`` (the
-``does_upload`` / ``returns_iterator`` fields), so an SDK bump that adds or
+``does_upload`` / ``returns_iterator`` / ``body_in_opts`` fields), so an SDK bump that adds or
 removes such an endpoint surfaces in that fixture's diff during the normal regen
 step, with no hand-maintained set to update here.
 """
@@ -226,6 +233,42 @@ def _iterator_ops_via_returns_iterator() -> set[tuple[str, str]]:
     return out
 
 
+def _methods_reading_body_from_opts() -> set[tuple[str, str]]:
+    """Methods whose ``*_with_http_info`` source reads ``opts['body']`` — the
+    ground-truth signal that the request body travels inside ``opts``. Returns
+    ``(ApiClassName, public_method_name)`` pairs.
+
+    Only the unconditional subscript counts: it is why the CLI makes ``--body``
+    required (the SDK raises ``KeyError`` without it). An SDK that switches to
+    ``opts.get('body')`` makes the body optional, so it drops out of this set and
+    fails the guard, forcing that decision to be revisited.
+    """
+    suffix = "_with_http_info"
+    out: set[tuple[str, str]] = set()
+    for cls_name, method_name, func in _with_http_info_methods():
+        tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Subscript)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "opts"
+                and isinstance(node.slice, ast.Constant)
+                and node.slice.value == "body"
+            ):
+                out.add((cls_name, method_name[: -len(suffix)]))
+    return out
+
+
+def _body_in_opts_ops() -> set[tuple[str, str]]:
+    """Methods the runtime classifies via ``_Operation.body_in_opts``."""
+    out: set[tuple[str, str]] = set()
+    for cls in _enumerate_api_classes():
+        for op in _operations_for(cls):
+            if op.body_in_opts:
+                out.add((cls.__name__, op.method_name))
+    return out
+
+
 def test_all_methods_share_expected_all_params() -> None:
     offenders: dict[str, list[str]] = {}
     count = 0
@@ -283,6 +326,20 @@ def test_iterator_detection_matches_source_construction() -> None:
         f"  proxy-only:  {sorted(via_proxy - constructed)}\n"
         f"  source-only: {sorted(constructed - via_proxy)}\n"
         "Update the returns_iterator predicate in cli.py."
+    )
+
+
+def test_body_in_opts_detection_matches_source() -> None:
+    reading = _methods_reading_body_from_opts()
+    assert reading, "no method reads opts['body'] — SDK introspection broke"
+    via_proxy = _body_in_opts_ops()
+    assert via_proxy == reading, (
+        "_Operation.body_in_opts (the 'docstring body, no body positional' proxy) "
+        "no longer matches the methods that read opts['body']:\n"
+        f"  proxy-only:  {sorted(via_proxy - reading)}\n"
+        f"  source-only: {sorted(reading - via_proxy)}\n"
+        "Update the body_in_opts predicate in cli.py so --body lands on exactly "
+        "these commands."
     )
 
 
