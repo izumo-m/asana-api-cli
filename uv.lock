@@ -23,7 +23,7 @@ wheels = [
 
 [[package]]
 name = "asana-api-cli"
-version = "3.3.2"
+version = "3.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "asana" },
@@ -95,7 +95,6 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "os_name == 'nt'" },
     { name = "importlib-metadata", version = "9.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10.2'" },
-    { name = "importlib-metadata", version = "10.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_version < '0'" },
     { name = "packaging" },
     { name = "pyproject-hooks" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
