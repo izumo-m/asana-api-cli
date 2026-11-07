@@ -21,6 +21,7 @@ Two concerns live here:
 
 from __future__ import annotations
 
+import sys
 import textwrap
 from typing import Any
 
@@ -559,6 +560,20 @@ class GroupWithGlobalOptions(_GlobalOptionsMixin, click.Group):  # pyright: igno
     """
 
     command_class = CommandWithGlobalOptions
+
+    def main(self, *args: Any, **kwargs: Any) -> Any:
+        # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
+        # stream encodings are the locale code page (e.g. cp932 on Japanese
+        # Windows): stdout/stderr raise UnicodeEncodeError when writing non-ASCII
+        # data, and stdin silently misdecodes a UTF-8 ``--body -`` payload.
+        # Reconfigure all three to UTF-8 so the same input/output works on every
+        # platform. This comes before argument parsing because the root group's
+        # ``--help`` prints from there, ahead of the group's callback. The hasattr
+        # guard keeps in-memory streams, which have no reconfigure(), from blowing up.
+        for stream in (sys.stdin, sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
+        return super().main(*args, **kwargs)
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         if ctx.parent is None:

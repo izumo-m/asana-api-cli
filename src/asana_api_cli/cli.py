@@ -1445,10 +1445,8 @@ def main() -> None:
     #
     # The global flags are parsed into the root context and written to
     # ``runtime`` by ``GroupWithGlobalOptions.invoke`` → ``_consume_global_options``
-    # before this callback runs, so there is nothing to apply here.
-    for stream in (sys.stdin, sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")  # pyright: ignore[reportAttributeAccessIssue]
+    # before this callback runs, so there is nothing to apply here. The streams
+    # are set to UTF-8 even earlier, in ``GroupWithGlobalOptions.main``.
 
 
 def _register_groups(root: click.Group) -> None:
