@@ -251,6 +251,7 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "Goals": "Manage organizational goals and metrics",
     "Jobs": "Check status of async background jobs",
     "Memberships": "Manage memberships across object types",
+    "Notifications": "Read and mark a user's Inbox notifications",
     "OooEntries": "Manage out-of-office (OOO) entries",
     "OrganizationExports": "Trigger and download org-wide exports",
     "PortfolioMemberships": "Read who has access to portfolios",
@@ -263,11 +264,13 @@ _GROUP_DESCRIPTIONS: dict[str, str] = {
     "Projects": "Manage projects, members, and followers",
     "Rates": "Manage per-user billing rates on projects",
     "Reactions": "Read emoji reactions on stories",
+    "Records": "Manage records (rows) in tables",
     "Roles": "Manage user roles within a workspace",
     "Rules": "Trigger Asana rule via incoming webhook",
     "Sections": "Manage project sections (board/list)",
     "StatusUpdates": "Post status updates on any object",
     "Stories": "Manage stories (comments + activity)",
+    "Tables": "Manage tables and their custom field columns",
     "Tags": "Manage tags applied to tasks",
     "TaskTemplates": "Instantiate or remove task templates",
     "Tasks": "Manage tasks, subtasks, and dependencies",
@@ -1435,14 +1438,6 @@ def _version_callback(ctx: click.Context, param: click.Parameter, value: bool) -
 )
 def main() -> None:
     """Asana API CLI — runtime-introspected wrapper around the python-asana SDK."""
-    # JSON I/O is required to be UTF-8 by RFC 8259, but on Windows the default
-    # stream encodings are the locale code page (e.g. cp932 on Japanese
-    # Windows): stdout/stderr raise UnicodeEncodeError when writing non-ASCII
-    # data, and stdin silently misdecodes a UTF-8 ``--body -`` payload.
-    # Reconfigure all three to UTF-8 so the same input/output works on every
-    # platform. The hasattr guard keeps CliRunner's in-memory streams (used
-    # by tests) from blowing up, since StringIO has no reconfigure().
-    #
     # The global flags are parsed into the root context and written to
     # ``runtime`` by ``GroupWithGlobalOptions.invoke`` → ``_consume_global_options``
     # before this callback runs, so there is nothing to apply here. The streams

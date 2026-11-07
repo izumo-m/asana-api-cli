@@ -115,14 +115,13 @@ class TestGroupShortHelp:
 
     def test_every_currently_loaded_sdk_group_renders_non_empty_help(self) -> None:
         # Doesn't fail when a new SDK group is missing from the dict (that
-        # path goes through the humanize fallback by design) — just checks
-        # the fallback also produces something readable.
+        # path goes through the humanize fallback by design, and the fallback
+        # for a one-word class is the class name itself) — just checks there
+        # is some help text.
         for cls in _enumerate_api_classes():
             short_name = cls.__name__[:-3]  # strip "Api"
             help_text = _group_short_help(short_name)
-            assert help_text and help_text != short_name, (
-                f"{short_name} produces empty or unchanged help: {help_text!r}"
-            )
+            assert help_text, f"{short_name} produces empty help: {help_text!r}"
 
     def test_group_descriptions_match_docs(self) -> None:
         """``docs/api-groups.md`` is the authoritative source for these

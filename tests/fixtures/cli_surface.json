@@ -1506,6 +1506,82 @@
       "group": "memberships"
     },
     {
+      "class_name": "NotificationsApi",
+      "commands": [
+        {
+          "body_in_opts": false,
+          "command": "get-notifications-for-user",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_notifications_for_user",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "user_gid",
+            "workspace"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "body_in_opts": false,
+          "command": "mark-notifications-read-for-user",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "mark_notifications_read_for_user",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "user_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "mark-notifications-unread-for-user",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "mark_notifications_unread_for_user",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "user_gid"
+          ],
+          "returns_iterator": false
+        }
+      ],
+      "group": "notifications"
+    },
+    {
       "class_name": "OooEntriesApi",
       "commands": [
         {
@@ -2917,7 +2993,7 @@
           "does_upload": false,
           "has_opts": true,
           "method": "search_projects_for_workspace",
-          "paginatable": false,
+          "paginatable": true,
           "params": [
             {
               "name": "completed",
@@ -2997,6 +3073,11 @@
             {
               "name": "due_on.before",
               "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
               "required": false
             },
             {
@@ -3232,6 +3313,216 @@
         }
       ],
       "group": "reactions"
+    },
+    {
+      "class_name": "RecordsApi",
+      "commands": [
+        {
+          "body_in_opts": false,
+          "command": "create-record",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "create_record",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "delete-record",
+          "does_upload": false,
+          "has_opts": false,
+          "method": "delete_record",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "record_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "get-record",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_record",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "record_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "get-records-for-table",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_records_for_table",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "modified_since",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "sort_by",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "table_gid"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "body_in_opts": false,
+          "command": "search-records-for-workspace",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "search_records_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "created_at.after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "created_at.before",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "created_on",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_on.after",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "created_on.before",
+              "py_type": "date",
+              "required": false
+            },
+            {
+              "name": "followers.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "followers.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "sort_ascending",
+              "py_type": "bool",
+              "required": false
+            },
+            {
+              "name": "sort_by",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "tables.all",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "tables.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "tables.not",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "teams.any",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "text",
+              "py_type": "str",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "body_in_opts": false,
+          "command": "update-record",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "update_record",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "record_gid"
+          ],
+          "returns_iterator": false
+        }
+      ],
+      "group": "records"
     },
     {
       "class_name": "RolesApi",
@@ -3611,6 +3902,26 @@
         },
         {
           "body_in_opts": false,
+          "command": "create-story-for-record",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "create_story_for_record",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "record_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
           "command": "create-story-for-task",
           "does_upload": false,
           "has_opts": true,
@@ -3683,6 +3994,50 @@
           ],
           "positional": [
             "goal_gid"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "body_in_opts": false,
+          "command": "get-stories-for-record",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_stories_for_record",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "created_after",
+              "py_type": "datetime",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            },
+            {
+              "name": "resource_subtype",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "sort_ascending",
+              "py_type": "bool",
+              "required": false
+            }
+          ],
+          "positional": [
+            "record_gid"
           ],
           "returns_iterator": true
         },
@@ -3771,6 +4126,204 @@
         }
       ],
       "group": "stories"
+    },
+    {
+      "class_name": "TablesApi",
+      "commands": [
+        {
+          "body_in_opts": false,
+          "command": "add-custom-field-setting-for-table",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "add_custom_field_setting_for_table",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "table_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "create-table",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "create_table",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "delete-table",
+          "does_upload": false,
+          "has_opts": false,
+          "method": "delete_table",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "table_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "get-custom-field-settings-for-table",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_custom_field_settings_for_table",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "table_gid"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "body_in_opts": false,
+          "command": "get-custom-field-settings-for-table-legacy",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_custom_field_settings_for_table_legacy",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "table_gid"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "body_in_opts": false,
+          "command": "get-table",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_table",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "table_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "get-tables-for-workspace",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "get_tables_for_workspace",
+          "paginatable": true,
+          "params": [
+            {
+              "name": "limit",
+              "py_type": "int",
+              "required": false
+            },
+            {
+              "name": "offset",
+              "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "workspace_gid"
+          ],
+          "returns_iterator": true
+        },
+        {
+          "body_in_opts": false,
+          "command": "remove-custom-field-setting-for-table",
+          "does_upload": false,
+          "has_opts": false,
+          "method": "remove_custom_field_setting_for_table",
+          "paginatable": false,
+          "params": [],
+          "positional": [
+            "body",
+            "table_gid"
+          ],
+          "returns_iterator": false
+        },
+        {
+          "body_in_opts": false,
+          "command": "update-table",
+          "does_upload": false,
+          "has_opts": true,
+          "method": "update_table",
+          "paginatable": false,
+          "params": [
+            {
+              "name": "opt_fields",
+              "py_type": "list[str]",
+              "required": false
+            }
+          ],
+          "positional": [
+            "body",
+            "table_gid"
+          ],
+          "returns_iterator": false
+        }
+      ],
+      "group": "tables"
     },
     {
       "class_name": "TagsApi",
@@ -4613,7 +5166,7 @@
           "does_upload": false,
           "has_opts": true,
           "method": "search_tasks_for_workspace",
-          "paginatable": false,
+          "paginatable": true,
           "params": [
             {
               "name": "assigned_by.any",
@@ -4763,6 +5316,11 @@
             {
               "name": "liked_by.not",
               "py_type": "str",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "py_type": "int",
               "required": false
             },
             {
@@ -5475,6 +6033,11 @@
           "method": "get_time_tracking_entries",
           "paginatable": true,
           "params": [
+            {
+              "name": "assignee",
+              "py_type": "str",
+              "required": false
+            },
             {
               "name": "attributable_to",
               "py_type": "str",

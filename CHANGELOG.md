@@ -20,18 +20,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drops that condition silently. See
   [docs/usage.md](docs/usage.md#filters-without-their-own-option).
 
+### Changed
+
+- **`asana-api --help` describes the `notifications`, `records`, and `tables`
+  groups** in its own words. The groups themselves come from the SDK and appear
+  on any asana-api-cli version once `python-asana >= 5.5.1` is installed.
+
 ### Fixed
 
+- **`asana-api --help` no longer fails when its output is redirected on Japanese
+  Windows.** With `asana-api --help > help.txt` or a pipe, it stopped with
+  `UnicodeEncodeError` (exit `1`) under a code page such as cp932. It now prints
+  UTF-8, like every other command.
 - **The search commands now accept their dotted filters.**
   `tasks search-tasks-for-workspace` and `projects search-projects-for-workspace`
   were missing their dotted filters, so e.g. `--followers.any me` failed with
   `No such option`. They are now available, with the dot kept:
   `--followers.any`, `--tags.all`, `--created-by.not`, `--due-on.before`,
   `--modified-at.after`, and so on — see each command's `--help`
-- **`asana-api --help` no longer fails when its output is redirected on Japanese
-  Windows.** With `asana-api --help > help.txt` or a pipe, it stopped with
-  `UnicodeEncodeError` (exit `1`) under a code page such as cp932. It now prints
-  UTF-8, like every other command.
   ([#1](https://github.com/izumo-m/asana-api-cli/issues/1)). Custom field
   filters (`custom_fields.<gid>.value` and the like) go through the new
   `--opts`.

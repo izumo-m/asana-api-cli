@@ -110,7 +110,7 @@ Procedure:
    tags (set `old` / `new` to the versions, without the `v`):
 
    ```bash
-   old=5.3.0 new=5.4.0
+   old=5.4.0 new=5.5.1
    for f in rest api_client configuration api/attachments_api; do
      diff -u --label "v$old/asana/$f.py" --label "v$new/asana/$f.py" \
        <(curl -fsSL "https://raw.githubusercontent.com/Asana/python-asana/v$old/asana/$f.py") \
