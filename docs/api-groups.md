@@ -81,7 +81,7 @@ CRUD coverage — SDK methods are the ground truth.
 | `typeahead`                   | [Typeahead](https://developers.asana.com/reference/typeahead)                                         | Type-ahead lookup of workspace resources   |
 | `user-task-lists`             | [User Task Lists](https://developers.asana.com/reference/user-task-lists)                             | Read a user's My Tasks list                |
 | `users`                       | [Users](https://developers.asana.com/reference/users)                                                 | Read/update users (`me` = authenticated)   |
-| `webhooks`                    | [Webhooks](https://developers.asana.com/reference/webhooks)                                           | Manage webhook subscriptions (real-time)   |
+| `webhooks`                    | [Webhooks](https://developers.asana.com/reference/webhooks) ([usage](api-webhooks.md))                | Manage webhook subscriptions (real-time)   |
 | `workspace-memberships`       | [Workspace Memberships](https://developers.asana.com/reference/workspace-memberships)                 | Read workspace members (admin/guest flags) |
 | `workspaces`                  | [Workspaces](https://developers.asana.com/reference/workspaces)                                       | Update workspace and manage its users      |
 
