@@ -1,0 +1,57 @@
+name: Watch python-asana releases
+
+# Opens an issue when the latest `asana` release on PyPI has not been
+# announced yet. The issue only announces the release; assessing and bumping
+# the SDK stays a manual step (docs/development.md, "Bumping the asana SDK").
+#
+# The `sdk-release` issues are the only state: a release counts as announced
+# once an issue titled "python-asana X.Y.Z released" exists, open or closed.
+
+on:
+  schedule:
+    - cron: "23 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+# Two overlapping runs would both miss each other's issue and open it twice.
+concurrency:
+  group: sdk-release-watch
+
+jobs:
+  check:
+    if: github.repository == 'izumo-m/asana-api-cli'
+    name: Check PyPI for a new asana release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open an issue for a new release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ASSIGNEE: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          latest=$(curl -fsS --retry 3 https://pypi.org/pypi/asana/json | jq -r '.info.version')
+          if [[ ! $latest =~ ^[0-9][0-9A-Za-z.+!-]*$ ]]; then
+            echo "::error::unexpected version from PyPI: $latest"
+            exit 1
+          fi
+          echo "latest on PyPI: $latest"
+
+          title="python-asana $latest released"
+          titles=$(gh issue list --state all --label sdk-release --limit 1000 \
+            --json title --jq '.[].title')
+          if grep -Fxq -- "$title" <<< "$titles"; then
+            echo "Already announced."
+            exit 0
+          fi
+
+          gh label create sdk-release --force --color 0e8a16 \
+            --description "A new python-asana release is available"
+          gh issue create --title "$title" --label sdk-release \
+            --assignee "$ASSIGNEE" --body "\`asana\` $latest is available on PyPI.
+
+          - PyPI: https://pypi.org/project/asana/$latest/
+          - Upstream releases: https://github.com/Asana/python-asana/releases"

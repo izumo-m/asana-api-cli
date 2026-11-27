@@ -46,6 +46,15 @@ The CLI surface snapshot test (see
 group/command/option churn introduced by an SDK bump. The `dependencies` lower
 bound in `pyproject.toml` is kept wide (`asana>=5.0.2,<6`) — the CLI adapts to
 whatever SDK is installed — so a bump tracks the *snapshot*, not the floor.
+
+A scheduled workflow (`.github/workflows/sdk-release-watch.yml`) checks PyPI
+daily and opens an issue labelled `sdk-release` when the latest `asana`
+release there has no such issue yet. The issue only announces the release —
+one per version, never reopened — and the bump itself is the manual procedure
+below. Those issues are the workflow's only record of what it has announced:
+closing one is fine, but deleting it, changing its title or removing its
+label makes the workflow announce that release again.
+
 Procedure:
 
 1. `uv sync --upgrade-package asana` to relock and install the new SDK
