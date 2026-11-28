@@ -21,7 +21,11 @@ Release steps run from a developer machine; PyPI publication is automated via ta
    - `CHANGELOG.md`: rename the `[Unreleased]` heading to `[X.Y.Z] - YYYY-MM-DD`, then update the link section at the bottom — add a new `[X.Y.Z]: .../compare/v<prev>...vX.Y.Z` line and repoint `[Unreleased]` to `.../compare/vX.Y.Z...HEAD`.
 3. Merge to `main` with `git merge --no-ff <branch>`, so the merge commit is preserved as a clear release boundary.
 4. Tag the **merge commit on `main`** with `git tag vX.Y.Z`.
-5. Push everything in one go: `git push origin main <branch> vX.Y.Z`.
+5. Push `main` on its own, then the rest: `git push origin main`, then
+   `git push origin <branch> vX.Y.Z`. GitHub has been seen not to start its
+   dependency graph job for a push that updates `main` together with other
+   refs; the graph, and the Dependabot alerts drawn from it, then keep
+   describing an older `uv.lock`.
 
 The tag push triggers `.github/workflows/publish.yml`, which builds and uploads to PyPI.
 
@@ -33,5 +37,6 @@ that changes nothing users install, to put the verified state on the default
 branch. Merge with `git merge --no-ff <branch>` and a message that says so
 (e.g. `Merge branch 'develop': verified with python-asana X.Y.Z (no release)`),
 leave the `pyproject.toml` version as is, and do not tag the merge: releases
-are the tagged merge commits. Push with `git push origin main <branch>`;
-without a tag, `publish.yml` does not run.
+are the tagged merge commits. Push `main` on its own first, as in step 5:
+`git push origin main`, then `git push origin <branch>`; without a tag,
+`publish.yml` does not run.
